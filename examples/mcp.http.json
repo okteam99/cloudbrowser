@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "docker-browser": {
+    "cloudbrowser": {
       "type": "http",
       "url": "https://browser.example.com/mcp",
       "headers": { "Authorization": "Bearer COPY_FROM_AUTHENTICATED_WEB_PAGE" }

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="200" viewBox="0 0 1080 200" role="img" aria-labelledby="title desc">
+  <title id="title">cloudbrowser 三步使用流程</title>
+  <desc id="desc">部署服务，访问 HTTP 控制台，复制 Agent 使用 Prompt。</desc>
+  <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0 8 4 0 8" fill="none" stroke="#6b90d2" stroke-width="1.5"/></marker></defs>
+  <g font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans CJK SC','Microsoft YaHei',sans-serif">
+    <g fill="#f3f7ff" stroke="#d7e4fa"><rect x="1" y="20" width="318" height="160" rx="18"/><rect x="381" y="20" width="318" height="160" rx="18"/><rect x="761" y="20" width="318" height="160" rx="18"/></g>
+    <g stroke="#6b90d2" stroke-width="2" marker-end="url(#arrow)"><path d="M334 100h30"/><path d="M714 100h30"/></g>
+    <g fill="#2463eb"><circle cx="40" cy="59" r="18"/><circle cx="420" cy="59" r="18"/><circle cx="800" cy="59" r="18"/></g>
+    <g fill="white" font-size="18" font-weight="700" text-anchor="middle"><text x="40" y="65">1</text><text x="420" y="65">2</text><text x="800" y="65">3</text></g>
+    <g fill="#15315e" font-size="23" font-weight="700"><text x="70" y="67">部署</text><text x="450" y="67">访问 HTTP 控制台</text><text x="830" y="67" font-size="20">复制 Agent 使用 Prompt</text></g>
+    <g fill="#576b8a" font-size="16"><text x="24" y="112">运行 Docker，设置访问密码</text><text x="24" y="143">自动获得 HTTPS 地址或使用自有地址</text><text x="404" y="112">打开服务地址，输入访问密码</text><text x="404" y="143">查看接入信息、直播与录屏</text><text x="784" y="112">粘贴给 Agent，连接云浏览器</text><text x="784" y="143">开始操作，全程可见、随时回放</text></g>
+  </g>
+</svg>

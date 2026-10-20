@@ -1,8 +1,12 @@
-# DockerBrowserMcp
+# cloudbrowser
 
 **让 AI 操作浏览器，实时直播、全程录屏，操作过程看得见。** 通过 MCP 将远程浏览器接入 AI Agent；打开控制台、输入访问密码，即可复制接入信息。
 
 实例创建时可指定 UA、页面视口、HTTP/SOCKS5 鉴权代理、语言与时区；支持点击、输入、iframe、多标签页、上传下载、截图及诊断。
+
+## 使用流程
+
+![三步开始使用：部署 → 访问 HTTP 控制台 → 复制 Agent 使用 Prompt](docs/assets/getting-started.svg)
 
 ## 快速部署
 
@@ -12,18 +16,18 @@
 
 ```sh
 docker run -d --init \
-  --name docker-browser-mcp \
+  --name cloudbrowser \
   --restart unless-stopped \
   --shm-size=1g \
   -e WEB_PASSWORD='替换为你的强密码' \
   -v browser-mcp-data:/data \
-  bdpgogoup/dockerbrowsermcp:20261020225338
+  bdpgogoup/cloudbrowser:20261020233007
 ```
 
 查看自动生成的 HTTPS 地址：
 
 ```sh
-docker logs docker-browser-mcp
+docker logs cloudbrowser
 ```
 
 日志中的 `Public HTTPS URL` 就是控制台地址。打开后输入密码，复制 MCP 接入信息。MCP 地址、直播及录屏分享地址全部自动使用该 HTTPS 地址。
@@ -38,13 +42,13 @@ docker logs docker-browser-mcp
 
 ```sh
 docker run -d --init \
-  --name docker-browser-mcp \
+  --name cloudbrowser \
   --restart unless-stopped \
   --shm-size=1g \
   -e WEB_PASSWORD='替换为你的强密码' \
   -e CF_TUNNEL_TOKEN='替换为隧道的连接器Token' \
   -v browser-mcp-data:/data \
-  bdpgogoup/dockerbrowsermcp:20261020225338
+  bdpgogoup/cloudbrowser:20261020233007
 ```
 
 服务自动读取隧道配置，识别唯一指向本容器端口的域名，无需再填 `BASE_URL`。如果配置了多个符合条件的域名、通配符或路径规则，请增加 `-e BASE_URL=https://browser.example.com` 明确选择地址。只支持 Cloudflare 远程管理的命名隧道，不会代替用户购买域名或创建 DNS。
@@ -57,14 +61,14 @@ Token 通过子进程环境传递，不出现在命令行参数、网页、MCP �
 
 ```sh
 docker run -d --init \
-  --name docker-browser-mcp \
+  --name cloudbrowser \
   --restart unless-stopped \
   --shm-size=1g \
   -p 8080:8080 \
   -e BASE_URL=http://localhost:8080 \
   -e WEB_PASSWORD='替换为你的强密码' \
   -v browser-mcp-data:/data \
-  bdpgogoup/dockerbrowsermcp:20261020225338
+  bdpgogoup/cloudbrowser:20261020233007
 ```
 
 部署到远程服务器时，将 `BASE_URL` 改为实际可访问地址；部署方负责 DNS、反向代理、HTTPS 或端口映射接通容器8080。`BASE_URL` 可带路径前缀。
@@ -87,7 +91,7 @@ MCP（Streamable HTTP）：https://browser.example.com/mcp
 
 公开文档仅提供通用说明；真实 Token 仍通过登录后的复制操作获取。复制内容包含服务访问凭据，请只交给可信使用方。
 
-控制台使用 React + Ant Design，包含工作台、实时实例、历史录屏、MCP 接入和文档中心，并适配手机屏幕。所有前端资源随镜像打包，不依赖外部 CDN。
+控制台使用 React + Ant Design，包含工作台、实时实例、历史录屏、代理管理、MCP 接入和文档中心，并适配手机屏幕。所有前端资源随镜像打包，不依赖外部 CDN。
 
 不需要 SSH 配置或 Chrome 插件。原 stdio / SSH 接入方式仍保留。
 
@@ -105,7 +109,7 @@ MCP（Streamable HTTP）：https://browser.example.com/mcp
 ```json
 {
   "mcpServers": {
-    "docker-browser": {
+    "cloudbrowser": {
       "type": "http",
       "url": "https://browser.example.com/mcp",
       "headers": { "Authorization": "Bearer <网页自动生成>" }
@@ -223,7 +227,7 @@ Agent 可通过 MCP 创建无需登录的只读观看链接；链接使用 `BASE
 | `MAX_LOG_BYTES` | 16777216 | 诊断事件轮转总大小，不含最多1000份实例快照 |
 | `LOG_RETENTION_HOURS` | 168 | 诊断事件和结束实例状态的最长保留时间 |
 | `ARTIFACT_RETENTION_HOURS` | 168 | 产物及历史录像保留时间 |
-| `PROXY_CONFIG` | /config/proxies.json | 预配置代理文件 |
+| `PROXY_CONFIG` | /config/proxies.json | 首次启动时导入的代理文件 |
 | `DATA_DIR` | /data（Docker） | 数据存储位置 |
 | `ALLOWED_HOSTS` | 空 | 可选目标白名单，逗号分隔，支持 *.example.com |
 | `ALLOW_PRIVATE_NETWORKS` | false | 显式允许内网测试，会扩大访问范围 |
@@ -233,15 +237,35 @@ Web 模式始终要求 WEB_PASSWORD。自动隧道失败时会退出，不会回
 
 对于路径前缀，反向代理可保留或剥离该前缀，页面链接均使用配置的外部前缀。反向代理需保留客户端 Origin，且 MJPEG 直播路由禁用缓冲（Nginx 可设 `proxy_buffering off`），MCP 路由需允许 POST 并配置足够超时。
 
-## 使用预配置代理（可选）
+## 代理管理与 HTTP 请求
 
-复制 `config/proxies.example.json` 为自己的配置文件；真实文件已被 .gitignore 排除。启动时添加只读挂载：
+登录控制台，打开 **代理管理**，点击 **添加代理**。填写服务器 IP / 域名、端口，选择国家 / 地区，填写用户名和密码；默认 SOCKS5，也支持 HTTP / HTTPS。名称可不填。支持编辑、启停、删除和复制代理 ID；密码按明文显示。
+
+配置保存在 `/data/proxies.json`，使用数据卷即可在重建容器后保留。国家是手动标记，不代表系统已验证出口地理位置；“启用”表示允许被选用，不保证当前连通。修改、停用或删除代理只影响新的浏览器和 HTTP 请求，已运行实例保留原有配置。
+
+Agent 调用 `list_proxies` 查询列表，可传 `country: "US"`、`protocol: "socks5"`；默认仅返回启用项。返回 ID、名称、地址、国家和鉴权标记，不返回用户名或密码。然后按 ID 创建实例：
+
+```json
+{"proxy_id":"proxy_由平台生成的ID","viewport":{"width":390,"height":844}}
+```
+
+也可以直接调用 **`proxy_curl`**，通过同一个代理发送 HTTP 请求，无需启动浏览器：
+
+```json
+{"proxy_id":"proxy_由平台生成的ID","url":"https://api.ipify.org?format=json"}
+```
+
+可指定 `method`、`headers`、UTF-8 `body`、`follow_redirects`、`timeout_ms`、`max_bytes` 和 `response_encoding`（text / base64）。返回状态码、响应头、响应体、最终 URL 和耗时。默认 GET、15 秒、64 KiB、不跟随跳转；最长60秒、最大响应1 MiB、最多5次跳转，请求体最多64 KiB。HTTP 4xx/5xx 原样返回状态码；网络失败和超限返回工具错误。不会执行 Shell、自动重试或在代理失败后直连。请求可能已到达目标，写请求超时后应确认状态再重试。
+
+目标遵循 `ALLOWED_HOSTS` 和内网访问限制，跳转目标也经过代理网关检查。HTTP 请求并发上限与 `MAX_INSTANCES` 相同，但不占浏览器实例名额。响应可能包含目标站点的敏感信息，按需要使用并保存；诊断日志不记录请求头、请求体和响应体。
+
+原内联 `proxy` 参数和 `proxy_ref` 仍兼容，与 `proxy_id` 三选一。可选挂载旧配置：
 
 ```sh
 --mount type=bind,src=/srv/browser-mcp/proxies.json,dst=/config/proxies.json,readonly
 ```
 
-Agent 用 `list_proxies` 获取名称，再传 `proxy_ref` 创建实例。`proxy` 和 `proxy_ref` 互斥。文件需可被容器非 root 用户读取；修改配置后新实例生效，已有实例不变。
+仅当数据卷尚无代理配置时，首次启动会导入 `PROXY_CONFIG`（格式见 `config/proxies.example.json`），保留原引用作为代理 ID；之后以控制台中的配置为准，无需修改挂载文件。配置文件需要可被容器非 root 用户读取。
 
 ## 上传下载、诊断与操作状态
 
@@ -290,15 +314,15 @@ Agent 用 `list_proxies` 获取名称，再传 `proxy_ref` 创建实例。`proxy
 服务或容器整个不可用时，MCP也无法响应。请先在服务器上保留以下输出，再恢复服务：
 
 ```sh
-docker logs --since 30m --tail 200 docker-browser-mcp
-docker inspect --format 'oom={{.State.OOMKilled}} exit={{.State.ExitCode}} restarts={{.RestartCount}} error={{.State.Error}}' docker-browser-mcp
+docker logs --since 30m --tail 200 cloudbrowser
+docker inspect --format 'oom={{.State.OOMKilled}} exit={{.State.ExitCode}} restarts={{.RestartCount}} error={{.State.Error}}' cloudbrowser
 ```
 
 不要用完整 `docker inspect` 输出替代上述摘要，完整输出可能包含部署环境中的密码和Token。
 
 ## 发布镜像
 
-发布目标固定为 **Docker Hub `bdpgogoup/dockerbrowsermcp`**。标签为 `YYYYMMDDHHMMSS`，默认上海时区。脚本默认构建并推送 amd64 / arm64 两个平台，不发布 latest 别名。
+发布目标固定为 **Docker Hub `bdpgogoup/cloudbrowser`**。标签为 `YYYYMMDDHHMMSS`，默认上海时区。脚本默认构建并推送 amd64 / arm64 两个平台，不发布 latest 别名。
 
 ```sh
 # 先预览，不构建、不登录、不推送
@@ -313,10 +337,10 @@ bash scripts/publish-docker.sh
 ## 源码构建及 stdio 接入
 
 ```sh
-docker build -t docker-browser-mcp:0.6.0 .
+docker build -t cloudbrowser:0.7.0 .
 ```
 
-将一行部署命令最后的镜像名换成 `docker-browser-mcp:0.6.0` 即可本地使用。
+将一行部署命令最后的镜像名换成 `cloudbrowser:0.7.0` 即可本地使用。
 
 兼容配置见 [本地 stdio](examples/mcp.local.json)、[SSH stdio](examples/mcp.ssh.json)。仍使用 `docker exec -i`，不得使用 `-t`。MCP_PRINCIPAL 是可信 SSH/Docker 接入中的命名空间，不是独立认证。
 

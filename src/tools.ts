@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { createSchema, proxySchema } from './config.js';
+import { proxyCurlSchema } from './proxy-http.js';
 const id = z.string().min(1).max(100);
 const target = z
   .object({
@@ -118,9 +119,23 @@ export const definitions: Record<
   },
   list_proxies: {
     description:
-      'List server-configured proxy names and countries. Credentials are never returned.',
-    schema: z.object({}),
+      'List platform proxies with proxy_id, name, declared country, protocol, server, enabled status and authentication flag; no credentials. Enabled proxies are configured candidates, not guaranteed live or geolocated. Defaults to enabled only. Use proxy_id in create_instance, check_proxy or proxy_curl.',
+    schema: z
+      .object({
+        country: z
+          .string()
+          .regex(/^[A-Z]{2}$/)
+          .optional(),
+        protocol: z.enum(['socks5', 'http', 'https']).optional(),
+        enabled_only: z.boolean().default(true),
+      })
+      .strict(),
     readOnly: true,
+  },
+  proxy_curl: {
+    description:
+      'Send one HTTP(S) request through a saved enabled proxy_id using curl, without a browser or shell. Supports methods, headers, UTF-8 body, bounded response and optional redirects. Returns HTTP status, response headers/body and elapsed time, including 4xx/5xx. No direct fallback; private destinations remain blocked unless enabled by the operator. No automatic retry; writes may succeed even when a timeout is returned. Output can contain destination secrets: handle appropriately.',
+    schema: proxyCurlSchema,
   },
   check_proxy: {
     description:
@@ -128,17 +143,18 @@ export const definitions: Record<
     schema: z
       .object({
         proxy: proxySchema.optional(),
+        proxy_id: z.string().min(1).max(128).optional(),
         proxy_ref: id.optional(),
         check_url: z.string().url().optional(),
       })
       .refine(
-        (v) => Boolean(v.proxy) !== Boolean(v.proxy_ref),
-        'Specify exactly one proxy or proxy_ref',
+        (v) => [v.proxy, v.proxy_id, v.proxy_ref].filter((x) => x !== undefined).length === 1,
+        'Specify exactly one proxy, proxy_id or proxy_ref',
       ),
   },
   create_instance: {
     description:
-      'Create an isolated Chromium instance with fixed UA, viewport and optional authenticated HTTP/SOCKS5 proxy. No direct fallback. No proxy means explicit direct mode.',
+      'Create an isolated Chromium instance with fixed UA, viewport and optional authenticated HTTP/SOCKS5 proxy. Use proxy_id from list_proxies, inline proxy, or legacy proxy_ref (mutually exclusive). No direct fallback. No proxy means explicit direct mode.',
     schema: createSchema,
   },
   list_instances: {

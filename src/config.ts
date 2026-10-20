@@ -34,6 +34,7 @@ export const createSchema = z
       })
       .default({ width: 1280, height: 720 }),
     proxy: proxySchema.optional(),
+    proxy_id: z.string().min(1).max(128).optional(),
     proxy_ref: z.string().max(128).optional(),
     mobile: z
       .object({
@@ -48,7 +49,10 @@ export const createSchema = z
     max_lifetime_seconds: z.number().int().min(60).max(14400).default(3600),
   })
   .strict()
-  .refine((v) => !(v.proxy && v.proxy_ref), 'proxy and proxy_ref are mutually exclusive');
+  .refine(
+    (v) => [v.proxy, v.proxy_id, v.proxy_ref].filter((x) => x !== undefined).length <= 1,
+    'Specify at most one proxy, proxy_id or proxy_ref',
+  );
 export type Proxy = z.infer<typeof proxySchema>;
 export type InstanceOptions = z.infer<typeof createSchema>;
 const integer = (name: string, fallback: number, min: number, max: number) => {

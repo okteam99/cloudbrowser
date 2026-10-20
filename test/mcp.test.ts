@@ -50,11 +50,24 @@ test('MCP stdio discovery, operation lookup, artifact transfer, reconnect and pr
     assert.ok(ready, logs);
     a = await connect('alice');
     const tools = await a.listTools();
-    assert.equal(tools.tools.length, 30);
+    assert.equal(tools.tools.length, 31);
+    for (const [name, required] of [
+      ['create_instance', ['proxy_id', 'user_agent', 'viewport']],
+      ['proxy_curl', ['proxy_id', 'url', 'headers', 'body', 'timeout_ms']],
+      ['check_proxy', ['proxy_id', 'proxy', 'check_url']],
+    ] as const) {
+      const schema = tools.tools.find((t) => t.name === name)!.inputSchema;
+      for (const key of required)
+        assert.ok(schema.properties?.[key], `${name} must advertise ${key}`);
+    }
     const call = async (c: Client, name: string, args: any = {}) => {
       const r: any = await c.callTool({ name, arguments: args });
       return JSON.parse(r.content[0].text);
     };
+    assert.equal(
+      (await call(a, 'create_instance', { proxy_id: 'x', proxy_ref: 'y' })).error.code,
+      'INVALID_ARGUMENT',
+    );
     const created = await call(a, 'create_instance', { viewport: { width: 390, height: 844 } });
     assert.equal(created.status, 'succeeded');
     const i = created.data.instance_id;

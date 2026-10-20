@@ -11,6 +11,8 @@ import { definitions } from './tools.js';
 import { dashboard, loginPage, sharePage } from './web-ui.js';
 import { publicError } from './errors.js';
 import { frameMedia, liveMedia, videoMedia } from './media.js';
+import { ZodError } from 'zod';
+import { ToolError } from './errors.js';
 
 async function body(req: IncomingMessage, limit = 1048576) {
   const chunks: Buffer[] = [];
@@ -99,6 +101,7 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         const files: Record<string, string> = {
           '/assets/app.js': 'application/javascript; charset=utf-8',
           '/assets/app.css': 'text/css; charset=utf-8',
+          '/assets/getting-started.svg': 'image/svg+xml',
         };
         const mime = Object.hasOwn(files, path) ? files[path] : undefined;
         if (!mime) {
@@ -118,12 +121,12 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         return;
       }
       if (path === '/healthz') {
-        json(res, { status: 'ok', version: '0.6.0' });
+        json(res, { status: 'ok', version: '0.7.0' });
         return;
       }
       if (path === '/mcp') {
         if (!bearer) {
-          res.setHeader('www-authenticate', 'Bearer realm="DockerBrowserMcp"');
+          res.setHeader('www-authenticate', 'Bearer realm="cloudbrowser"');
           json(res, { error: 'Bearer token required' }, 401);
           return;
         }
@@ -242,6 +245,43 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         json(res, { error: 'Authentication required' }, 401);
         return;
       }
+      const proxyRoute = /^\/api\/proxies(?:\/([^/]+))?$/.exec(path);
+      if (proxyRoute) {
+        if (req.method === 'GET' && !proxyRoute[1]) {
+          json(res, manager.proxies.list());
+          return;
+        }
+        if (!['POST', 'PUT', 'DELETE'].includes(req.method ?? '')) {
+          json(res, { error: 'Method not allowed' }, 405);
+          return;
+        }
+        if (!bearer && (!session || req.headers['x-csrf-token'] !== session)) {
+          json(res, { error: 'Invalid session' }, 403);
+          return;
+        }
+        const id = proxyRoute[1] ? decodeURIComponent(proxyRoute[1]) : undefined;
+        if ((req.method === 'POST' && id) || (req.method !== 'POST' && !id)) {
+          json(res, { error: 'Invalid proxy route' }, 400);
+          return;
+        }
+        try {
+          if (req.method === 'DELETE') json(res, await manager.proxies.remove(id!));
+          else {
+            const input = JSON.parse(await body(req, 16384));
+            const saved = await manager.proxies.save(input, id);
+            manager.logs.registerSecret(saved.username, false);
+            manager.logs.registerSecret(saved.password, false);
+            json(res, saved, req.method === 'POST' ? 201 : 200);
+          }
+        } catch (e) {
+          if (e instanceof ZodError || e instanceof SyntaxError)
+            json(res, { error: 'Invalid proxy fields' }, 400);
+          else if (e instanceof ToolError)
+            json(res, { error: e.message }, e.code === 'PROXY_NOT_FOUND' ? 404 : 409);
+          else throw e;
+        }
+        return;
+      }
       if (path === '/logout' && req.method === 'POST') {
         const form = new URLSearchParams(await body(req, 8192));
         if (!session || form.get('csrf') !== session) {
@@ -262,7 +302,7 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         const mcpUrl = `${baseUrl}/mcp`;
         const mcp_config = {
           mcpServers: {
-            'docker-browser': {
+            cloudbrowser: {
               type: 'http',
               url: mcpUrl,
               headers: { Authorization: `Bearer ${auth.token}` },

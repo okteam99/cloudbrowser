@@ -1,4 +1,4 @@
-# DockerBrowserMcp Agent 接入指南
+# cloudbrowser Agent 接入指南
 
 本文档公开可读，只包含通用接口与操作流程。实际 MCP 地址和认证信息由用户单独提供。
 
@@ -14,7 +14,7 @@
 ```json
 {
   "mcpServers": {
-    "docker-browser": {
+    "cloudbrowser": {
       "type": "http",
       "url": "https://browser.example.com/mcp",
       "headers": {

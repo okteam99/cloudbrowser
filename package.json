@@ -1,6 +1,6 @@
 {
-  "name": "docker-browser-mcp",
-  "version": "0.6.0",
+  "name": "cloudbrowser",
+  "version": "0.7.0",
   "private": true,
   "type": "module",
   "engines": {

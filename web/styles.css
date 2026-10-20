@@ -1302,3 +1302,15 @@ input {
     margin: 18px 0;
   }
 }
+
+.proxy-id {
+  font:
+    11px ui-monospace,
+    monospace;
+  overflow-wrap: anywhere;
+}
+.proxy-secret {
+  font-family: ui-monospace, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

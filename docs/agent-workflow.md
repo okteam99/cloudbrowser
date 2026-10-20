@@ -4,7 +4,7 @@
 
 1. 从用户目标确定 URL、设备、代理和允许的写入操作。只使用用户授权的账号、文件与站点。
 2. `list_proxies` 选择代理；不把国家标签当作已验证的出口。
-3. `create_instance` 指定 UA、viewport、mobile、locale、timezone、proxy_ref，保存 instance_id 和初始 page_id。
+3. `create_instance` 指定 UA、viewport、mobile、locale、timezone、proxy_id，保存 instance_id 和初始 page_id。
 4. `verify_environment` 检查真实 IP、UA 和设备属性；失败时报告环境失败，不能当作目标网站故障。
 5. `navigate` 打开目标；`snapshot` 获取可见结构与元素。
 6. `interact` 使用 role/name 或当前快照 ref。页面变化后重新读取，不猜测过期引用。
@@ -39,3 +39,7 @@
 4. 若SIGKILL或资源异常，核对同一时间的资源事件和宿主/容器证据，不能仅凭信号或当前OOM计数认定某个实例因OOM被杀。服务重启、cgroup重建或缺少字段时明确证据不足。
 5. 若原操作结果不明，保留未知状态，不盲目重试提交。需要恢复时，先确认任务可中止，关闭旧实例再创建新实例；诊断工具本身不会自动取消或重试业务操作。
 6. 记录instance_id、operation_id、日志seq与时间，说明已证实事实、候选原因和缺失证据。服务完全不可达时让部署方保留docker日志和状态摘要；升级前未记录的事件无法补回。
+
+## 使用平台代理
+
+需要指定国家或代理时，先调用 `list_proxies`（可按 country / protocol 筛选），再把返回的 `proxy_id` 传给 `create_instance`。如需先测出口或直接验证接口，调用 `proxy_curl`，无需启动浏览器。国家是人工标记，必须通过可信 IP 服务验证实际出口。不要把代理凭据写进 Prompt、日志或报告。修改配置不会改变已经创建的实例。

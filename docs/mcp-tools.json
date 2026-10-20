@@ -104,7 +104,34 @@
       "description": "Create an expiring public read-only viewer URL for one owned live instance or finalized recording. Anyone with this link can see its content without login; it grants no browser control or access to other resources. Returns URL once. Default 24 hours, maximum 30 days. Requires web mode.",
       "inputSchema": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "live",
+              "recording"
+            ]
+          },
+          "instance_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "recording_id": {
+            "$ref": "#/properties/instance_id"
+          },
+          "expires_in_seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2592000,
+            "default": 86400
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
       },
       "annotations": {
         "readOnlyHint": false,
@@ -290,10 +317,27 @@
     },
     {
       "name": "list_proxies",
-      "description": "List server-configured proxy names and countries. Credentials are never returned.",
+      "description": "List platform proxies with proxy_id, name, declared country, protocol, server, enabled status and authentication flag; no credentials. Enabled proxies are configured candidates, not guaranteed live or geolocated. Defaults to enabled only. Use proxy_id in create_instance, check_proxy or proxy_curl.",
       "inputSchema": {
         "type": "object",
-        "properties": {},
+        "properties": {
+          "country": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$"
+          },
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "socks5",
+              "http",
+              "https"
+            ]
+          },
+          "enabled_only": {
+            "type": "boolean",
+            "default": true
+          }
+        },
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
@@ -307,11 +351,134 @@
       }
     },
     {
+      "name": "proxy_curl",
+      "description": "Send one HTTP(S) request through a saved enabled proxy_id using curl, without a browser or shell. Supports methods, headers, UTF-8 body, bounded response and optional redirects. Returns HTTP status, response headers/body and elapsed time, including 4xx/5xx. No direct fallback; private destinations remain blocked unless enabled by the operator. No automatic retry; writes may succeed even when a timeout is returned. Output can contain destination secrets: handle appropriately.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "proxy_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "maxLength": 8192
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "HEAD",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE",
+              "OPTIONS"
+            ],
+            "default": "GET"
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 8192
+            },
+            "propertyNames": {
+              "pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$"
+            },
+            "default": {}
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 65536
+          },
+          "follow_redirects": {
+            "type": "boolean",
+            "default": false
+          },
+          "timeout_ms": {
+            "type": "integer",
+            "minimum": 1000,
+            "maximum": 60000,
+            "default": 15000
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576,
+            "default": 65536
+          },
+          "response_encoding": {
+            "type": "string",
+            "enum": [
+              "text",
+              "base64"
+            ],
+            "default": "text"
+          }
+        },
+        "required": [
+          "proxy_id",
+          "url"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "openWorldHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
       "name": "check_proxy",
       "description": "Launch a temporary isolated browser through the selected proxy and query an IP endpoint; always cleans up. Does not assert country.",
       "inputSchema": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "proxy": {
+            "type": "object",
+            "properties": {
+              "server": {
+                "type": "string",
+                "format": "uri"
+              },
+              "username": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "password": {
+                "type": "string",
+                "maxLength": 512
+              }
+            },
+            "required": [
+              "server"
+            ],
+            "additionalProperties": false
+          },
+          "proxy_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "proxy_ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "check_url": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
       },
       "annotations": {
         "readOnlyHint": false,
@@ -324,10 +491,114 @@
     },
     {
       "name": "create_instance",
-      "description": "Create an isolated Chromium instance with fixed UA, viewport and optional authenticated HTTP/SOCKS5 proxy. No direct fallback. No proxy means explicit direct mode.",
+      "description": "Create an isolated Chromium instance with fixed UA, viewport and optional authenticated HTTP/SOCKS5 proxy. Use proxy_id from list_proxies, inline proxy, or legacy proxy_ref (mutually exclusive). No direct fallback. No proxy means explicit direct mode.",
       "inputSchema": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "user_agent": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "viewport": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "integer",
+                "minimum": 240,
+                "maximum": 3840
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 240,
+                "maximum": 3840
+              }
+            },
+            "required": [
+              "width",
+              "height"
+            ],
+            "additionalProperties": false,
+            "default": {
+              "width": 1280,
+              "height": 720
+            }
+          },
+          "proxy": {
+            "type": "object",
+            "properties": {
+              "server": {
+                "type": "string",
+                "format": "uri"
+              },
+              "username": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "password": {
+                "type": "string",
+                "maxLength": 512
+              }
+            },
+            "required": [
+              "server"
+            ],
+            "additionalProperties": false
+          },
+          "proxy_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "proxy_ref": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "mobile": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "default": true
+              },
+              "touch": {
+                "type": "boolean",
+                "default": true
+              },
+              "device_scale_factor": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 4,
+                "default": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "locale": {
+            "type": "string",
+            "maxLength": 64,
+            "default": "en-US"
+          },
+          "timezone": {
+            "type": "string",
+            "maxLength": 128,
+            "default": "UTC"
+          },
+          "idle_timeout_seconds": {
+            "type": "integer",
+            "minimum": 30,
+            "maximum": 3600,
+            "default": 600
+          },
+          "max_lifetime_seconds": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 14400,
+            "default": 3600
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
       },
       "annotations": {
         "readOnlyHint": false,
@@ -535,7 +806,36 @@
       "description": "Navigate, reload, back or forward. HTTP success is not a business pass.",
       "inputSchema": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "instance_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "page_id": {
+            "$ref": "#/properties/instance_id"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "goto",
+              "reload",
+              "back",
+              "forward"
+            ],
+            "default": "goto"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": [
+          "instance_id",
+          "page_id"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
       },
       "annotations": {
         "readOnlyHint": false,
@@ -592,7 +892,81 @@
       "description": "Click/fill/press/select/check/hover/scroll using ref or exact role/name, text, CSS; optional frame CSS. Never blindly retry a timed-out write.",
       "inputSchema": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "instance_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "page_id": {
+            "$ref": "#/properties/instance_id"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "click",
+              "fill",
+              "press",
+              "select",
+              "check",
+              "hover",
+              "scroll"
+            ]
+          },
+          "target": {
+            "type": "object",
+            "properties": {
+              "ref": {
+                "$ref": "#/properties/instance_id"
+              },
+              "role": {
+                "type": "string",
+                "maxLength": 64
+              },
+              "name": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 1024
+              },
+              "css": {
+                "type": "string",
+                "maxLength": 1024
+              },
+              "frame": {
+                "type": "string",
+                "maxLength": 1024
+              }
+            },
+            "additionalProperties": false
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 100000
+          },
+          "checked": {
+            "type": "boolean"
+          },
+          "delta_x": {
+            "type": "number",
+            "minimum": -10000,
+            "maximum": 10000
+          },
+          "delta_y": {
+            "type": "number",
+            "minimum": -10000,
+            "maximum": 10000
+          }
+        },
+        "required": [
+          "instance_id",
+          "page_id",
+          "action"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
       },
       "annotations": {
         "readOnlyHint": false,
@@ -608,7 +982,72 @@
       "description": "Wait for one element state, URL glob or known download ID. No fixed sleeps.",
       "inputSchema": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "instance_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "page_id": {
+            "$ref": "#/properties/instance_id"
+          },
+          "target": {
+            "type": "object",
+            "properties": {
+              "ref": {
+                "$ref": "#/properties/instance_id"
+              },
+              "role": {
+                "type": "string",
+                "maxLength": 64
+              },
+              "name": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 1024
+              },
+              "css": {
+                "type": "string",
+                "maxLength": 1024
+              },
+              "frame": {
+                "type": "string",
+                "maxLength": 1024
+              }
+            },
+            "additionalProperties": false
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "download_id": {
+            "$ref": "#/properties/instance_id"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "visible",
+              "hidden",
+              "attached",
+              "detached"
+            ]
+          },
+          "timeout_ms": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 60000
+          }
+        },
+        "required": [
+          "instance_id",
+          "page_id"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
       },
       "annotations": {
         "readOnlyHint": true,

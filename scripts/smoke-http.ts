@@ -26,7 +26,7 @@ try {
   assert.equal(info.agent_instructions.split('\n').length, 4);
   assert.ok(
     info.agent_instructions.includes(
-      info.mcp_config.mcpServers['docker-browser'].headers.Authorization,
+      info.mcp_config.mcpServers['cloudbrowser'].headers.Authorization,
     ),
   );
   const publicGuide = await fetch(info.agent_guide_url);
@@ -34,12 +34,12 @@ try {
   const guide = await publicGuide.text();
   assert.ok(guide.includes('create_instance'));
   assert.ok(
-    !guide.includes(info.mcp_config.mcpServers['docker-browser'].headers.Authorization.slice(7)),
+    !guide.includes(info.mcp_config.mcpServers['cloudbrowser'].headers.Authorization.slice(7)),
   );
   client = new Client({ name: 'http-smoke', version: '1' });
   await client.connect(
     new StreamableHTTPClientTransport(new URL(info.mcp_url), {
-      requestInit: { headers: info.mcp_config.mcpServers['docker-browser'].headers },
+      requestInit: { headers: info.mcp_config.mcpServers['cloudbrowser'].headers },
     }),
   );
   const tools = await client.listTools();

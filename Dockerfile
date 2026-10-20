@@ -5,12 +5,13 @@ COPY package.json package-lock.json tsconfig.json tsconfig.web.json ./
 RUN npm ci
 COPY src ./src
 COPY web ./web
+COPY docs/assets ./docs/assets
 COPY scripts/build-web.mjs ./scripts/build-web.mjs
 RUN npm run build && npm prune --omit=dev
 
 FROM mcr.microsoft.com/playwright:v1.64.1-noble
 ENV NODE_ENV=production DATA_DIR=/data MCP_SOCKET=/tmp/browser-mcp/service.sock WEB_PORT=8080
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg curl && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=cloudflared /usr/local/bin/cloudflared /usr/local/bin/cloudflared
 COPY --from=build --chown=pwuser:pwuser /app/node_modules ./node_modules

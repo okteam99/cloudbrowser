@@ -102,6 +102,7 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     assert.equal(root.status, 200);
     assert.match(await root.text(), /访问密码/);
     assert.equal((await fetch(base + '/api/connection')).status, 401);
+    assert.equal((await fetch(base + '/api/proxies')).status, 401);
     assert.equal((await fetch(base + '/mcp', { method: 'POST', body: '{}' })).status, 401);
     const publicGuide = await fetch(base + '/docs/agent-guide.md', {
       headers: { Origin: 'https://agent.example' },
@@ -145,6 +146,20 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     assert.equal(login.status, 303);
     const cookie = login.headers.get('set-cookie')!.split(';')[0];
     const headers = { Cookie: cookie };
+    assert.equal(
+      (await fetch(base + '/api/proxies', { method: 'POST', headers, body: '{}' })).status,
+      403,
+    );
+    assert.equal(
+      (
+        await fetch(base + '/api/proxies', {
+          method: 'POST',
+          headers: { ...headers, Origin: 'https://untrusted.example' },
+          body: '{}',
+        })
+      ).status,
+      403,
+    );
     assert.match(await (await fetch(base + '/', { headers })).text(), /正在加载浏览器控制台/);
     assert.equal((await fetch(base + '/assets/app.js')).status, 200);
     assert.equal((await fetch(base + '/assets/app.css')).status, 200);
@@ -167,12 +182,12 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
       await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
       await page.getByRole('button', { name: '复制 MCP 配置' }).click();
       const copied = JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
-      assert.equal(copied.mcpServers['docker-browser'].url, base + '/mcp');
-      assert.match(copied.mcpServers['docker-browser'].headers.Authorization, /^Bearer [\w-]+$/);
+      assert.equal(copied.mcpServers['cloudbrowser'].url, base + '/mcp');
+      assert.match(copied.mcpServers['cloudbrowser'].headers.Authorization, /^Bearer [\w-]+$/);
       await page.getByRole('button', { name: '复制 Agent 接入信息', exact: true }).click();
       const copiedGuide = await page.evaluate(() => navigator.clipboard.readText());
       assert.equal(copiedGuide.split('\n').length, 4);
-      assert.ok(copiedGuide.includes(copied.mcpServers['docker-browser'].headers.Authorization));
+      assert.ok(copiedGuide.includes(copied.mcpServers['cloudbrowser'].headers.Authorization));
       assert.ok(copiedGuide.endsWith(base + '/docs/agent-guide.md'));
       assert.ok(copiedGuide.includes(base + '/mcp'));
       assert.equal(
@@ -180,15 +195,39 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
         base + '/docs/agent-guide.md',
       );
       assert.ok(
-        !guideText.includes(
-          copied.mcpServers['docker-browser'].headers.Authorization.split(' ')[1],
-        ),
+        !guideText.includes(copied.mcpServers['cloudbrowser'].headers.Authorization.split(' ')[1]),
       );
 
+      await page.getByRole('heading', { name: '一步，把云浏览器连接到你的 Agent' }).waitFor();
+      await page.getByRole('menuitem', { name: '代理管理' }).click();
+      await page.getByRole('button', { name: '添加代理' }).click();
+      await page.getByLabel('名称（可选）').fill('UI 测试代理');
+      await page.getByLabel('服务器 IP / 域名').fill('203.0.113.2');
+      await page.getByLabel('用户名', { exact: true }).fill('ui-user');
+      const password = page.getByLabel('密码（明文）', { exact: true });
+      assert.equal(await password.getAttribute('type'), 'text');
+      await password.fill('ui-proxy-password');
+      await page.getByRole('button', { name: '保存代理' }).click();
+      await page.getByText('ui-proxy-password', { exact: true }).waitFor();
+      await page.getByRole('button', { name: '编辑代理 UI 测试代理', exact: true }).click();
+      assert.equal(await page.getByLabel('服务器 IP / 域名').inputValue(), '203.0.113.2');
+      await page.getByLabel('密码（明文）', { exact: true }).fill('ui-proxy-updated');
+      await page.getByRole('button', { name: '保存代理' }).click();
+      await page.getByText('ui-proxy-updated', { exact: true }).waitFor();
+      await page.getByRole('switch', { name: '启用代理 UI 测试代理', exact: true }).click();
+      await page.waitForFunction(async (base) => {
+        const rows = await (await fetch(base + '/api/proxies')).json();
+        return rows.length === 1 && rows[0].enabled === false;
+      }, base);
+      await page.getByRole('switch', { name: '启用代理 UI 测试代理', exact: true }).click();
+      await page.waitForFunction(
+        async (base) => (await (await fetch(base + '/api/proxies')).json())[0]?.enabled === true,
+        base,
+      );
       await page.getByRole('menuitem', { name: '使用文档' }).click();
       await page.locator('.markdown-body').waitFor();
       const deployment = page.locator('.markdown-body pre').first();
-      assert.match(await deployment.innerText(), /bdpgogoup\/dockerbrowsermcp:\d{14}/);
+      assert.match(await deployment.innerText(), /bdpgogoup\/cloudbrowser:\d{14}/);
       assert.ok(
         (await deployment.innerText()).split('\n').length > 5,
         'Deployment command should use readable shell continuations',
@@ -219,7 +258,7 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     assert.ok(connection.agent_instructions.length < 700);
     assert.equal((connection.agent_instructions.match(/https?:\/\/\S+/g) ?? []).length, 2);
     assert.ok(connection.agent_instructions.includes(connection.agent_guide_url));
-    const auth = connection.mcp_config.mcpServers['docker-browser'].headers;
+    const auth = connection.mcp_config.mcpServers['cloudbrowser'].headers;
     assert.ok(auth.Authorization.startsWith('Bearer '));
     assert.ok(!connection.mcp_url.includes(auth.Authorization.slice(7)));
     assert.equal(
@@ -237,7 +276,24 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
         requestInit: { headers: auth },
       }),
     );
-    assert.equal((await client.listTools()).tools.length, 30);
+    assert.equal((await client.listTools()).tools.length, 31);
+    const savedList: any = await client.callTool({
+      name: 'list_proxies',
+      arguments: { protocol: 'socks5', country: 'US' },
+    });
+    const savedProxies = JSON.parse(savedList.content[0].text).data;
+    assert.equal(savedProxies.length, 1);
+    assert.equal(savedProxies[0].name, 'UI 测试代理');
+    assert.ok(savedProxies[0].proxy_id.startsWith('proxy_'));
+    assert.ok(
+      !JSON.stringify(savedProxies).includes('ui-user') &&
+        !JSON.stringify(savedProxies).includes('ui-proxy-updated'),
+    );
+    const proxyFailure = await client.callTool({
+      name: 'proxy_curl',
+      arguments: { proxy_id: 'unknown', url: 'https://example.com/' },
+    });
+    assert.equal(proxyFailure.isError, true);
     const call = async (name: string, args: any = {}) => {
       const r: any = await client!.callTool({ name, arguments: args });
       return JSON.parse(r.content[0].text);
@@ -457,6 +513,18 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     client = undefined;
     await stop(proc);
     proc = await start();
+    const persistedProxies = await (await fetch(base + '/api/proxies', { headers: auth })).json();
+    assert.equal(persistedProxies[0].password, 'ui-proxy-updated');
+    assert.equal(
+      (
+        await fetch(base + '/api/proxies/' + persistedProxies[0].proxy_id, {
+          method: 'DELETE',
+          headers: auth,
+        })
+      ).status,
+      200,
+    );
+    assert.deepEqual(await (await fetch(base + '/api/proxies', { headers: auth })).json(), []);
     assert.equal(
       (await fetch(base + '/api/connection', { headers })).status,
       401,

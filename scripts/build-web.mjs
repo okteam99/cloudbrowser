@@ -11,9 +11,10 @@ await build({
   logLevel: 'info',
 });
 
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, copyFile } from 'node:fs/promises';
 import { gzipSync } from 'node:zlib';
-for (const name of ['app.js', 'app.css']) {
+await copyFile('docs/assets/getting-started.svg', 'dist/public/getting-started.svg');
+for (const name of ['app.js', 'app.css', 'getting-started.svg']) {
   const raw = await readFile(`dist/public/${name}`);
   await writeFile(`dist/public/${name}.gz`, gzipSync(raw, { level: 9 }));
 }

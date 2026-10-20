@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
 import { definitions } from './tools.js';
 import { publicError } from './errors.js';
 export type Dispatch = (
@@ -10,14 +11,16 @@ export type Dispatch = (
   operationId: string,
 ) => Promise<any>;
 export function createMcpServer(owner: string, call: Dispatch) {
-  const server = new McpServer({ name: 'docker-browser-mcp', version: '0.6.0' });
+  const server = new McpServer({ name: 'cloudbrowser', version: '0.7.0' });
   for (const [name, d] of Object.entries(definitions)) {
-    // SDK accepts ZodEffects; raw shape would discard cross-field validation.
+    // SDK discovery requires an object at the root. Keep full cross-field validation in the handler.
+    let inputSchema = d.schema;
+    while (inputSchema instanceof z.ZodEffects) inputSchema = inputSchema.innerType();
     server.registerTool(
       name,
       {
         description: d.description,
-        inputSchema: d.schema as any,
+        inputSchema: inputSchema as any,
         annotations: {
           readOnlyHint: !!d.readOnly,
           destructiveHint: !d.readOnly,
@@ -41,15 +44,20 @@ export function createMcpServer(owner: string, call: Dispatch) {
             content.push({ type: 'image', mimeType: 'image/png', data: result.data.data_base64 });
           return { content, structuredContent: result, isError: result.status !== 'succeeded' };
         } catch (e) {
+          const invalid = e instanceof z.ZodError;
           return {
             content: [
               {
                 type: 'text',
                 text: JSON.stringify({
                   operation_id: operationId,
-                  status: 'unknown',
-                  error: publicError(e),
-                  note: 'Use get_operation with operation_id before retrying.',
+                  status: invalid ? 'failed' : 'unknown',
+                  error: invalid
+                    ? { code: 'INVALID_ARGUMENT', message: 'Invalid arguments.' }
+                    : publicError(e),
+                  note: invalid
+                    ? undefined
+                    : 'Use get_operation with operation_id before retrying.',
                 }),
               },
             ],

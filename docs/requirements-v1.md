@@ -1,4 +1,4 @@
-# DockerBrowserMcp V1 需求与设计方案
+# cloudbrowser V1 需求与设计方案
 
 日期：2026-10-20
 
@@ -48,12 +48,12 @@ Agent + 场景 Skill
 | `viewport.width/height` | 页面内容区域宽高，单位为 CSS 像素 |
 | `proxy.server` | 代理协议、地址和端口 |
 | `proxy.username/password` | 可选鉴权，输入与日志分离 |
-| `proxy_ref` | 可选的服务器预配置代理引用 |
+| `proxy_id` / `proxy_ref` | 控制台保存代理的 ID / 兼容旧预配置引用 |
 | `mobile.enabled/touch/device_scale_factor` | 可选移动环境配置 |
 | `locale/timezone` | 可选语言和时区 |
 | `idle_timeout/max_lifetime` | 在服务上限内设置生命周期 |
 
-`proxy` 与 `proxy_ref` 互斥。可以不指定代理用于明确请求的直连任务；指定代理后不得失败回退直连。
+`proxy`、`proxy_id` 与 `proxy_ref` 三选一。可以不指定代理用于明确请求的直连任务；指定代理后不得失败回退直连。
 
 尺寸以页面视口为 V1 标准，不以浏览器外框为标准。手机 UA、移动设备属性和手机视口是不同设置，服务需返回实际生效值及不一致提示。
 
@@ -86,7 +86,7 @@ Agent + 场景 Skill
 - 出口校验默认在测试前执行；连接故障或敏感场景可再次校验。
 - 网页请求、浏览器后台流量和可能的旁路路径需要明确控制与测试，不能只靠 IP 查询证明不存在旁路。
 
-代理凭据不写入 Skill、截图说明、普通日志或工具返回；优先使用 `proxy_ref`。直接传入凭据时同样需脱敏。
+代理凭据不写入 Skill、截图说明、普通日志或 MCP 代理列表；管理页在登录后明文展示，优先使用 `proxy_id`。直接传入凭据时同样需脱敏。
 
 ## 6. MCP 工具设计（候选接口）
 

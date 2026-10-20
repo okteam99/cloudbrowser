@@ -1,13 +1,20 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import assert from 'node:assert/strict';
-// Use --docker for an already-running docker-browser-mcp container.
+// Use --docker for an already-running cloudbrowser container.
 const docker = process.argv.includes('--docker');
 const transport = new StdioClientTransport(
   docker
     ? {
         command: 'docker',
-        args: ['exec', '-i', 'docker-browser-mcp', 'node', 'dist/cli.js', 'stdio'],
+        args: [
+          'exec',
+          '-i',
+          process.env.SMOKE_CONTAINER ?? 'cloudbrowser',
+          'node',
+          'dist/cli.js',
+          'stdio',
+        ],
       }
     : {
         command: process.execPath,
@@ -15,7 +22,7 @@ const transport = new StdioClientTransport(
         env: { ...process.env } as Record<string, string>,
       },
 );
-const client = new Client({ name: 'docker-browser-mcp-smoke', version: '1.0.0' });
+const client = new Client({ name: 'cloudbrowser-smoke', version: '1.0.0' });
 await client.connect(transport);
 let activeInstance: string | undefined;
 try {

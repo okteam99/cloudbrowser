@@ -50,6 +50,32 @@ export type Recording = {
   bytes: number;
   error?: string;
 };
+export type SavedProxy = {
+  proxy_id: string;
+  name: string;
+  protocol: 'socks5' | 'http' | 'https';
+  host: string;
+  port: number;
+  country: string;
+  username: string;
+  password: string;
+  enabled: boolean;
+  updated_at: string;
+};
+export async function mutate<T>(
+  path: string,
+  method: 'POST' | 'PUT' | 'DELETE',
+  data?: unknown,
+): Promise<T> {
+  const response = await fetch(bootstrap.base + path, {
+    method,
+    headers: { 'content-type': 'application/json', 'x-csrf-token': bootstrap.csrf },
+    body: data === undefined ? undefined : JSON.stringify(data),
+  });
+  if (response.status === 401) window.location.assign(bootstrap.base + '/');
+  if (!response.ok) throw Error(`保存失败（${response.status}），请检查填写内容或重新登录`);
+  return response.json() as Promise<T>;
+}
 export const bootstrap: Bootstrap = JSON.parse(document.getElementById('bootstrap')!.textContent!);
 export async function api<T>(path: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(bootstrap.base + path, { cache: 'no-store', signal });

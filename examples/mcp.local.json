@@ -1,8 +1,8 @@
 {
   "mcpServers": {
-    "docker-browser": {
+    "cloudbrowser": {
       "command": "docker",
-      "args": ["exec", "-i", "-e", "MCP_PRINCIPAL=agent-main", "docker-browser-mcp", "node", "dist/cli.js", "stdio"]
+      "args": ["exec", "-i", "-e", "MCP_PRINCIPAL=agent-main", "cloudbrowser", "node", "dist/cli.js", "stdio"]
     }
   }
 }

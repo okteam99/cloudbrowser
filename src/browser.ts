@@ -15,7 +15,6 @@ import { mkdir, mkdtemp, rm, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   createSchema,
-  loadProxies,
   proxySchema,
   type Config,
   type InstanceOptions,
@@ -27,6 +26,8 @@ import { RecordingStore } from './recordings.js';
 import { ShareStore } from './shares.js';
 import { Diagnostics, resources } from './diagnostics.js';
 import { ToolError, publicError, safeUrl } from './errors.js';
+import { ProxyStore } from './proxies.js';
+import { proxyCurl } from './proxy-http.js';
 
 type PageEntry = {
   page: Page;
@@ -79,18 +80,24 @@ export class BrowserManager {
   recordings: RecordingStore;
   shares: ShareStore;
   logs: Diagnostics;
+  proxies: ProxyStore;
+  private curlActive = 0;
   private creating = 0;
   private closing = 0;
   constructor(public cfg: Config) {
     this.artifacts = new Artifacts(cfg);
     this.policy = new NetworkPolicy(cfg);
     this.logs = new Diagnostics(cfg);
+    this.proxies = new ProxyStore(cfg);
     this.recordings = new RecordingStore(cfg, (event) => this.logs.log(event));
     this.shares = new ShareStore(cfg.dataDir);
   }
   async init() {
     await mkdir(this.cfg.dataDir, { recursive: true, mode: 0o700 });
     await this.logs.init();
+    await this.proxies.init();
+    for (const p of this.proxies.list())
+      (this.logs.registerSecret(p.username, false), this.logs.registerSecret(p.password, false));
     await this.artifacts.init();
     await this.recordings.init();
     await this.shares.init();
@@ -272,18 +279,13 @@ export class BrowserManager {
       await download.delete().catch(() => {});
     }
   }
-  private async resolveProxy(options: { proxy?: Proxy; proxy_ref?: string }) {
-    if (options.proxy && options.proxy_ref)
-      throw new ToolError('INVALID_ARGUMENT', 'proxy and proxy_ref are mutually exclusive.');
-    if (options.proxy_ref) {
-      const found = (await loadProxies(this.cfg.proxyFile))[options.proxy_ref];
-      if (!found) throw new ToolError('PROXY_NOT_FOUND', 'Unknown proxy_ref.');
-      return proxySchema.parse({
-        server: found.server,
-        username: found.username,
-        password: found.password,
-      });
-    }
+  private async resolveProxy(options: { proxy?: Proxy; proxy_id?: string; proxy_ref?: string }) {
+    if (
+      [options.proxy, options.proxy_id, options.proxy_ref].filter((x) => x !== undefined).length > 1
+    )
+      throw new ToolError('INVALID_ARGUMENT', 'Specify at most one proxy, proxy_id or proxy_ref.');
+    const id = options.proxy_id ?? options.proxy_ref;
+    if (id) return this.proxies.resolve(id);
     return options.proxy ? proxySchema.parse(options.proxy) : undefined;
   }
   private summary(i: Instance) {
@@ -303,7 +305,11 @@ export class BrowserManager {
       timezone: i.options.timezone,
       mobile: i.options.mobile,
       proxy: i.proxy
-        ? { server: i.proxy.server, authenticated: Boolean(i.proxy.username || i.proxy.password) }
+        ? {
+            proxy_id: i.options.proxy_id ?? i.options.proxy_ref,
+            server: i.proxy.server,
+            authenticated: Boolean(i.proxy.username || i.proxy.password),
+          }
         : null,
       idle_timeout_seconds: i.options.idle_timeout_seconds,
       max_lifetime_seconds: i.options.max_lifetime_seconds,
@@ -925,7 +931,7 @@ export class BrowserManager {
     if (name === 'health')
       return {
         status: 'ok',
-        version: '0.6.0',
+        version: '0.7.0',
         base_url: this.cfg.baseUrl,
         public_url_mode: this.cfg.quickTunnel
           ? 'quick_tunnel'
@@ -941,16 +947,20 @@ export class BrowserManager {
         diagnostic_last_write_error: this.logs.lastWriteError ?? null,
         diagnostic_dropped_events: this.logs.droppedEvents,
       };
-    if (name === 'list_proxies')
-      return Object.entries(await loadProxies(this.cfg.proxyFile)).map(([ref, p]) => ({
-        proxy_ref: ref,
-        server: (() => {
-          const u = new URL(p.server);
-          return `${u.protocol}//${u.host}`;
-        })(),
-        country: p.country,
-        authenticated: Boolean(p.username || p.password),
-      }));
+    if (name === 'list_proxies') return this.proxies.available(a);
+    if (name === 'proxy_curl') {
+      if (this.curlActive >= this.cfg.maxInstances)
+        throw new ToolError('HTTP_BUSY', 'Concurrent HTTP request limit reached.');
+      const proxy = this.proxies.resolve(a.proxy_id);
+      this.logs.registerSecret(proxy.username, false);
+      this.logs.registerSecret(proxy.password, false);
+      this.curlActive++;
+      try {
+        return await proxyCurl(this.policy, proxy, a);
+      } finally {
+        this.curlActive--;
+      }
+    }
     if (name === 'create_instance') return this.create(owner, a, operationId);
     if (name === 'list_instances')
       return Array.from(this.instances.values())
@@ -959,7 +969,11 @@ export class BrowserManager {
     if (name === 'get_artifact')
       return this.artifacts.get(owner, a.artifact_id, a.offset, a.length);
     if (name === 'check_proxy') {
-      const result = await this.create(owner, { proxy: a.proxy, proxy_ref: a.proxy_ref });
+      const result = await this.create(owner, {
+        proxy: a.proxy,
+        proxy_id: a.proxy_id,
+        proxy_ref: a.proxy_ref,
+      });
       try {
         return await this.execute(owner, 'verify_environment', {
           instance_id: result.instance_id,

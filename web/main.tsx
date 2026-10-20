@@ -73,13 +73,15 @@ import {
 } from './api';
 import 'antd/dist/reset.css';
 import './styles.css';
+import { ProxiesPage } from './proxies';
 
 const { Title, Text, Paragraph } = Typography;
-type Section = 'overview' | 'instances' | 'history' | 'connect' | 'docs';
+type Section = 'overview' | 'instances' | 'history' | 'proxies' | 'connect' | 'docs';
 const navItems = [
   { key: 'overview', icon: <DesktopOutlined />, label: '工作台' },
   { key: 'instances', icon: <VideoCameraOutlined />, label: '实时实例' },
   { key: 'history', icon: <HistoryOutlined />, label: '历史录屏' },
+  { key: 'proxies', icon: <SafetyCertificateOutlined />, label: '代理管理' },
   { key: 'connect', icon: <ApiOutlined />, label: 'MCP 接入' },
   { key: 'docs', icon: <FileTextOutlined />, label: '使用文档' },
 ];
@@ -87,6 +89,7 @@ const sectionTitles: Record<Section, { title: string; description: string }> = {
   overview: { title: '工作台', description: '连接你的 Agent，在这里观察浏览器的每一步。' },
   instances: { title: '实时实例', description: '选择一个实例，实时查看当前活动标签页。' },
   history: { title: '历史录屏', description: '回看已结束的浏览器会话，定位问题、还原过程。' },
+  proxies: { title: '代理管理', description: '配置国家和代理线路，由 Agent 按代理 ID 选择使用。' },
   connect: { title: 'MCP 接入', description: '复制接入说明，把远程浏览器交给 Agent。' },
   docs: { title: '使用文档', description: '从首次连接到日常使用，你需要的信息都在这里。' },
 };
@@ -97,7 +100,7 @@ function Brand({ light = false }: { light?: boolean }) {
         <DesktopOutlined />
       </span>
       <div>
-        <strong>DockerBrowser</strong>
+        <strong>cloudbrowser</strong>
         <span>MCP CONSOLE</span>
       </div>
     </div>
@@ -178,7 +181,7 @@ function Login() {
           </div>
         </div>
         <Text type="secondary" className="login-footer">
-          DockerBrowserMcp · 你的远程浏览器工作台
+          cloudbrowser · 你的远程浏览器工作台
         </Text>
       </section>
     </main>
@@ -315,7 +318,7 @@ function Dashboard() {
                 <span className="status-dot" />
                 远程浏览器服务
               </div>
-              <Text>DockerBrowserMcp · v0.6</Text>
+              <Text>cloudbrowser · v0.7</Text>
             </div>
           </Layout.Sider>
         )}
@@ -604,6 +607,7 @@ function Dashboard() {
                 onPlay={setPlaying}
               />
             )}
+            {section === 'proxies' && <ProxiesPage />}
             {section === 'connect' && (
               <ConnectionPage
                 connection={service.connection}
@@ -613,7 +617,7 @@ function Dashboard() {
             )}
             {section === 'docs' && <DocsPage onConnect={() => choose('connect')} />}
             <footer className="page-footer">
-              <Text type="secondary">DockerBrowserMcp</Text>
+              <Text type="secondary">cloudbrowser</Text>
               <Space split={<span>·</span>}>
                 <a href={`${bootstrap.base}/docs/README.md`} target="_blank" rel="noreferrer">
                   完整文档 <ExportOutlined />
@@ -1092,18 +1096,18 @@ function ConnectionPage({
         <Skeleton active />
       </Card>
     );
-  const server = connection.mcp_config.mcpServers['docker-browser'];
+  const server = connection.mcp_config.mcpServers['cloudbrowser'];
   const token = server.headers.Authorization.replace(/^Bearer /, '');
   const masked = JSON.stringify(connection.mcp_config, null, 2).replace(
     token,
     '••••••••（点击复制获取完整配置）',
   );
-  const toml = `[mcp_servers.docker-browser]\nurl = "${connection.mcp_url}"\n\n[mcp_servers.docker-browser.http_headers]\nAuthorization = "Bearer ${reveal ? token : '••••••••'}"`;
+  const toml = `[mcp_servers.cloudbrowser]\nurl = "${connection.mcp_url}"\n\n[mcp_servers.cloudbrowser.http_headers]\nAuthorization = "Bearer ${reveal ? token : '••••••••'}"`;
   return (
     <>
       <Card className="connection-banner" bordered={false}>
         <div>
-          <Title level={4}>一步，把浏览器连接到 Agent</Title>
+          <Title level={4}>一步，把云浏览器连接到你的 Agent</Title>
           <Paragraph type="secondary">
             一句话、MCP 地址、认证信息和一个公开文档链接。
             <br />
@@ -1222,7 +1226,7 @@ function ConnectionPage({
                         icon={<CopyOutlined />}
                         onClick={() =>
                           onCopy(
-                            `[mcp_servers.docker-browser]\nurl = ${JSON.stringify(connection.mcp_url)}\n\n[mcp_servers.docker-browser.http_headers]\nAuthorization = ${JSON.stringify(server.headers.Authorization)}`,
+                            `[mcp_servers.cloudbrowser]\nurl = ${JSON.stringify(connection.mcp_url)}\n\n[mcp_servers.cloudbrowser.http_headers]\nAuthorization = ${JSON.stringify(server.headers.Authorization)}`,
                           )
                         }
                       >
@@ -1324,13 +1328,24 @@ function DocsPage({ onConnect }: { onConnect: () => void }) {
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={{
+              img: ({ src, alt }) => (
+                <img
+                  src={
+                    src === 'docs/assets/getting-started.svg'
+                      ? `${bootstrap.base}/assets/getting-started.svg`
+                      : src
+                  }
+                  alt={alt}
+                  style={{ maxWidth: '100%' }}
+                />
+              ),
               a: ({ children, ...props }) => (
                 <a
                   {...props}
                   href={
                     props.href?.startsWith('http') || props.href?.startsWith('#')
                       ? props.href
-                      : `https://github.com/okteam99/DockerBrowserMcp/blob/main/${props.href ?? 'README.md'}`
+                      : `https://github.com/okteam99/cloudbrowser/blob/main/${props.href ?? 'README.md'}`
                   }
                   target="_blank"
                   rel="noreferrer"
@@ -1428,7 +1443,7 @@ function PublicViewer() {
           />
           <div>
             <Title level={4} style={{ margin: 0 }}>
-              DockerBrowser
+              cloudbrowser
             </Title>
             <Text type="secondary">AI 浏览器 · 公开观看</Text>
           </div>

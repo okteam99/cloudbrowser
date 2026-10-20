@@ -1,4 +1,4 @@
-# MCP 接口 V0.6
+# MCP 接口 V0.7
 
 推荐使用 `BASE_URL/mcp` 的 Streamable HTTP，携带 `Authorization: Bearer <登录网页自动生成的 Token>`。网页登录后可复制完整配置。兼容 MCP stdio，通过 SSH 或 docker exec 接入。HTTP 调用共享 web principal，stdio 仍按 MCP_PRINCIPAL 隔离。
 
@@ -23,9 +23,9 @@
 | --- | --- | --- |
 | `list_recordings` | 可选 instance_id | 当前 principal 的录像、状态、playback_url；播放仍需网页登录或相同 Bearer |
 | `health` | `{}` | 服务状态与容量 |
-| `list_proxies` | `{}` | proxy_ref、server、country、鉴权标记，不返回密码 |
-| `check_proxy` | proxy 或 proxy_ref；可选 check_url | 临时浏览器查询出口，始终清理；不能混用两种代理参数 |
-| `create_instance` | UA、viewport、proxy/proxy_ref、mobile、locale、timezone、生命周期 | instance_id、pages、实际设备属性、警告 |
+| `list_proxies` | 可选 country（两位大写国家码）、protocol（socks5/http/https）、enabled_only（默认true） | proxy_id、兼容 proxy_ref、名称、地址、国家、启用状态、鉴权标记；不返回用户名或密码 |
+| `check_proxy` | proxy、proxy_id、proxy_ref 三选一；可选 check_url | 临时浏览器查询出口，始终清理；不验证国家 |
+| `create_instance` | UA、viewport、proxy/proxy_id/proxy_ref、mobile、locale、timezone、生命周期 | instance_id、pages、实际设备属性、警告 |
 | `get_instance` | instance_id | 配置和页面，隐藏凭据 |
 | `list_instances` | `{}` | 同 principal 的实例 |
 | `verify_environment` | instance_id；可选 check_url | 实际设备属性、IP 查询响应；不自动判断国家 |
@@ -40,7 +40,7 @@
   "user_agent": "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
   "viewport": {"width": 412, "height": 915},
   "mobile": {"enabled": true, "touch": true, "device_scale_factor": 2},
-  "proxy_ref": "us",
+  "proxy_id": "proxy_从list_proxies获取的ID",
   "idle_timeout_seconds": 600,
   "max_lifetime_seconds": 3600
 }
@@ -71,6 +71,30 @@
 撤销或到期后，后续访问返回404，已有直播连接在1秒内断开；已下载/已缓冲内容无法收回。观看页状态约3秒刷新一次。直播正常结束的媒体请求返回410，观看页显示已结束。
 
 无需登录的路由仅有：`GET /share/{随机密钥}`、`GET /share/{随机密钥}/status`、`GET /share/{随机密钥}/media`（录像另支持 HEAD）、`GET /share/{随机密钥}/frame`（仅直播）。密钥不能替换为 MCP Token，也不能作为 MCP Bearer 使用。公开页不返回代理信息、原网页 URL、控制台凭证或其他资源列表。静态资源和健康检查仍保持原有访问策略。
+
+## 通过代理发送 HTTP 请求
+
+`proxy_curl` 不创建浏览器，通过平台保存的启用代理 ID 调用 curl。参数：
+
+| 参数 | 默认值 / 限制 |
+| --- | --- |
+| `proxy_id` | 必填，来自 `list_proxies` |
+| `url` | 必填，HTTP(S)，不接受 URL 内嵌认证 |
+| `method` | GET；支持 HEAD/POST/PUT/PATCH/DELETE/OPTIONS |
+| `headers` | 字符串对象，最多50项，禁止换行及代理认证/请求分帧头 |
+| `body` | 可选 UTF-8 字符串，最多64 KiB，HEAD 不能带请求体 |
+| `follow_redirects` | false；启用后最多5次跳转 |
+| `timeout_ms` | 15000；1000–60000 |
+| `max_bytes` | 65536；1–1048576，超限停止请求并报错 |
+| `response_encoding` | text；可选 base64，用于二进制响应 |
+
+```json
+{"proxy_id":"proxy_...","url":"https://api.ipify.org?format=json","method":"GET"}
+```
+
+返回 `proxy_id`、`status_code`、`final_url`、`elapsed_ms`、`redirect_count`、`headers`（name/value 数组）、`bytes`、`encoding`、`body`。4xx/5xx 是有效 HTTP 结果；连接、TLS、超时和大小超限是工具错误。响应不写入诊断日志，但 `get_operation` 可在内存保留期内读取操作结果，响应内容可能包含目标站点的敏感信息。
+
+每次请求必须指定启用的保存代理，不自动直连、重试或执行 Shell。内网和域名限制与浏览器网关一致，对跳转也生效。并发请求上限等于 `MAX_INSTANCES`，不占浏览器名额。超时或断线不代表写请求未执行，先确认再重试。`list_proxies` 中的国家是管理员填写的标记，启用不代表健康；可用该工具查询可信 IP 服务验证实际出口。
 
 ## 页面与定位
 

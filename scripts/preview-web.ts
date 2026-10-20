@@ -25,7 +25,7 @@ const info: any = await (
 const client = new Client({ name: 'preview', version: '1' });
 await client.connect(
   new StreamableHTTPClientTransport(new URL(info.mcp_url), {
-    requestInit: { headers: info.mcp_config.mcpServers['docker-browser'].headers },
+    requestInit: { headers: info.mcp_config.mcpServers['cloudbrowser'].headers },
   }),
 );
 const created: any = await client.callTool({

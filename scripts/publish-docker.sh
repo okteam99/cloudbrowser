@@ -2,7 +2,7 @@
 set -euo pipefail
 # Publish to Docker Hub using existing Docker credentials, or a supplied token.
 # Never prints passwords or tokens. Cross-platform images are pushed by buildx.
-image='bdpgogoup/dockerbrowsermcp'
+image='bdpgogoup/cloudbrowser'
 release_tz="${RELEASE_TZ:-Asia/Shanghai}"
 tag="${RELEASE_TAG:-$(TZ="$release_tz" date +%Y%m%d%H%M%S)}"
 platforms="${PLATFORMS:-linux/amd64,linux/arm64}"
@@ -30,7 +30,7 @@ readme_file="$repo_dir/README.md"
 readme_backup="$(mktemp)"
 readme_expected="$(mktemp)"
 cp "$readme_file" "$readme_backup"
-sed -E "s#bdpgogoup/dockerbrowsermcp:[0-9]{14}#$image:$tag#g" "$readme_backup" > "$readme_expected"
+sed -E "s#bdpgogoup/cloudbrowser:[0-9]{14}#$image:$tag#g" "$readme_backup" > "$readme_expected"
 cp "$readme_expected" "$readme_file"
 published=false
 finish() {
@@ -53,11 +53,11 @@ printf '\nPublished: %s:%s\n' "$image" "$tag"
 printf 'README deployment tag updated to %s\n\n' "$tag"
 cat <<'DEPLOY'
 docker run -d --init \
-  --name docker-browser-mcp \
+  --name cloudbrowser \
   --restart unless-stopped \
   --shm-size=1g \
   -e WEB_PASSWORD=CHANGE_ME \
   -v browser-mcp-data:/data \
 DEPLOY
 printf '  %s:%s\n' "$image" "$tag"
-printf '\nView the generated HTTPS URL: docker logs docker-browser-mcp\n'
+printf '\nView the generated HTTPS URL: docker logs cloudbrowser\n'
