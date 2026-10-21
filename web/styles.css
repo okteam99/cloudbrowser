@@ -1488,3 +1488,19 @@ input {
 .live-instance-details .ant-tag {
   font-size: 10px;
 }
+
+.live-instance-detail-value {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+.live-instance-detail-value .ant-typography {
+  margin: 0;
+  min-width: 0;
+}
+.live-instance-detail-value .ant-btn {
+  flex: 0 0 22px;
+  width: 22px;
+  padding: 0;
+}

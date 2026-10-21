@@ -361,6 +361,12 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
         result.data.actual.user_agent,
       ),
     );
+    await viewerContext.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await viewerPage.getByRole('button', { name: '复制 UA', exact: true }).click();
+    assert.equal(
+      await viewerPage.evaluate(() => navigator.clipboard.readText()),
+      result.data.actual.user_agent,
+    );
     await call('verify_environment', { instance_id: id, check_url: fixtureUrl + '/ip' });
     await viewerPage.waitForFunction(
       () => document.querySelector('.instance-egress')?.textContent?.trim() === '8.8.4.4',

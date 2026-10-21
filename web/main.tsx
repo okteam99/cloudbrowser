@@ -595,6 +595,7 @@ function Dashboard() {
                   <Col xs={24} xl={13}>
                     <LiveViewer
                       instance={service.instances.find((i) => i.instance_id === watching)}
+                      onCopy={copy}
                     />
                   </Col>
                 </Row>
@@ -802,41 +803,66 @@ function InstanceEnvironment({ instance: i }: { instance: BrowserInstance }) {
     </div>
   );
 }
-function LiveInstanceDetails({ instance: i }: { instance: BrowserInstance }) {
+function LiveInstanceDetails({
+  instance: i,
+  onCopy,
+}: {
+  instance: BrowserInstance;
+  onCopy: (value: string) => void;
+}) {
   const ua = instanceUa(i),
     ip = i.egress?.ip;
   return (
     <div className="live-instance-details">
       <div className="live-instance-detail">
         <Text type="secondary">代理地址</Text>
-        <Text
-          className="instance-proxy-address"
-          copyable={i.proxy ? { text: i.proxy.server } : false}
-        >
-          {i.proxy?.server ?? '直连（未使用代理）'}
-        </Text>
+        <div className="live-instance-detail-value">
+          <Text className="instance-proxy-address">{i.proxy?.server ?? '直连（未使用代理）'}</Text>
+          {i.proxy && (
+            <Button
+              type="text"
+              size="small"
+              icon={<CopyOutlined />}
+              aria-label="复制代理地址"
+              onClick={() => onCopy(i.proxy!.server)}
+            />
+          )}
+        </div>
       </div>
       <div className="live-instance-detail">
         <Text type="secondary">出口 IP</Text>
         <Space size={8} wrap>
-          <Text className="instance-egress" copyable={ip ? { text: ip } : false}>
-            {ip ?? '未检测'}
-          </Text>
+          <Text className="instance-egress">{ip ?? '未检测'}</Text>
           {ip && (
-            <Tooltip title={networkHint(i)}>
-              <Tag bordered={false}>{egressSource(i)}</Tag>
-            </Tooltip>
+            <>
+              <Button
+                type="text"
+                size="small"
+                icon={<CopyOutlined />}
+                aria-label="复制出口 IP"
+                onClick={() => onCopy(ip)}
+              />
+              <Tooltip title={networkHint(i)}>
+                <Tag bordered={false}>{egressSource(i)}</Tag>
+              </Tooltip>
+            </>
           )}
         </Space>
       </div>
       <div className="live-instance-detail live-instance-ua">
         <Text type="secondary">UA</Text>
-        <Paragraph
-          className="instance-user-agent"
-          copyable={{ text: ua, tooltips: ['复制 UA', '已复制'] }}
-        >
-          {ua}
-        </Paragraph>
+        <div className="live-instance-detail-value">
+          <Paragraph className="instance-user-agent">{ua}</Paragraph>
+          <Tooltip title="复制完整 UA">
+            <Button
+              type="text"
+              size="small"
+              icon={<CopyOutlined />}
+              aria-label="复制 UA"
+              onClick={() => onCopy(ua)}
+            />
+          </Tooltip>
+        </div>
       </div>
     </div>
   );
@@ -920,7 +946,13 @@ function InstanceTable({
     />
   );
 }
-function LiveViewer({ instance }: { instance?: BrowserInstance }) {
+function LiveViewer({
+  instance,
+  onCopy,
+}: {
+  instance?: BrowserInstance;
+  onCopy: (value: string) => void;
+}) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
@@ -1006,7 +1038,7 @@ function LiveViewer({ instance }: { instance?: BrowserInstance }) {
           <Text type="secondary">实时画面仅供查看，操作由 Agent 执行</Text>
         )}
       </div>
-      {instance && <LiveInstanceDetails instance={instance} />}
+      {instance && <LiveInstanceDetails instance={instance} onCopy={onCopy} />}
     </Card>
   );
 }
