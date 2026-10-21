@@ -34,6 +34,7 @@ import { proxyCurl } from './proxy-http.js';
 import { PageData } from './page-data.js';
 import { readStorageState, storageLimit, deadline } from './browser-state.js';
 import sharp from 'sharp';
+import { operatingSystem, type BrowserEnvironment } from './browser-environment.js';
 
 type PageEntry = {
   page: Page;
@@ -61,6 +62,8 @@ type Instance = {
   options: InstanceOptions;
   proxy?: Proxy;
   userAgent?: string;
+  proxyCountry?: string;
+  environment?: BrowserEnvironment;
   egress?: { ip: string; source: 'instance_check'; checked_at: string };
   pages: Map<string, PageEntry>;
   pageData: Map<string, PageData>;
@@ -364,6 +367,8 @@ export class BrowserManager {
       viewport: i.options.viewport,
       storage_state_id: i.options.storage_state_id,
       user_agent: i.userAgent ?? i.options.user_agent ?? 'browser default',
+      country: i.proxyCountry ?? null,
+      country_source: i.proxyCountry ? ('proxy_config' as const) : ('unknown' as const),
       egress,
       locale: i.options.locale,
       timezone: i.options.timezone,
@@ -383,6 +388,30 @@ export class BrowserManager {
         'Host policy is defense in depth; use trusted upstream proxies and a network firewall for strict egress isolation.',
       ],
     };
+  }
+  private async persistEnvironment(i: Instance) {
+    const current = this.summary(i);
+    const userAgent = i.userAgent ?? i.options.user_agent ?? null;
+    // Keep the last known sample if the saved proxy is later edited, removed or unchecked.
+    const environment: BrowserEnvironment = {
+      captured_at: new Date().toISOString(),
+      user_agent: userAgent,
+      os: operatingSystem(userAgent),
+      country: i.proxyCountry ?? null,
+      country_source: i.proxyCountry ? 'proxy_config' : 'unknown',
+      egress: current.egress.ip ? current.egress : (i.environment?.egress ?? current.egress),
+    };
+    i.environment = environment;
+    this.logs.update(i.id, { environment: structuredClone(environment) });
+    await this.recordings.setEnvironment(i.id, environment).catch(() =>
+      this.logs.log({
+        owner: i.owner,
+        instance_id: i.id,
+        component: 'recorder',
+        level: 'error',
+        code: 'environment_persist_failed',
+      }),
+    );
   }
   async create(owner: string, raw: unknown, operationId?: string, id = `ins_${randomUUID()}`) {
     if (this.instances.size + this.creating + this.closing >= this.cfg.maxInstances)
@@ -412,6 +441,10 @@ export class BrowserManager {
       const options = createSchema.parse(raw);
       this.logs.update(id, { task_description: options.task_description });
       const proxy = await this.resolveProxy(options);
+      const proxyId = options.proxy_id ?? options.proxy_ref;
+      const country = proxyId
+        ? this.proxies.list().find((p) => p.proxy_id === proxyId)?.country
+        : undefined;
       const storage = options.storage_state_id
         ? await readStorageState(this.artifacts, owner, options.storage_state_id)
         : undefined;
@@ -514,6 +547,7 @@ export class BrowserManager {
         gateway,
         options,
         proxy,
+        proxyCountry: country && country !== 'ZZ' ? country : undefined,
         pages: new Map(),
         pageData: new Map(),
         probes: new Map(),
@@ -610,6 +644,7 @@ export class BrowserManager {
       });
       const actual = await this.environment(p);
       i.userAgent = actual.user_agent;
+      await this.persistEnvironment(i);
       return { ...this.summary(i), actual };
     } catch (e) {
       failed = true;
@@ -710,6 +745,7 @@ export class BrowserManager {
     i.closing = true;
     this.instances.delete(id);
     this.closing++;
+    await this.persistEnvironment(i);
     this.logs.update(id, { status: 'closing', close_reason: reason });
     this.logs.log({
       owner,
@@ -1121,7 +1157,7 @@ export class BrowserManager {
     if (name === 'health')
       return {
         status: 'ok',
-        version: '0.10.0',
+        version: '0.10.1',
         base_url: this.cfg.baseUrl,
         public_url_mode: this.cfg.quickTunnel
           ? 'quick_tunnel'
@@ -1376,6 +1412,7 @@ export class BrowserManager {
             source: 'instance_check',
             checked_at: new Date().toISOString(),
           };
+        if (observedIp) await this.persistEnvironment(i);
         return {
           instance_id: i.id,
           check_url: u,

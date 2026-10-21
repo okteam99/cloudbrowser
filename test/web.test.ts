@@ -623,6 +623,11 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     assert.ok(history[0].frames >= 2);
     assert.ok(history[0].bytes > 0);
     assert.equal(history[0].fps, 2);
+    assert.equal(history[0].environment.user_agent, result.data.actual.user_agent);
+    assert.equal(history[0].environment.egress.ip, '8.8.4.4');
+    assert.equal(history[0].environment.egress.source, 'instance_check');
+    assert.equal(history[0].environment.country, null);
+    assert.ok(history[0].environment.os);
     const playback = `${base}/api/recordings/${history[0].id}/video`;
     assert.equal((await fetch(playback)).status, 401);
     const part = await fetch(playback, { headers: { ...headers, Range: 'bytes=0-3' } });
@@ -667,6 +672,17 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
 
     await viewerPage.getByRole('menuitem', { name: '历史录屏' }).click();
     await viewerPage.getByLabel('搜索录像', { exact: true }).fill('移动端页面');
+    await viewerPage.locator('.history-egress').getByText('8.8.4.4', { exact: true }).waitFor();
+    await viewerPage
+      .getByRole('button', { name: `查看完整 UA ${history[0].id}`, exact: true })
+      .click();
+    await viewerPage
+      .locator('.history-user-agent')
+      .getByText(result.data.actual.user_agent, { exact: true })
+      .waitFor();
+    await viewerPage
+      .getByRole('button', { name: `查看完整 UA ${history[0].id}`, exact: true })
+      .click();
     await viewerPage.getByRole('button', { name: `查看实例日志 ${id}`, exact: true }).click();
     await logDrawer.getByText('close_instance', { exact: true }).waitFor();
     await logDrawer.getByText('wait_for', { exact: true }).waitFor();
@@ -718,7 +734,10 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     assert.ok(restoredLogs.entries.some((e: any) => e.fields?.tool === 'close_instance'));
     const persisted = await fetch(base + '/api/recordings', { headers: auth });
     assert.equal(persisted.status, 200);
-    assert.equal(((await persisted.json()) as any[]).length, recordingsBefore);
+    const restoredRecordings = (await persisted.json()) as any[];
+    assert.equal(restoredRecordings.length, recordingsBefore);
+    assert.deepEqual(restoredRecordings[0].environment, history[0].environment);
+    assert.deepEqual(restoredLogs.instance.environment, history[0].environment);
     const resumedClient = new Client({ name: 'diagnostic-reconnect', version: '1' });
     try {
       await resumedClient.connect(

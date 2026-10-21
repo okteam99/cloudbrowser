@@ -84,7 +84,7 @@ export const definitions: Record<
   },
   list_recordings: {
     description:
-      'List retained recordings for this principal, optionally filtered by instance. Playback URLs require web login or the MCP Bearer token.',
+      'List retained recordings for this principal, optionally filtered by instance, including task description and captured environment (exit IP/source/time, configured country, OS and full UA) when recorded. Playback URLs require web login or the MCP Bearer token.',
     schema: z.object({ instance_id: z.string().optional() }),
     readOnly: true,
   },

@@ -123,6 +123,11 @@ test('real Chromium: device, isolation, interaction, popup, iframe, download, up
       /Unknown/,
     );
     await call('close_instance', { instance_id: i.instance_id });
+    const recording = (await m.recordings.list()).find((r) => r.instance_id === i.instance_id)!;
+    assert.equal(recording.environment?.user_agent, 'TestAndroid/1.0');
+    assert.equal(recording.environment?.os, 'Android');
+    assert.equal(recording.environment?.country, null);
+    assert.deepEqual(recording.environment?.egress, metadata.egress);
     assert.equal(
       (await call('get_artifact', { artifact_id: screen.id, offset: 0, length: 10 })).size,
       screen.size,

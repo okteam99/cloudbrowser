@@ -197,11 +197,12 @@ test(
       });
       assert.equal(instance.egress.ip, '8.8.8.8');
       assert.equal(instance.egress.source, 'proxy_check');
+      assert.equal(instance.country, 'US');
       assert.ok(!JSON.stringify(instance.egress).includes('pass'));
       const ids = { instance_id: instance.instance_id, page_id: instance.pages[0].page_id };
       await call('navigate', { ...ids, url });
       const changed = await m.proxies.save(
-        { ...fields, port: socksPort, username: 'changed' },
+        { ...fields, country: 'GB', port: socksPort, username: 'changed' },
         proxy.proxy_id,
       );
       await m.proxies.recordHealth(changed.proxy_id, changed.updated_at, {
@@ -219,6 +220,14 @@ test(
       await assert.rejects(() => call('create_instance', { proxy_id: proxy.proxy_id }), /disabled/);
       await call('navigate', { ...ids, url: url + '/existing' });
       await call('close_instance', { instance_id: instance.instance_id });
+      const environment = m.logs.get('alice', instance.instance_id).environment!;
+      assert.equal(environment.country, 'US', 'Country must reflect creation, not later edits');
+      assert.equal(environment.country_source, 'proxy_config');
+      assert.equal(environment.egress.ip, '8.8.8.8', 'Preserve the original connection sample');
+      assert.equal(environment.egress.source, 'proxy_check');
+      assert.equal(environment.user_agent, 'SavedProxy/1.0');
+      assert.equal(environment.os, null);
+      assert.ok(!JSON.stringify(environment).includes('pass'));
       const events = JSON.stringify(await call('get_logs', { limit: 200 }));
       assert.ok(
         events.includes('line1') && events.includes('saved-id') && !events.includes('wrong'),

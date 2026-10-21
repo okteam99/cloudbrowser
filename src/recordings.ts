@@ -7,11 +7,13 @@ import sharp from 'sharp';
 import type { Config } from './config.js';
 import { ToolError, publicError } from './errors.js';
 import type { LogEvent } from './diagnostics.js';
+import type { BrowserEnvironment } from './browser-environment.js';
 
 export type RecordingMeta = {
   id: string;
   instance_id: string;
   task_description?: string;
+  environment?: BrowserEnvironment;
   owner: string;
   created_at: string;
   ended_at?: string;
@@ -26,6 +28,7 @@ export type RecordingMeta = {
 export type LiveFrame = { bytes: Buffer; time: number; page_id: string };
 export class RecordingStore {
   active = new Map<string, InstanceRecorder>();
+  private pending: Promise<unknown> = Promise.resolve();
   constructor(
     public cfg: Config,
     public emit: (event: Omit<LogEvent, 'seq' | 'time'>) => void = () => {},
@@ -48,9 +51,20 @@ export class RecordingStore {
   }
   async persist(m: RecordingMeta) {
     const path = this.path(m.id, 'json');
-    await writeFile(`${path}.tmp`, JSON.stringify(m), { mode: 0o600 });
-    const { rename } = await import('node:fs/promises');
-    await rename(`${path}.tmp`, path);
+    const value = JSON.stringify(m);
+    const work = this.pending.then(async () => {
+      await writeFile(`${path}.tmp`, value, { mode: 0o600 });
+      const { rename } = await import('node:fs/promises');
+      await rename(`${path}.tmp`, path);
+    });
+    this.pending = work.catch(() => {});
+    await work;
+  }
+  async setEnvironment(instance: string, environment: BrowserEnvironment) {
+    const recorder = this.active.get(instance);
+    if (!recorder) return;
+    recorder.meta.environment = structuredClone(environment);
+    if (this.cfg.recordVideo) await this.persist(recorder.meta);
   }
   async list() {
     const names = await readdir(join(this.cfg.dataDir, 'recordings'));

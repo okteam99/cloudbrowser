@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import { freemem, totalmem, loadavg } from 'node:os';
 import type { Config } from './config.js';
 import { ToolError } from './errors.js';
+import type { BrowserEnvironment } from './browser-environment.js';
 
 export type Level = 'info' | 'warn' | 'error';
 export type Component = 'service' | 'browser' | 'page' | 'operation' | 'recorder' | 'tunnel';
@@ -32,6 +33,7 @@ export type LogEvent = {
 export type InstanceRecord = {
   instance_id: string;
   task_description?: string;
+  environment?: BrowserEnvironment;
   owner: string;
   created_at: string;
   updated_at: string;

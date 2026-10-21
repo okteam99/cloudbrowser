@@ -19,6 +19,7 @@ import {
   Layout,
   Menu,
   Modal,
+  Popover,
   Progress,
   Row,
   Select,
@@ -47,6 +48,7 @@ import {
   FileTextOutlined,
   FullscreenOutlined,
   HistoryOutlined,
+  InfoCircleOutlined,
   KeyOutlined,
   LinkOutlined,
   LockOutlined,
@@ -320,7 +322,7 @@ function Dashboard() {
                 <span className="status-dot" />
                 远程浏览器服务
               </div>
-              <Text>cloudbrowser · v0.10.0</Text>
+              <Text>cloudbrowser · v0.10.1</Text>
             </div>
           </Layout.Sider>
         )}
@@ -789,7 +791,7 @@ function egressSource(i: BrowserInstance) {
 function networkHint(i: BrowserInstance) {
   return [
     i.proxy ? `代理地址：${i.proxy.server}` : '未使用代理，直接连接',
-    `出口 IP：${i.egress?.ip ?? '未检测'}`,
+    `出口 IP：${i.egress?.ip ?? '未检测'} ${countryLabel(i.country)}`,
     `来源：${egressSource(i)}`,
     i.egress?.checked_at
       ? `检测时间：${new Date(i.egress.checked_at).toLocaleString('zh-CN')}`
@@ -802,12 +804,14 @@ function InstanceEnvironment({ instance: i }: { instance: BrowserInstance }) {
   return (
     <div className="instance-environment">
       <Tooltip title={networkHint(i)}>
-        <div className="instance-environment-line">
+        <div className="instance-environment-line instance-network-line">
           <span className="instance-env-label">
             {i.egress?.ip ? '出口' : i.proxy ? '代理' : '网络'}
           </span>
           <span className="instance-env-value">{i.egress?.ip ?? proxyAddress(i)}</span>
-          {i.egress?.ip && <span className="instance-env-source">{egressSource(i)}</span>}
+          <Tooltip title="创建实例时的代理配置国家">
+            <span className="instance-egress-country">{countryLabel(i.country)}</span>
+          </Tooltip>
         </div>
       </Tooltip>
       <Tooltip title={instanceUa(i)}>
@@ -849,6 +853,9 @@ function LiveInstanceDetails({
         <Text type="secondary">出口 IP</Text>
         <Space size={8} wrap>
           <Text className="instance-egress">{ip ?? '未检测'}</Text>
+          <Tooltip title="创建实例时的代理配置国家">
+            <Text className="instance-egress-country">{countryLabel(i.country)}</Text>
+          </Tooltip>
           {ip && (
             <>
               <Button
@@ -1118,6 +1125,52 @@ function RecordingTable({
         </Space>
       ),
     },
+    ...(!compact
+      ? [
+          {
+            title: '出口 IP',
+            key: 'egress',
+            width: 270,
+            render: (_: unknown, r: Recording) => (
+              <Tooltip title={recordingNetworkHint(r)}>
+                <Space size={6} wrap>
+                  <Text className="history-egress">
+                    {r.environment?.egress.ip ?? (r.environment ? '未检测' : '未记录')}
+                  </Text>
+                  <Text type="secondary" className="history-country">
+                    {recordingCountry(r)}
+                  </Text>
+                </Space>
+              </Tooltip>
+            ),
+          },
+          {
+            title: 'OS / UA',
+            key: 'os',
+            width: 135,
+            render: (_: unknown, r: Recording) => (
+              <Space size={4} className="history-os">
+                <Tooltip title="根据当时浏览器实际 UA 识别的系统">
+                  <Text>{r.environment?.os ?? (r.environment ? '未知' : '未记录')}</Text>
+                </Tooltip>
+                <Popover
+                  trigger="click"
+                  title="实例环境信息"
+                  content={<RecordingEnvironment recording={r} />}
+                >
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<InfoCircleOutlined />}
+                    aria-label={`查看完整 UA ${r.id}`}
+                    title="查看完整 UA"
+                  />
+                </Popover>
+              </Space>
+            ),
+          },
+        ]
+      : []),
     {
       title: '开始时间',
       dataIndex: 'created_at',
@@ -1145,7 +1198,7 @@ function RecordingTable({
     {
       title: '操作',
       key: 'action',
-      width: 150,
+      width: compact ? 150 : 210,
       align: 'right',
       render: (_, r) => (
         <Space size={0}>
@@ -1170,12 +1223,14 @@ function RecordingTable({
           </Tooltip>
           <Tooltip title="查看调用日志">
             <Button
-              type="text"
+              type="link"
               size="small"
               icon={<FileTextOutlined />}
               aria-label={`查看实例日志 ${r.instance_id}`}
               onClick={() => onLogs(r)}
-            />
+            >
+              {!compact && '调用日志'}
+            </Button>
           </Tooltip>
         </Space>
       ),
@@ -1184,6 +1239,8 @@ function RecordingTable({
   return (
     <Table
       rowKey="id"
+      className="recording-table"
+      scroll={compact ? undefined : { x: 1100 }}
       columns={columns}
       dataSource={recordings}
       loading={loading}
@@ -1214,6 +1271,53 @@ function RecordingTable({
     />
   );
 }
+function recordingCountry(r: Recording) {
+  return countryLabel(r.environment?.country, r.environment ? '国家未知' : '国家未记录');
+}
+function countryLabel(code?: string | null, missing = '国家未知') {
+  if (!code || !/^[A-Z]{2}$/.test(code) || code === 'ZZ') return missing;
+  const name = new Intl.DisplayNames(['zh-CN'], { type: 'region' }).of(code);
+  return `${name ?? code} (${code})`;
+}
+function recordingNetworkHint(r: Recording) {
+  const e = r.environment?.egress;
+  if (!e) return '此历史记录未保存环境信息';
+  return [
+    e.source === 'instance_check'
+      ? '来源：实例检测'
+      : e.source === 'proxy_check'
+        ? '来源：代理检测样本，未验证当时浏览器连接的出口'
+        : '未检测出口 IP',
+    e.checked_at ? `检测时间：${new Date(e.checked_at).toLocaleString('zh-CN')}` : '',
+    r.environment?.country ? '国家来自创建实例时的代理配置，未经出口 IP 地理验证' : '',
+  ]
+    .filter(Boolean)
+    .join('；');
+}
+function RecordingEnvironment({ recording: r }: { recording: Recording }) {
+  return (
+    <div className="recording-environment-details">
+      <Descriptions column={1} size="small">
+        <Descriptions.Item label="出口 IP">
+          {r.environment?.egress.ip ?? (r.environment ? '未检测' : '未记录')} {recordingCountry(r)}
+        </Descriptions.Item>
+        <Descriptions.Item label="OS（UA 识别）">
+          {r.environment?.os ?? (r.environment ? '未知' : '未记录')}
+        </Descriptions.Item>
+      </Descriptions>
+      <Text type="secondary">完整 UA</Text>
+      <Paragraph
+        className="history-user-agent"
+        copyable={r.environment?.user_agent ? { text: r.environment.user_agent } : false}
+      >
+        {r.environment?.user_agent ?? '未记录'}
+      </Paragraph>
+      <Text type="secondary" className="recording-environment-note">
+        {recordingNetworkHint(r)}
+      </Text>
+    </div>
+  );
+}
 function HistoryPage({
   recordings,
   loading,
@@ -1230,7 +1334,7 @@ function HistoryPage({
   const filtered = recordings.filter(
     (r) =>
       (status === 'all' || r.status === status) &&
-      `${r.instance_id} ${r.id} ${r.task_description ?? ''}`
+      `${r.instance_id} ${r.id} ${r.task_description ?? ''} ${r.environment?.egress.ip ?? ''} ${recordingCountry(r)} ${r.environment?.os ?? ''} ${r.environment?.user_agent ?? ''}`
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
@@ -1247,7 +1351,7 @@ function HistoryPage({
       <div className="table-toolbar">
         <Input.Search
           allowClear
-          placeholder="搜索任务、实例或录像 ID"
+          placeholder="搜索任务、ID、IP、国家或 OS"
           aria-label="搜索录像"
           value={query}
           onChange={(e) => setQuery(e.target.value)}

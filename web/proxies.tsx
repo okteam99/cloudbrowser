@@ -63,7 +63,7 @@ function ProxyState({ p }: { p: SavedProxy }) {
     h.checked_at ? `上次检测：${new Date(h.checked_at).toLocaleString('zh-CN')}` : '等待检测',
     h.error_code ? `失败原因：${h.error_code}` : '',
     h.http_status ? `HTTP ${h.http_status}` : '',
-    h.observed_ip ? `出口 IP：${h.observed_ip}` : '',
+    h.observed_ip ? `出口 IP：${h.observed_ip} ${names.of(p.country)} (${p.country})` : '',
     h.next_check_at ? `下次检测：${new Date(h.next_check_at).toLocaleString('zh-CN')}` : '',
   ]
     .filter(Boolean)

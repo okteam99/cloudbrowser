@@ -1450,16 +1450,46 @@ input {
   min-width: 0;
   font-family: ui-monospace, monospace;
 }
-.instance-env-source {
+.instance-network-line {
+  flex-wrap: wrap;
+}
+.instance-network-line .instance-env-value {
+  flex-shrink: 0;
+  max-width: 100%;
+}
+.instance-egress-country {
   flex: 0 0 auto;
-  font-size: 9px;
-  color: #94a1b6;
+  white-space: nowrap;
+  color: #65758c;
 }
 .live-instance-details {
   border-top: 1px solid #edf0f5;
   padding: 14px 18px 0;
   display: grid;
   gap: 10px;
+}
+.recording-table .history-egress {
+  font-family: ui-monospace, monospace;
+  overflow-wrap: anywhere;
+}
+.recording-table .history-os {
+  white-space: nowrap;
+}
+.recording-environment-details {
+  width: min(380px, calc(100vw - 64px));
+}
+.recording-environment-details .history-user-agent {
+  margin: 6px 0 10px;
+  font:
+    12px/1.7 ui-monospace,
+    monospace;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.recording-environment-note {
+  font-size: 12px;
+  line-height: 1.7;
+  display: block;
 }
 .live-instance-detail {
   display: grid;

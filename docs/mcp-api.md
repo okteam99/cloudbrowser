@@ -307,4 +307,6 @@ inspect_instance和get_logs不占用浏览器执行锁；get_diagnostics也可�
 
 实例摘要（`create_instance`、`list_instances`、`get_instance`）的 `user_agent` 为创建时从浏览器读取的实际值；`egress` 包含 `ip`、`source`（instance_check / proxy_check / unknown）、`checked_at`。实例检测由 `verify_environment` 的有效 IP 响应更新；代理检查样本只在代理 ID、地址和凭据与实例固定配置一致且仍新鲜时采用，不能保证当前连接出口相同。未知值返回 null，列表读取不额外访问外部服务。
 
+实例摘要的 `country` / `country_source` 为创建时固定的代理配置国家（proxy_config），未配置时为 null / unknown。`list_recordings` 和 `inspect_instance.instance` 的可选 `environment` 保存实例运行期间的环境快照：`captured_at`、`user_agent`、按 UA 识别的 `os`、`country`、`country_source` 和 `egress`。创建成功、有效实例出口检测及关闭时更新；历史读取不查询当前代理配置或发起地理检测。旧记录可能没有 `environment`。OS 不是服务器 OS，国家配置不代表 IP 地理验证。
+
 多个入口域名均可访问控制台与 MCP，浏览器请求按当前 Host 进行同源校验，无需域名白名单。BASE_URL 只决定文档、MCP接入和分享链接的主地址；未设置时使用隧道路由中第一个指向本容器的有效域名。密码、Token与CSRF校验保持有效，反向代理需保留外部Host。

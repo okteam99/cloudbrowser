@@ -31,6 +31,8 @@ export type BrowserInstance = {
   created_at: string;
   viewport: { width: number; height: number };
   user_agent: string;
+  country?: string | null;
+  country_source?: 'proxy_config' | 'unknown';
   locale: string;
   timezone: string;
   active_page_id?: string;
@@ -46,6 +48,14 @@ export type Recording = {
   id: string;
   instance_id: string;
   task_description?: string;
+  environment?: {
+    captured_at: string;
+    user_agent: string | null;
+    os: string | null;
+    country: string | null;
+    country_source: 'proxy_config' | 'unknown';
+    egress: NonNullable<BrowserInstance['egress']>;
+  };
   owner: string;
   created_at: string;
   ended_at?: string;
