@@ -8,6 +8,7 @@ import {
   type ElementHandle,
   type Dialog,
   type Download,
+  type Request,
 } from 'playwright';
 import type { Server } from 'proxy-chain';
 import { randomUUID } from 'node:crypto';
@@ -30,6 +31,9 @@ import { ToolError, publicError, safeUrl } from './errors.js';
 import { ProxyStore } from './proxies.js';
 import { ProxyHealthMonitor } from './proxy-health.js';
 import { proxyCurl } from './proxy-http.js';
+import { PageData } from './page-data.js';
+import { readStorageState, storageLimit, deadline } from './browser-state.js';
+import sharp from 'sharp';
 
 type PageEntry = {
   page: Page;
@@ -37,6 +41,7 @@ type PageEntry = {
   refs: Map<string, ElementHandle>;
   dialog?: Dialog;
   crashed?: boolean;
+  requiresReload?: boolean;
 };
 type Instance = {
   id: string;
@@ -58,6 +63,7 @@ type Instance = {
   userAgent?: string;
   egress?: { ip: string; source: 'instance_check'; checked_at: string };
   pages: Map<string, PageEntry>;
+  pageData: Map<string, PageData>;
   created: number;
   touched: number;
   events: any[];
@@ -166,6 +172,11 @@ export class BrowserManager {
     p.refs.clear();
   }
   private attach(i: Instance, page: Page) {
+    const existing = [...i.pages].find(([, entry]) => entry.page === page);
+    if (existing) return existing[0];
+    const retained = [...i.pageData].find(([, data]) => data.page === page);
+    if (retained) return retained[0];
+    if (page.isClosed()) return '';
     const id = `page_${randomUUID()}`;
     if (i.pages.size >= this.cfg.maxPages) {
       void page.close();
@@ -174,11 +185,19 @@ export class BrowserManager {
     }
     const entry: PageEntry = { page, generation: 0, refs: new Map() };
     i.pages.set(id, entry);
+    i.pageData.set(id, new PageData(page));
+    while (i.pageData.size > this.cfg.maxPages) {
+      const old = [...i.pageData].find(([, data]) => data.closed);
+      if (!old) break;
+      old[1].dispose();
+      i.pageData.delete(old[0]);
+    }
     i.activePageId = id;
     page.on('close', () => {
       this.clearRefs(entry);
       i.pages.delete(id);
       i.probes.delete(id);
+      if (i.activePageId === id) i.activePageId = [...i.pages.keys()].at(-1);
       this.event(i, { type: 'page_closed', page_id: id, instance_closing: i.closing });
     });
     page.on('framenavigated', (frame) => {
@@ -339,8 +358,11 @@ export class BrowserManager {
         ? `${this.cfg.baseUrl.replace(/\/$/, '')}/api/instances/${i.id}/live`
         : undefined,
       status: i.crashed ? 'crashed' : 'ready',
+      busy: i.busy,
+      active_operation: i.operation ?? null,
       created_at: new Date(i.created).toISOString(),
       viewport: i.options.viewport,
+      storage_state_id: i.options.storage_state_id,
       user_agent: i.userAgent ?? i.options.user_agent ?? 'browser default',
       egress,
       locale: i.options.locale,
@@ -390,6 +412,10 @@ export class BrowserManager {
       const options = createSchema.parse(raw);
       this.logs.update(id, { task_description: options.task_description });
       const proxy = await this.resolveProxy(options);
+      const storage = options.storage_state_id
+        ? await readStorageState(this.artifacts, owner, options.storage_state_id)
+        : undefined;
+      for (const origin of storage?.origins ?? []) await this.policy.url(origin.origin);
       gateway = await createGateway(this.policy, proxy);
       dir = await mkdtemp(join(this.cfg.dataDir, 'sessions', 'instance-'));
       this.logs.registerSecret(proxy?.username, false);
@@ -466,6 +492,7 @@ export class BrowserManager {
         timezoneId: options.timezone,
         acceptDownloads: true,
         serviceWorkers: 'block',
+        storageState: storage,
       });
       context.setDefaultTimeout(this.cfg.timeout);
       context.setDefaultNavigationTimeout(this.cfg.timeout);
@@ -488,6 +515,7 @@ export class BrowserManager {
         options,
         proxy,
         pages: new Map(),
+        pageData: new Map(),
         probes: new Map(),
         created: Date.now(),
         touched: Date.now(),
@@ -500,6 +528,30 @@ export class BrowserManager {
       };
       current = i;
       context.on('page', (page) => this.attach(i, page));
+      const dataFor = (request: Request) => {
+        if (i.closing) return undefined;
+        try {
+          const page = request.frame().page();
+          const pageId = this.attach(i, page);
+          const data = i.pageData.get(pageId);
+          data?.request(request);
+          return data;
+        } catch {
+          return undefined;
+        }
+      };
+      context.on('request', (request) => {
+        dataFor(request);
+      });
+      context.on('response', (response) => {
+        dataFor(response.request())?.response(response);
+      });
+      context.on('requestfinished', (request) => {
+        dataFor(request)?.finished(request);
+      });
+      context.on('requestfailed', (request) => {
+        dataFor(request)?.failed(request);
+      });
       browser.on('disconnected', () => {
         this.logs.log({
           owner,
@@ -695,6 +747,7 @@ export class BrowserManager {
     clearTimeout(kill);
     await i.browser.close().catch(() => {});
     await i.gateway.close(true).catch(() => {});
+    for (const data of i.pageData.values()) data.dispose();
     await rm(i.dir, { recursive: true, force: true }).catch(() =>
       this.logs.log({
         owner,
@@ -876,7 +929,7 @@ export class BrowserManager {
     if (['navigate', 'create_page'].includes(name) && typeof a.url === 'string') fields.url = a.url;
     if (name === 'verify_environment' && typeof a.check_url === 'string') fields.url = a.check_url;
     if (
-      ['navigate', 'interact'].includes(name) &&
+      ['navigate', 'interact', 'pointer', 'keyboard'].includes(name) &&
       typeof a.action === 'string' &&
       [
         'goto',
@@ -890,6 +943,14 @@ export class BrowserManager {
         'check',
         'hover',
         'scroll',
+        'double_click',
+        'right_click',
+        'move',
+        'down',
+        'up',
+        'drag',
+        'wheel',
+        'type',
       ].includes(a.action)
     )
       fields.action = a.action;
@@ -948,6 +1009,51 @@ export class BrowserManager {
     operationId: string,
     instanceId?: string,
   ): Promise<any> {
+    if (
+      [
+        'get_instance',
+        'list_pages',
+        'get_page',
+        'list_network_requests',
+        'get_network_request',
+        'get_console_logs',
+      ].includes(name)
+    ) {
+      const i = this.instances.get(a.instance_id);
+      if (!i || i.owner !== owner)
+        throw new ToolError('INSTANCE_NOT_FOUND', 'Unknown or closed instance.');
+      if (name === 'get_instance') return this.summary(i);
+      if (name === 'list_pages')
+        return [...i.pages].map(([page_id, p]) => ({
+          ...i.pageData.get(page_id)!.info(page_id, i.activePageId === page_id),
+          dialog: p.dialog?.type(),
+          pending_dialog: p.dialog
+            ? { type: p.dialog.type(), message: p.dialog.message().slice(0, 1000) }
+            : null,
+        }));
+      const data = i.pageData.get(a.page_id);
+      if (!data) throw new ToolError('PAGE_NOT_FOUND', 'Unknown or expired tab data.');
+      if (name === 'get_page')
+        return {
+          ...data.info(a.page_id, i.activePageId === a.page_id),
+          dialog: i.pages.get(a.page_id)?.dialog
+            ? {
+                type: i.pages.get(a.page_id)!.dialog!.type(),
+                message: i.pages.get(a.page_id)!.dialog!.message().slice(0, 1000),
+              }
+            : null,
+          requires_reload: i.pages.get(a.page_id)?.requiresReload ?? false,
+        };
+      if (name === 'list_network_requests')
+        return { instance_id: i.id, page_id: a.page_id, ...data.network(a) };
+      if (name === 'get_network_request')
+        return {
+          instance_id: i.id,
+          page_id: a.page_id,
+          ...data.detail(a.request_id, a.include_body ?? true),
+        };
+      return { instance_id: i.id, page_id: a.page_id, ...data.consoleLogs(a) };
+    }
     if (name === 'inspect_instance')
       return this.inspect(owner, a.instance_id, a.probe ?? true, a.timeout_ms ?? 1500);
     if (name === 'get_diagnostics') {
@@ -1015,7 +1121,7 @@ export class BrowserManager {
     if (name === 'health')
       return {
         status: 'ok',
-        version: '0.9.1',
+        version: '0.10.0',
         base_url: this.cfg.baseUrl,
         public_url_mode: this.cfg.quickTunnel
           ? 'quick_tunnel'
@@ -1099,17 +1205,143 @@ export class BrowserManager {
       i.touched = Date.now();
     }
   }
+  private async evaluate(i: Instance, p: PageEntry, a: any) {
+    const frame = a.frame_id ? i.pageData.get(a.page_id)!.frame(a.frame_id) : p.page.mainFrame();
+    let argument: string;
+    try {
+      argument = JSON.stringify(a.arg ?? null);
+    } catch {
+      throw new ToolError('INVALID_ARGUMENT', 'Script arg must be JSON serializable.');
+    }
+    const session = await i.context
+      .newCDPSession(frame)
+      .catch(() => i.context.newCDPSession(p.page));
+    const expression = `(async () => { const candidate = (${a.script}); const value = await (typeof candidate === 'function' ? candidate(JSON.parse(${JSON.stringify(argument)})) : candidate); let json; try { json = JSON.stringify(value); } catch (e) { return {serialization_error: String(e)}; } if (json === undefined) return {json:'null', value_type:typeof value}; const bytes = new TextEncoder().encode(json).length; if (bytes > ${a.max_result_bytes ?? 65536}) return {too_large:true,bytes}; return {json,bytes,value_type:typeof value}; })()`;
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      const result: any = await Promise.race([
+        frame.evaluate(expression),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => {
+            p.requiresReload = true;
+            void session.send('Runtime.terminateExecution').catch(() => {});
+            reject(
+              new ToolError(
+                'SCRIPT_TIMEOUT',
+                'Script exceeded its deadline. Reload this tab before further writes; do not blindly retry.',
+              ),
+            );
+          }, a.timeout_ms ?? 5000);
+        }),
+      ]);
+      if (result.too_large)
+        throw new ToolError(
+          'SCRIPT_RESULT_TOO_LARGE',
+          `Script result exceeds ${a.max_result_bytes ?? 65536} bytes.`,
+        );
+      if (result.serialization_error)
+        throw new ToolError('SCRIPT_RESULT_NOT_SERIALIZABLE', result.serialization_error);
+      return {
+        page_id: a.page_id,
+        frame_id: i.pageData.get(a.page_id)!.frameId(frame),
+        value: JSON.parse(result.json),
+        value_type: result.value_type,
+        bytes: result.bytes ?? 0,
+      };
+    } catch (error) {
+      if (error instanceof ToolError) throw error;
+      throw new ToolError('SCRIPT_ERROR', error instanceof Error ? error.message : String(error));
+    } finally {
+      clearTimeout(timer);
+      this.clearRefs(p);
+      void session.detach().catch(() => {});
+    }
+  }
+  private async pointer(i: Instance, p: PageEntry, a: any) {
+    const { width, height } = i.options.viewport;
+    const validate = (x: number | undefined, y: number | undefined) => {
+      if (x === undefined || y === undefined || x < 0 || y < 0 || x >= width || y >= height)
+        throw new ToolError(
+          'INVALID_COORDINATES',
+          'Coordinates must be inside the viewport in CSS pixels.',
+        );
+    };
+    if (a.x !== undefined || a.y !== undefined) validate(a.x, a.y);
+    if (a.action === 'drag') validate(a.to_x, a.to_y);
+    const held: string[] = [];
+    let dragging = false;
+    try {
+      for (const raw of a.modifiers ?? []) {
+        const modifier =
+          raw === 'ControlOrMeta' ? (process.platform === 'darwin' ? 'Meta' : 'Control') : raw;
+        await p.page.keyboard.down(modifier);
+        held.push(modifier);
+      }
+      const options = { button: a.button ?? 'left' };
+      if (a.action === 'drag') {
+        await p.page.mouse.move(a.x, a.y);
+        await p.page.mouse.down(options);
+        dragging = true;
+        await p.page.mouse.move(a.to_x, a.to_y, { steps: a.steps ?? 12 });
+        await p.page.mouse.up(options);
+        dragging = false;
+      } else if (a.action === 'wheel') {
+        if (a.x !== undefined) await p.page.mouse.move(a.x, a.y);
+        await p.page.mouse.wheel(a.delta_x ?? 0, a.delta_y ?? 600);
+      } else if (a.action === 'move') await p.page.mouse.move(a.x, a.y, { steps: a.steps ?? 1 });
+      else if (a.action === 'down') {
+        await p.page.mouse.move(a.x, a.y);
+        await p.page.mouse.down(options);
+      } else if (a.action === 'up') {
+        if (a.x !== undefined) await p.page.mouse.move(a.x, a.y);
+        await p.page.mouse.up(options);
+      } else if (a.action === 'double_click') await p.page.mouse.dblclick(a.x, a.y, options);
+      else
+        await p.page.mouse.click(a.x, a.y, {
+          button: a.action === 'right_click' ? 'right' : options.button,
+        });
+      this.clearRefs(p);
+      return { page_id: a.page_id, action: a.action, coordinate_space: 'viewport_css_pixels' };
+    } finally {
+      if (dragging) await p.page.mouse.up({ button: a.button ?? 'left' }).catch(() => {});
+      for (const modifier of held.reverse()) await p.page.keyboard.up(modifier).catch(() => {});
+    }
+  }
   private async action(i: Instance, name: string, a: any): Promise<any> {
-    if (name === 'get_instance') return this.summary(i);
-    if (name === 'list_pages')
-      return Promise.all(
-        Array.from(i.pages, async ([page_id, p]) => ({
-          page_id,
-          url: p.page.url(),
-          title: await p.page.title().catch(() => ''),
-          dialog: p.dialog?.type(),
-        })),
+    if (name === 'save_storage_state') {
+      const state = await i.context.storageState({ indexedDB: a.indexed_db ?? false });
+      const bytes = Buffer.from(JSON.stringify(state));
+      if (bytes.length > storageLimit)
+        throw new ToolError('STORAGE_STATE_TOO_LARGE', 'Login state exceeds 2 MiB.');
+      const artifact = await this.artifacts.save(
+        i.owner,
+        i.id,
+        'storage-state.json',
+        'application/json',
+        bytes,
+        'storage_state',
       );
+      return {
+        storage_state_id: artifact.id,
+        artifact,
+        cookies: state.cookies.length,
+        origins: state.origins.length,
+        indexed_db: a.indexed_db ?? false,
+      };
+    }
+    if (name === 'restore_storage_state') {
+      const state = await readStorageState(this.artifacts, i.owner, a.storage_state_id);
+      for (const origin of state.origins) await this.policy.url(origin.origin);
+      await i.context.setStorageState(state);
+      i.options.storage_state_id = a.storage_state_id;
+      return {
+        restored: true,
+        storage_state_id: a.storage_state_id,
+        cookies: state.cookies.length,
+        origins: state.origins.length,
+        reload_required: true,
+      };
+    }
     if (name === 'create_page') {
       if (i.pages.size >= this.cfg.maxPages)
         throw new ToolError('PAGE_LIMIT', 'Maximum pages reached.');
@@ -1159,7 +1391,98 @@ export class BrowserManager {
       }
     }
     const p = this.page(i, a.page_id);
-    if (['navigate', 'interact', 'upload_file'].includes(name)) i.activePageId = a.page_id;
+    if (
+      p.requiresReload &&
+      !['navigate', 'close_page', 'snapshot', 'screenshot', 'read_element'].includes(name)
+    )
+      throw new ToolError(
+        'PAGE_RELOAD_REQUIRED',
+        'A script timed out. Reload this tab or close it before another write.',
+      );
+    if (p.requiresReload && name === 'navigate' && a.action !== 'reload')
+      throw new ToolError(
+        'PAGE_RELOAD_REQUIRED',
+        'Use navigate action=reload to discard the timed-out script context.',
+      );
+    if (
+      [
+        'navigate',
+        'interact',
+        'upload_file',
+        'evaluate',
+        'pointer',
+        'keyboard',
+        'select_page',
+      ].includes(name)
+    )
+      i.activePageId = a.page_id;
+    if (name === 'select_page') {
+      await deadline(p.page.bringToFront(), 2000);
+      return i.pageData.get(a.page_id)!.info(a.page_id, true);
+    }
+    if (name === 'evaluate') return this.evaluate(i, p, a);
+    if (name === 'read_element') {
+      const element = this.target(p, a.target) as ElementHandle<Element>;
+      const data = await deadline(
+        element.evaluate((el, max) => {
+          const input = el as HTMLInputElement;
+          const rect = el.getBoundingClientRect();
+          const attributes: Record<string, string> = {};
+          for (const attribute of [...el.attributes].slice(0, 100))
+            attributes[attribute.name] = attribute.value.slice(0, 4096);
+          return {
+            tag: el.tagName.toLowerCase(),
+            text: (el.textContent ?? '').trim().slice(0, max),
+            value: typeof input.value === 'string' ? input.value.slice(0, max) : null,
+            checked: typeof input.checked === 'boolean' ? input.checked : null,
+            selected:
+              typeof (el as HTMLOptionElement).selected === 'boolean'
+                ? (el as HTMLOptionElement).selected
+                : null,
+            disabled: typeof input.disabled === 'boolean' ? input.disabled : null,
+            attributes,
+            box: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+            visible: !!(rect.width && rect.height) && getComputedStyle(el).visibility !== 'hidden',
+          };
+        }, a.max_text ?? 10000),
+        this.cfg.timeout,
+      );
+      const box = await deadline(element.boundingBox(), this.cfg.timeout);
+      return { page_id: a.page_id, ...data, box };
+    }
+    if (name === 'keyboard') {
+      const pending_dialog = await this.withDialog(p, async () => {
+        if (a.action === 'type') await p.page.keyboard.insertText(a.value);
+        else if (a.action === 'down')
+          await p.page.keyboard.down(
+            a.value === 'ControlOrMeta'
+              ? process.platform === 'darwin'
+                ? 'Meta'
+                : 'Control'
+              : a.value,
+          );
+        else if (a.action === 'up')
+          await p.page.keyboard.up(
+            a.value === 'ControlOrMeta'
+              ? process.platform === 'darwin'
+                ? 'Meta'
+                : 'Control'
+              : a.value,
+          );
+        else await p.page.keyboard.press(a.value);
+      });
+      this.clearRefs(p);
+      return { page_id: a.page_id, action: a.action, pending_dialog };
+    }
+    if (name === 'pointer') {
+      const pending_dialog = await this.withDialog(p, () => this.pointer(i, p, a));
+      return {
+        page_id: a.page_id,
+        action: a.action,
+        pending_dialog,
+        coordinate_space: 'viewport_css_pixels',
+      };
+    }
     if (name === 'close_page') {
       await p.page.close();
       return { status: 'closed' };
@@ -1175,6 +1498,8 @@ export class BrowserManager {
         await this.policy.url(a.url);
         response = await p.page.goto(a.url, { waitUntil: 'domcontentloaded' });
       }
+      p.requiresReload = false;
+      i.pageData.get(a.page_id)!.title = await p.page.title();
       return {
         page_id: a.page_id,
         url: p.page.url(),
@@ -1223,7 +1548,8 @@ export class BrowserManager {
         actual: await this.environment(p.page),
         tree: tree.slice(0, 60000),
         elements: found,
-        frames: p.page.frames().map((f) => ({ name: f.name(), url: f.url() })),
+        frames: i.pageData.get(a.page_id)!.info(a.page_id, i.activePageId === a.page_id).frames,
+        tree_truncated: tree.length > 60000,
         note: 'References identify the original DOM node; obtain a fresh snapshot after DOM changes. Content and URLs can contain user data.',
       };
     }
@@ -1288,12 +1614,46 @@ export class BrowserManager {
       return { type: d.type(), accepted: a.accept };
     }
     if (name === 'screenshot') {
-      const bytes = await p.page.screenshot({
+      const options = {
         type: 'png',
         fullPage: a.full_page ?? false,
+        clip: a.clip,
         timeout: this.cfg.timeout,
-      });
-      return this.artifacts.save(i.owner, i.id, 'screenshot.png', 'image/png', bytes, 'screenshot');
+      } as const;
+      const bytes = a.target
+        ? await this.target(p, a.target).screenshot({ type: 'png', timeout: this.cfg.timeout })
+        : await p.page.screenshot(options);
+      const artifact = await this.artifacts.save(
+        i.owner,
+        i.id,
+        'screenshot.png',
+        'image/png',
+        bytes,
+        'screenshot',
+      );
+      let image = await sharp(bytes)
+        .resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 65 })
+        .toBuffer();
+      if (image.length > 524288)
+        image = await sharp(bytes)
+          .resize({ width: 800, height: 800, fit: 'inside', withoutEnlargement: true })
+          .jpeg({ quality: 40 })
+          .toBuffer();
+      const preview = await this.artifacts.save(
+        i.owner,
+        i.id,
+        'screenshot-preview.jpg',
+        'image/jpeg',
+        image,
+        'screenshot_preview',
+      );
+      const dimensions = await sharp(image).metadata();
+      return {
+        ...artifact,
+        preview: { ...preview, width: dimensions.width, height: dimensions.height },
+        viewport: i.options.viewport,
+      };
     }
     if (name === 'upload_file') {
       const artifact = await this.artifacts.get(i.owner, a.artifact_id, 0, 0);

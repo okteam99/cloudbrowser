@@ -140,7 +140,7 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         return;
       }
       if (path === '/healthz') {
-        json(res, { status: 'ok', version: '0.9.1' });
+        json(res, { status: 'ok', version: '0.10.0' });
         return;
       }
       if (path === '/mcp') {

@@ -11,7 +11,7 @@ export type Dispatch = (
   operationId: string,
 ) => Promise<any>;
 export function createMcpServer(owner: string, call: Dispatch) {
-  const server = new McpServer({ name: 'cloudbrowser', version: '0.9.1' });
+  const server = new McpServer({ name: 'cloudbrowser', version: '0.10.0' });
   for (const [name, d] of Object.entries(definitions)) {
     // SDK discovery requires an object at the root. Keep full cross-field validation in the handler.
     let inputSchema = d.schema;
@@ -32,6 +32,20 @@ export function createMcpServer(owner: string, call: Dispatch) {
         try {
           const result = await call(owner, name, d.schema.parse(args), operationId);
           const content: any[] = [{ type: 'text', text: JSON.stringify(result) }];
+          if (name === 'screenshot' && result.status === 'succeeded' && result.data?.preview?.id) {
+            const preview = await call(
+              owner,
+              'get_artifact',
+              { artifact_id: result.data.preview.id, offset: 0, length: 524288 },
+              randomUUID(),
+            );
+            if (preview.status === 'succeeded' && preview.data.complete)
+              content.push({
+                type: 'image',
+                mimeType: 'image/jpeg',
+                data: preview.data.data_base64,
+              });
+          }
           if (
             name === 'get_artifact' &&
             result.data?.mime === 'image/png' &&

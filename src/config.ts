@@ -33,6 +33,12 @@ export const createSchema = z
       .max(1000)
       .describe('Task objective shown in the console and retained with instance history.')
       .optional(),
+    storage_state_id: z
+      .string()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe('Owner-authorized login state artifact from save_storage_state.'),
     user_agent: z.string().min(1).max(1024).optional(),
     viewport: z
       .object({

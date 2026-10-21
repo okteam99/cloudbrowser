@@ -47,3 +47,13 @@
 ## 使用平台代理
 
 需要指定国家或代理时，先调用 `list_proxies`（可按 country / protocol / status 筛选；优先 status="healthy"），再把返回的 `proxy_id` 传给 `create_instance`。如需先测出口或直接验证接口，调用 `proxy_curl`，无需启动浏览器。国家是人工标记，必须通过可信 IP 服务验证实际出口。不要把代理凭据写进 Prompt、日志或报告。修改配置不会改变已经创建的实例。
+
+## 多实例、多 Tab、脚本和网络分析
+
+先用 list_instances 选择实例，再用 list_pages / get_page 确认 page_id、frame_id、URL及标题；所有页面工具都明确传入对应实例和 Tab。select_page 切换焦点及直播/录屏内容。截图直接返回可见图片和原图artifact，坐标操作按原始视口CSS像素换算，避免把缩略图像素直接当作点击坐标。
+
+优先使用 snapshot、read_element、interact、pointer、keyboard 完成明确操作。需要页面脚本时使用 evaluate，表达式或函数返回JSON；函数可接收arg，也可指定iframe的frame_id。脚本结果超限时缩小查询范围。SCRIPT_TIMEOUT后先查询只读状态、网络和Console，确认副作用，再reload该Tab或关闭；不能重复提交原脚本。
+
+网络查询从 list_network_requests 按 URL、资源类型、HTTP状态或失败标记筛选，选request_id调用get_network_request读取头和正文。原文数据不脱敏；识别pending、截断、太大或未采集状态。按request_id合并游标增量更新，Console使用get_console_logs读取原始文本和异常堆栈。缓存只在实例存活期间保留，需要保留证据时先读取并保存，再关闭实例。
+
+登录后save_storage_state保存Cookie和localStorage，需要IndexedDB登录令牌时指定indexed_db=true；下次create_instance传storage_state_id。向现有实例restore_storage_state后显式reload。状态文件为私有artifact，分享录像链接不包含登录态。

@@ -2,7 +2,7 @@
 
 **让 AI 操作浏览器，实时直播、全程录屏，操作过程看得见。** 通过 MCP 将远程浏览器接入 AI Agent；打开控制台、输入访问密码，即可复制接入信息。
 
-实例创建时可填写任务描述，并指定 UA、页面视口、HTTP/SOCKS5 鉴权代理、语言与时区；支持点击、输入、iframe、多标签页、上传下载、截图及诊断。
+实例创建时可填写任务描述，并指定 UA、页面视口、HTTP/SOCKS5 鉴权代理、语言与时区；支持点击、输入、iframe、多标签页、上传下载、截图及诊断；支持页面脚本、网络请求与响应查询、完整 Console、坐标点击/拖拽，以及登录态保存恢复。
 
 ## 使用流程
 
@@ -295,6 +295,25 @@ Agent 调用 `list_proxies` 查询列表，可传 `country: "US"`、`protocol: "
 
 工具执行成功不等于业务流程通过；实际测试标准由 Skill 决定。
 
+## 浏览器操作与分析
+
+当前提供 **42 个 MCP 工具**。除了多实例、多标签页、点击输入、iframe、上传下载，还支持：
+
+| 能力 | MCP 工具 |
+| --- | --- |
+| 查看实例与 Tab | list_instances / get_instance / list_pages / get_page，忙碌时也可查询 |
+| 切换焦点和直播页面 | select_page |
+| 结构化读取元素 | read_element，返回文本、值、属性、状态和坐标 |
+| 页面 / iframe 内执行JS | evaluate，支持参数、Promise、执行截止时间和结果大小限制 |
+| 查看网络请求与响应 | list_network_requests / get_network_request，按Tab区分，包含原始头与可用正文 |
+| 完整 Console 与异常 | get_console_logs，包含原始文本、位置和异常堆栈 |
+| 坐标点击、双击、右键、拖拽 | pointer，按视口CSS像素操作 |
+| 页面级键盘与组合键 | keyboard |
+| 截图直接给Agent查看 | screenshot，同次MCP响应附图片预览，并保留原始PNG |
+| 保存与恢复登录态 | save_storage_state / restore_storage_state，或create_instance传storage_state_id |
+
+网络和Console缓存有条数/字节上限，实例结束后不保留；需要证据时在关闭前读取。登录态以私有artifact保存，覆盖Cookie、localStorage和可选IndexedDB，支持跨实例与服务重启恢复。接口参数、限制和调用示例见[MCP接口文档](docs/mcp-api.md)。
+
 ## MCP 日志与故障排查
 
 `get_logs` 查询持久化事件，`inspect_instance` 查询当前或历史实例状态。实例关闭、浏览器崩溃、管理进程重启后，只要保留 `/data` 且记录未被清理，仍可排查；新日志能力无法补回升级前未记录的证据。
@@ -366,10 +385,10 @@ bash scripts/publish-docker.sh
 ## 源码构建及 stdio 接入
 
 ```sh
-docker build -t cloudbrowser:0.9.1 .
+docker build -t cloudbrowser:0.10.0 .
 ```
 
-将一行部署命令最后的镜像名换成 `cloudbrowser:0.9.1` 即可本地使用。
+将一行部署命令最后的镜像名换成 `cloudbrowser:0.10.0` 即可本地使用。
 
 兼容配置见 [本地 stdio](examples/mcp.local.json)、[SSH stdio](examples/mcp.ssh.json)。仍使用 `docker exec -i`，不得使用 `-t`。MCP_PRINCIPAL 是可信 SSH/Docker 接入中的命名空间，不是独立认证。
 

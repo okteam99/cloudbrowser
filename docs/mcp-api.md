@@ -1,4 +1,4 @@
-# MCP 接口 V0.9
+# MCP 接口 V0.10
 
 推荐使用 `BASE_URL/mcp` 的 Streamable HTTP，携带 `Authorization: Bearer <登录网页自动生成的 Token>`。网页登录后可复制完整配置。兼容 MCP stdio，通过 SSH 或 docker exec 接入。HTTP 调用共享 web principal，stdio 仍按 MCP_PRINCIPAL 隔离。
 
@@ -25,7 +25,7 @@
 | `health` | `{}` | 服务状态与容量 |
 | `list_proxies` | 可选 country（两位大写国家码）、protocol（socks5/http/https）、enabled_only（默认true）、status（healthy/unhealthy/unknown/checking/disabled） | proxy_id、兼容 proxy_ref、名称、地址、国家、启用状态、status、health（checked_at / next_check_at / latency_ms / observed_ip / http_status / error_code / checking）、鉴权标记；不返回用户名或密码 |
 | `check_proxy` | proxy、proxy_id、proxy_ref 三选一；可选 check_url | 临时浏览器查询出口，始终清理；不验证国家 |
-| `create_instance` | 可选 task_description（1–1000字符）、UA、viewport、proxy/proxy_id/proxy_ref、mobile、locale、timezone、生命周期 | instance_id、task_description、pages、实际设备属性、警告 |
+| `create_instance` | 可选 task_description（1–1000字符）、storage_state_id、UA、viewport、proxy/proxy_id/proxy_ref、mobile、locale、timezone、生命周期 | instance_id、task_description、pages、实际设备属性、警告 |
 | `get_instance` | instance_id | 配置和页面，隐藏凭据 |
 | `list_instances` | `{}` | 同 principal 的实例 |
 | `verify_environment` | instance_id；可选 check_url | 实际设备属性、IP 查询响应；不自动判断国家 |
@@ -140,12 +140,83 @@ role/name 和 text 为精确匹配。多元素匹配会报错，不默认点击�
 
 `wait_for` 的 state 为 visible/hidden/attached/detached。url 支持 Playwright URL glob。download_id 必须是 list_downloads 已返回的 ID。
 
+## Tab 详情、页面脚本与鼠标键盘
+
+所有页面操作显式传 `instance_id`、`page_id`。`list_instances` 返回当前 principal 的实例；`get_instance` 增加 busy、active_operation、storage_state_id。`get_instance`、`list_pages`、`get_page`、网络和 Console 查询使用缓存元信息，独立于浏览器动作锁，页面忙碌或渲染线程卡住时也可查询，不延长空闲超时。标题按页面事件更新，可能暂时为空或滞后。
+
+| 工具 | 参数与结果 |
+| --- | --- |
+| `get_page` | instance_id、page_id；返回 URL、标题、active、state、frames（frame_id / parent_frame_id / name / url）、pending dialog、requires_reload |
+| `select_page` | instance_id、page_id；选中浏览器焦点及直播/录屏页面 |
+| `read_element` | instance_id、page_id、target；max_text 默认10000、最多60000；返回文本、值、属性、勾选/选中/禁用状态、主视口CSS坐标box |
+| `evaluate` | instance_id、page_id、script；可选 arg、frame_id、timeout_ms（默认5000，100–30000）、max_result_bytes（默认65536，256–262144）；返回 value、value_type、bytes |
+| `pointer` | instance_id、page_id、action；支持 click / double_click / right_click / move / down / up / drag / wheel |
+| `keyboard` | instance_id、page_id、action=press/down/up/type、value；作用于当前焦点，支持 ControlOrMeta+A 等组合键 |
+
+`evaluate.script` 是 JavaScript 表达式或函数文本；函数接收 arg，可返回 Promise。在指定 Tab 或 frame_id 的网页上下文执行，继承实例网络与代理环境。返回 JSON 值，undefined 转为 null 并保留 value_type，BigInt/循环结构等不能序列化的值报错。
+
+```json
+{"instance_id":"ins_...","page_id":"page_...","script":"arg => Array.from(document.links).slice(0,arg.limit).map(a=>({text:a.textContent,url:a.href}))","arg":{"limit":5}}
+```
+
+脚本可改变网页并触发请求。SCRIPT_TIMEOUT 后会中断当前执行，并将页面标为 requires_reload；已发出的请求或异步副作用可能已经发生。先读取状态、Console、网络和日志，再通过 `navigate` 的 reload 丢弃旧执行上下文；继续写操作前必须 reload 或关闭该页。超时不自动重试。操作历史会原样记录脚本和参数。
+
+`pointer` 的 x/y、to_x/to_y 为 **主视口 CSS 像素**，必须位于视口内。click、double_click、right_click、move、down、drag 必须有 x/y；drag 另需 to_x/to_y。steps 默认12、1–100；button 为 left/right/middle；modifiers 可传 Alt/Control/ControlOrMeta/Meta/Shift，调用结束自动释放。分步拖拽可使用 down → move → up；需要跨调用保持修饰键时用 keyboard down/up。wheel 可传 x/y 定位滚动区域，再传 delta_x/delta_y。
+
+```json
+{"instance_id":"ins_...","page_id":"page_...","action":"drag","x":100,"y":200,"to_x":400,"to_y":200,"steps":20}
+```
+
+截图支持 `full_page`、`target` 或 `clip` 三选一（也可都不传取视口）。返回原始 PNG artifact 和 JPEG preview 元信息，MCP 同次响应附带可直接查看的 image 内容；预览最长边1280，必要时降到800，完整原图仍通过原始 artifact 获取。预览像素与 pointer 的 CSS 坐标可能不同，使用返回的 viewport 和 preview 尺寸换算。
+
+## Tab 网络请求与 Console
+
+| 工具 | 参数 |
+| --- | --- |
+| `list_network_requests` | instance_id、page_id；可选 after_seq、limit（默认100/最多200）、url（子串）、method、resource_type、status_code、failed_only |
+| `get_network_request` | instance_id、page_id、request_id；include_body 默认true |
+| `get_console_logs` | instance_id、page_id；可选 after_seq、limit（默认100/最多200）、level（精确匹配 log/info/warning/error/pageerror 等） |
+
+网络捕获从页面创建开始，覆盖导航、fetch/XHR、重定向和失败；每个请求独立 request_id，归属于一个实例和 Tab，包含 URL、方法、资源类型、frame_id、HTTP状态、耗时和 timing。详情包含原始请求/响应头和可用的正文。网络状态 pending/finished/failed 与 HTTP status_code 分开，HTTP 4xx/5xx 仍可正常完成网络传输。
+
+```json
+{"instance_id":"ins_...","page_id":"page_...","resource_type":"fetch","url":"/api/","limit":50}
+```
+
+```json
+{"instance_id":"ins_...","page_id":"page_...","request_id":"req_...","include_body":true}
+```
+
+正文异步采集，检查 response_body_status（pending/available/too_large/unavailable）和 body_error；pending 可稍后重查。每个正文最多256 KiB，大资源不重复读取，较大的压缩资源会跳过；UTF-8或base64由 encoding 标明，truncated 表示前缀截断。请求头最多100项、合计约32 KiB；URL最多16384字符。Console 保留原始文本、位置和页面异常堆栈，文本最多16384字符、堆栈32768字符，超限通过 truncated 标明。原始数据不脱敏。
+
+每个 Tab 网络缓存最多200条/4 MiB，Console最多300条/1 MiB。省略 after_seq 读取最近事件；传返回的 next_after_seq 增量读取，has_more=true 时继续。网络记录更新也推进seq，客户端按 request_id 合并更新，避免漏掉后到的响应。history_truncated、dropped_entries 报告轮转；主体采集全平台最多2个并发、16个排队任务，拥塞会标记 CAPTURE_QUEUE_FULL。
+
+这些缓存保存在实例内存中，实例关闭或服务重启后不保留。关闭 Tab 的缓存可继续查询，直到实例结束或被新的 Tab 历史挤出；同一实例最多保留 MAX_PAGES 份页面缓存，优先移除已关闭页面。get_logs 中的持久化功能调用和故障事件仍按既有保留期保存。
+
+## 登录态保存与恢复
+
+| 工具 / 参数 | 用法 |
+| --- | --- |
+| `save_storage_state` | instance_id；indexed_db 默认false；返回 storage_state_id、私有 artifact、Cookie和origin数量 |
+| `create_instance.storage_state_id` | 创建新实例时加载同一 principal 拥有的登录态 |
+| `restore_storage_state` | instance_id、storage_state_id；替换现有上下文的 Cookie和origin存储，随后显式 reload 页面 |
+
+登录态包括 Cookie、localStorage，以及启用 indexed_db 时的 IndexedDB；不包含 sessionStorage、页面内存或扩展。状态以最大2 MiB的JSON artifact存储，遵循既有数据卷、所有者校验、配额和保留期；可在实例关闭、服务重启后恢复。恢复的 origin 仍通过网络策略检查；不接受任意服务器文件路径。
+
+```json
+{"instance_id":"ins_...","indexed_db":true}
+```
+
+```json
+{"storage_state_id":"art_从save_storage_state获取","task_description":"继续上次登录后的流程"}
+```
+
 ## 诊断与产物
 
 | 工具 | 输入 | 输出 |
 | --- | --- | --- |
 | `get_diagnostics` | instance_id，limit 默认100，最多300 | 脱敏响应状态/跳转/失败请求、console 类别、下载 |
-| `screenshot` | instance_id、page_id、full_page 默认false | PNG artifact 元信息 |
+| `screenshot` | instance_id、page_id、full_page 默认false | 原始PNG artifact、JPEG preview元信息及同次MCP image内容 |
 | `list_downloads` | instance_id | 下载状态、失败、完成后的 artifact |
 | `put_artifact` | name、data_base64，可选 mime | 保存授权文件，解码后最多512 KiB |
 | `upload_file` | instance_id、page_id、target、artifact_id | 将已有文件上传到 file input |
@@ -198,12 +269,15 @@ inspect_instance和get_logs不占用浏览器执行锁；get_diagnostics也可�
 - STALE_ELEMENT_REFERENCE / AMBIGUOUS_ELEMENT / ELEMENT_ERROR
 - DOWNLOAD_FAILED / DOWNLOAD_TOO_LARGE / DOWNLOAD_NOT_FOUND
 - ARTIFACT_NOT_FOUND / ARTIFACT_TOO_LARGE / STORAGE_LIMIT
+- FRAME_NOT_FOUND / REQUEST_NOT_FOUND / INVALID_COORDINATES
+- SCRIPT_ERROR / SCRIPT_TIMEOUT / SCRIPT_RESULT_TOO_LARGE / SCRIPT_RESULT_NOT_SERIALIZABLE / PAGE_RELOAD_REQUIRED
+- INVALID_STORAGE_STATE / STORAGE_STATE_TOO_LARGE
 - DIALOG_NOT_FOUND / OPERATION_NOT_FOUND / OPERATION_FAILED
 - SHARING_DISABLED / LIVE_UNAVAILABLE / SHARE_LIMIT / SHARE_NOT_FOUND
 - RECORDING_NOT_READY / RECORDING_NOT_FOUND
 - LOG_READ_FAILED
 
-同实例一次只允许一个执行中的浏览器操作，其他实例可并行；get_logs、inspect_instance和get_diagnostics独立查询。close_instance 可强制结束正在运行的操作。get_operation 可查询当前管理进程最近500个调用；不能当作跨进程重启的永久幂等机制。服务不会自动重试点击或提交。
+同实例一次只允许一个执行中的浏览器操作，其他实例可并行；get_logs、inspect_instance、get_diagnostics、实例和Tab元信息、网络与Console查询独立执行。close_instance 可强制结束正在运行的操作。get_operation 可查询当前管理进程最近500个调用；不能当作跨进程重启的永久幂等机制。服务不会自动重试点击或提交。
 
 当前不支持外部 cancel 操作；可通过 close_instance 中止该实例。工具最长单步等待受配置限制，MCP 接入等待管理进程最多180秒，超时后原操作可能仍运行，需检查状态。
 

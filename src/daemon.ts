@@ -129,7 +129,19 @@ export async function daemon() {
       return result;
     })();
     // Polling diagnostic tools are safe to repeat and must not evict action results or retain large log pages.
-    if (!['get_logs', 'inspect_instance'].includes(name)) {
+    if (
+      ![
+        'get_logs',
+        'inspect_instance',
+        'get_instance',
+        'list_instances',
+        'list_pages',
+        'get_page',
+        'list_network_requests',
+        'get_network_request',
+        'get_console_logs',
+      ].includes(name)
+    ) {
       operations.set(operationId, { owner, name, created_at: new Date().toISOString(), promise });
       order.push(operationId);
       if (order.length > 500) operations.delete(order.shift()!);

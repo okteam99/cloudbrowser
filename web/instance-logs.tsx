@@ -6,6 +6,17 @@ import { api, compactId, displayTime, type InstanceLogEvent, type InstanceLogs }
 
 const { Text, Paragraph } = Typography;
 const tools: Record<string, string> = {
+  get_page: '查看页面',
+  select_page: '切换标签页',
+  evaluate: '执行页面脚本',
+  read_element: '读取元素',
+  list_network_requests: '查询网络请求',
+  get_network_request: '读取请求详情',
+  get_console_logs: '读取 Console',
+  pointer: '鼠标操作',
+  keyboard: '键盘操作',
+  save_storage_state: '保存登录态',
+  restore_storage_state: '恢复登录态',
   create_instance: '创建实例',
   close_instance: '关闭实例',
   get_instance: '读取实例',
@@ -27,6 +38,14 @@ const tools: Record<string, string> = {
   list_recordings: '查询录屏',
 };
 const actions: Record<string, string> = {
+  double_click: '双击',
+  right_click: '右键点击',
+  drag: '拖拽',
+  move: '移动鼠标',
+  down: '按下',
+  up: '抬起',
+  wheel: '滚轮',
+  type: '输入文字',
   goto: '打开网页',
   reload: '刷新网页',
   back: '后退',

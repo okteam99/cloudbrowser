@@ -374,7 +374,7 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
         requestInit: { headers: auth },
       }),
     );
-    assert.equal((await client.listTools()).tools.length, 31);
+    assert.equal((await client.listTools()).tools.length, 42);
     const savedList: any = await client.callTool({
       name: 'list_proxies',
       arguments: { protocol: 'socks5', country: 'US' },

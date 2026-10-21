@@ -50,11 +50,15 @@ test('MCP stdio discovery, operation lookup, artifact transfer, reconnect and pr
     assert.ok(ready, logs);
     a = await connect('alice');
     const tools = await a.listTools();
-    assert.equal(tools.tools.length, 31);
+    assert.equal(tools.tools.length, 42);
     for (const [name, required] of [
       ['create_instance', ['proxy_id', 'user_agent', 'viewport', 'task_description']],
       ['proxy_curl', ['proxy_id', 'url', 'headers', 'body', 'timeout_ms']],
       ['check_proxy', ['proxy_id', 'proxy', 'check_url']],
+      ['evaluate', ['instance_id', 'page_id', 'script', 'arg', 'frame_id', 'timeout_ms']],
+      ['pointer', ['action', 'x', 'y', 'to_x', 'to_y', 'modifiers']],
+      ['create_instance', ['storage_state_id']],
+      ['get_network_request', ['instance_id', 'page_id', 'request_id', 'include_body']],
     ] as const) {
       const schema = tools.tools.find((t) => t.name === name)!.inputSchema;
       for (const key of required)
@@ -71,6 +75,16 @@ test('MCP stdio discovery, operation lookup, artifact transfer, reconnect and pr
     const created = await call(a, 'create_instance', { viewport: { width: 390, height: 844 } });
     assert.equal(created.status, 'succeeded');
     const i = created.data.instance_id;
+    const screenshotResponse: any = await a.callTool({
+      name: 'screenshot',
+      arguments: { instance_id: i, page_id: created.data.pages[0].page_id },
+    });
+    assert.ok(
+      screenshotResponse.content.some(
+        (c: any) => c.type === 'image' && c.mimeType === 'image/jpeg',
+      ),
+    );
+    assert.equal(JSON.parse(screenshotResponse.content[0].text).data.mime, 'image/png');
     const inspected = await call(a, 'inspect_instance', { instance_id: i, probe: true });
     assert.equal(inspected.data.responsiveness.status, 'responsive');
     assert.ok(

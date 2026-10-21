@@ -183,11 +183,139 @@ export const definitions: Record<
     schema: z.object({ ...instance, url: z.string().url().optional() }),
   },
   list_pages: {
-    description: 'List page IDs, URLs, titles, pending dialogs. Popups appear automatically.',
+    description:
+      'List live tabs with cached titles, URLs, active state, frames and pending dialogs, even while busy or unresponsive. Popups appear automatically.',
     schema: z.object(instance),
     readOnly: true,
   },
   close_page: { description: 'Close a page.', schema: z.object(page) },
+  get_page: {
+    description:
+      'Read cached tab metadata, frame IDs, load state, pending dialog and reload-required flag without taking the action lock. Closed tab data is retained until instance closure or tab-history eviction.',
+    schema: z.object(page).strict(),
+    readOnly: true,
+  },
+  select_page: {
+    description:
+      'Select a live tab for browser focus, livestream and recording. Other operations still explicitly specify page_id.',
+    schema: z.object(page).strict(),
+  },
+  evaluate: {
+    description:
+      'Execute a JavaScript expression or function in this tab or frame. A function receives arg; promises are awaited. Returns a JSON value with bounded output. This can change page state. On timeout, execution is interrupted and the page must be reloaded before further writes; asynchronous effects may already have happened.',
+    schema: z
+      .object({
+        ...page,
+        script: z.string().min(1).max(100000),
+        arg: z.unknown().optional(),
+        frame_id: id.optional(),
+        timeout_ms: z.number().int().min(100).max(30000).default(5000),
+        max_result_bytes: z.number().int().min(256).max(262144).default(65536),
+      })
+      .strict(),
+  },
+  read_element: {
+    description:
+      'Read one element as structured data: text, value, attributes, checked/selected/disabled state and viewport bounding box. Use snapshot to refresh stale refs.',
+    schema: z
+      .object({ ...page, target, max_text: z.number().int().min(1).max(60000).default(10000) })
+      .strict(),
+    readOnly: true,
+  },
+  list_network_requests: {
+    description:
+      'Query this tab network metadata, including successful fetch/XHR, navigation, redirects and failures. Captures start at page creation. Cursor advances on updates as well as new requests; merge by request_id. Per-tab history is bounded to 200 entries / 4 MiB. No browser action lock.',
+    schema: z
+      .object({
+        ...page,
+        after_seq: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
+        limit: z.number().int().min(1).max(200).default(100),
+        url: z.string().max(4096).optional(),
+        method: z.string().max(32).optional(),
+        resource_type: z.string().max(64).optional(),
+        status_code: z.number().int().min(100).max(599).optional(),
+        failed_only: z.boolean().default(false),
+      })
+      .strict(),
+    readOnly: true,
+  },
+  get_network_request: {
+    description:
+      'Read one captured request with raw request/response headers and optional bodies. Bodies are captured up to 256 KiB each; check body status, truncation and capture errors. Binary bodies use base64. Captured data is not redacted. Works while the instance is busy.',
+    schema: z.object({ ...page, request_id: id, include_body: z.boolean().default(true) }).strict(),
+    readOnly: true,
+  },
+  get_console_logs: {
+    description:
+      'Read original console text, location and page exceptions with stack traces for one tab, without the action lock. Includes log/info/warning/error, not just error categories. Bounded to 300 entries / 1 MiB; inspect truncated and dropped_entries.',
+    schema: z
+      .object({
+        ...page,
+        after_seq: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
+        limit: z.number().int().min(1).max(200).default(100),
+        level: z.string().max(64).optional(),
+      })
+      .strict(),
+    readOnly: true,
+  },
+  pointer: {
+    description:
+      'Mouse operations in viewport CSS pixels: click, double_click, right_click, move, down, up, drag and wheel. Drag uses x/y to to_x/to_y; modifiers and mouse buttons supported. The active tab is selected for recording.',
+    schema: z
+      .object({
+        ...page,
+        action: z.enum([
+          'click',
+          'double_click',
+          'right_click',
+          'move',
+          'down',
+          'up',
+          'drag',
+          'wheel',
+        ]),
+        x: z.number().finite().min(0).max(3840).optional(),
+        y: z.number().finite().min(0).max(3840).optional(),
+        to_x: z.number().finite().min(0).max(3840).optional(),
+        to_y: z.number().finite().min(0).max(3840).optional(),
+        button: z.enum(['left', 'right', 'middle']).default('left'),
+        steps: z.number().int().min(1).max(100).default(12),
+        modifiers: z
+          .array(z.enum(['Alt', 'Control', 'ControlOrMeta', 'Meta', 'Shift']))
+          .max(4)
+          .default([]),
+        delta_x: z.number().min(-10000).max(10000).default(0),
+        delta_y: z.number().min(-10000).max(10000).default(600),
+      })
+      .strict()
+      .superRefine((a, c) => {
+        if (!['up', 'wheel'].includes(a.action) && (a.x === undefined || a.y === undefined))
+          c.addIssue({ code: 'custom', message: 'x and y required' });
+        if (a.action === 'drag' && (a.to_x === undefined || a.to_y === undefined))
+          c.addIssue({ code: 'custom', message: 'drag requires to_x and to_y' });
+      }),
+  },
+  keyboard: {
+    description:
+      'Page-level keyboard press, key down/up or text insertion at the focused element. Supports combinations such as ControlOrMeta+A and Tab without locating an element.',
+    schema: z
+      .object({
+        ...page,
+        action: z.enum(['press', 'down', 'up', 'type']),
+        value: z.string().min(1).max(100000),
+      })
+      .strict(),
+  },
+  save_storage_state: {
+    description:
+      'Save instance cookies, localStorage and optionally IndexedDB as a private owner-authorized artifact. Returns storage_state_id for create_instance or restore_storage_state. SessionStorage and browser extensions are not included.',
+    schema: z.object({ ...instance, indexed_db: z.boolean().default(false) }).strict(),
+  },
+  restore_storage_state: {
+    description:
+      'Replace cookies and origin storage from an owned saved storage_state_id. Existing pages should be explicitly reloaded to use the restored login. New instances can instead pass storage_state_id to create_instance.',
+    schema: z.object({ ...instance, storage_state_id: id }).strict(),
+  },
   navigate: {
     description: 'Navigate, reload, back or forward. HTTP success is not a business pass.',
     schema: z
@@ -251,8 +379,27 @@ export const definitions: Record<
     schema: z.object({ ...page, accept: z.boolean(), text: z.string().max(1000).optional() }),
   },
   screenshot: {
-    description: 'Capture PNG and return artifact metadata. get_artifact retrieves its bytes.',
-    schema: z.object({ ...page, full_page: z.boolean().default(false) }),
+    description:
+      'Capture this tab, full page, one element or viewport clip. Returns the original PNG artifact plus an inline image preview in MCP. Preview dimensions may be scaled; pointer coordinates remain viewport CSS pixels.',
+    schema: z
+      .object({
+        ...page,
+        full_page: z.boolean().default(false),
+        target: target.optional(),
+        clip: z
+          .object({
+            x: z.number().min(0),
+            y: z.number().min(0),
+            width: z.number().min(1).max(3840),
+            height: z.number().min(1).max(3840),
+          })
+          .optional(),
+      })
+      .strict()
+      .refine(
+        (a) => [a.full_page, a.target, a.clip].filter(Boolean).length <= 1,
+        'Use at most one full_page, target or clip',
+      ),
     readOnly: true,
   },
   get_diagnostics: {
