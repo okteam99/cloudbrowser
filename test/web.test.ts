@@ -9,6 +9,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { WebAuth } from '../src/auth.js';
 import { config } from '../src/config.js';
+import { requestOriginMatchesHost } from '../src/web.js';
 import { chromium, type Browser } from 'playwright';
 
 const freePort = async () => {
@@ -26,6 +27,18 @@ const stop = async (p: ChildProcess) => {
 };
 test('default concurrency is 10 and password changes rotate persisted MCP token', async () => {
   assert.equal(config().maxInstances, 10);
+  assert.equal(requestOriginMatchesHost('https://alias.example', 'alias.example'), true);
+  assert.equal(requestOriginMatchesHost('https://alias.example', 'alias.example:443'), true);
+  assert.equal(requestOriginMatchesHost('http://localhost:8080', 'localhost:8080'), true);
+  for (const [origin, host] of [
+    ['https://attacker.example', 'alias.example'],
+    ['null', 'alias.example'],
+    ['https://alias.example/path', 'alias.example'],
+    ['https://alias.example', 'user@alias.example'],
+    ['https://alias.example', 'alias.example/other'],
+    ['https://alias.example', undefined],
+  ])
+    assert.equal(requestOriginMatchesHost(origin!, host), false);
   const dir = await mkdtemp(join(tmpdir(), 'mcp-auth-'));
   try {
     const a = new WebAuth();
@@ -153,6 +166,62 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     assert.equal(login.status, 303);
     const cookie = login.headers.get('set-cookie')!.split(';')[0];
     const headers = { Cookie: cookie };
+    const aliasRequest = (
+      path: string,
+      method = 'GET',
+      data?: string,
+      origin = 'https://console-alias.example',
+    ) =>
+      new Promise<{ status: number; body: string; cookie?: string }>((resolve, reject) => {
+        const req = http.request(
+          {
+            hostname: '127.0.0.1',
+            port,
+            path: '/browser' + path,
+            method,
+            headers: {
+              Host: 'console-alias.example',
+              Origin: origin,
+              ...headers,
+              'content-type': 'application/x-www-form-urlencoded',
+            },
+          },
+          (res) => {
+            let body = '';
+            res.on('data', (c) => (body += c));
+            res.on('end', () =>
+              resolve({ status: res.statusCode!, body, cookie: res.headers['set-cookie']?.[0] }),
+            );
+          },
+        );
+        req.on('error', reject);
+        req.end(data);
+      });
+    const aliasLogin = await aliasRequest(
+      '/login',
+      'POST',
+      new URLSearchParams({ password: 'test-password-123' }).toString(),
+    );
+    assert.equal(aliasLogin.status, 303);
+    assert.ok(aliasLogin.cookie?.includes('HttpOnly'));
+    const aliasConnection = await aliasRequest('/api/connection');
+    assert.equal(aliasConnection.status, 200);
+    assert.equal(
+      JSON.parse(aliasConnection.body).base_url,
+      base,
+      'Link generation keeps BASE_URL as the primary URL',
+    );
+    assert.equal(
+      (
+        await aliasRequest(
+          '/login',
+          'POST',
+          new URLSearchParams({ password: 'test-password-123' }).toString(),
+          'https://untrusted.example',
+        )
+      ).status,
+      403,
+    );
     assert.equal(
       (await fetch(base + '/api/proxies', { method: 'POST', headers, body: '{}' })).status,
       403,

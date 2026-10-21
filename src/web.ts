@@ -36,6 +36,25 @@ const documents: Record<string, string> = {
   'mcp-tools.json': 'docs/mcp-tools.json',
   'agent-workflow.md': 'docs/agent-workflow.md',
 };
+export function requestOriginMatchesHost(origin: string, host?: string) {
+  if (!host) return false;
+  try {
+    const source = new URL(origin);
+    const target = new URL(`${source.protocol}//${host}`);
+    return (
+      ['http:', 'https:'].includes(source.protocol) &&
+      source.origin === origin &&
+      !target.username &&
+      !target.password &&
+      target.pathname === '/' &&
+      !target.search &&
+      !target.hash &&
+      source.origin === target.origin
+    );
+  } catch {
+    return false;
+  }
+}
 export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: Dispatch) {
   if (cfg.webPort === 0) return undefined;
   if (!cfg.webPassword || !cfg.baseUrl)
@@ -93,7 +112,7 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         res.end(req.method === 'HEAD' ? undefined : guide);
         return;
       }
-      if (req.headers.origin && req.headers.origin !== base.origin) {
+      if (req.headers.origin && !requestOriginMatchesHost(req.headers.origin, req.headers.host)) {
         json(res, { error: 'Origin not allowed' }, 403);
         return;
       }
@@ -121,7 +140,7 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         return;
       }
       if (path === '/healthz') {
-        json(res, { status: 'ok', version: '0.9.0' });
+        json(res, { status: 'ok', version: '0.9.1' });
         return;
       }
       if (path === '/mcp') {

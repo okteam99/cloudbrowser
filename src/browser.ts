@@ -1015,7 +1015,7 @@ export class BrowserManager {
     if (name === 'health')
       return {
         status: 'ok',
-        version: '0.9.0',
+        version: '0.9.1',
         base_url: this.cfg.baseUrl,
         public_url_mode: this.cfg.quickTunnel
           ? 'quick_tunnel'

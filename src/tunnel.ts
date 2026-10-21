@@ -54,9 +54,9 @@ export function inferTunnelUrl(config: unknown, port: number) {
         /* Non-HTTP catch-all rules are not application routes. */
       }
     }
-  if (hosts.size !== 1)
+  if (hosts.size === 0)
     throw Error(
-      'Cannot identify one public hostname targeting this container. Configure one hostname pointing to http://localhost:' +
+      'Cannot identify a public hostname targeting this container. Configure a hostname pointing to http://localhost:' +
         port +
         ', or set BASE_URL explicitly.',
     );

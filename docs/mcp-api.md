@@ -232,3 +232,5 @@ inspect_instance和get_logs不占用浏览器执行锁；get_diagnostics也可�
 本服务 Streamable HTTP 使用 JSON 响应，不依赖 Quick Tunnel 不支持的 SSE。所有模式保留原有密码、MCP Bearer、分享密钥和所有者隔离。
 
 实例摘要（`create_instance`、`list_instances`、`get_instance`）的 `user_agent` 为创建时从浏览器读取的实际值；`egress` 包含 `ip`、`source`（instance_check / proxy_check / unknown）、`checked_at`。实例检测由 `verify_environment` 的有效 IP 响应更新；代理检查样本只在代理 ID、地址和凭据与实例固定配置一致且仍新鲜时采用，不能保证当前连接出口相同。未知值返回 null，列表读取不额外访问外部服务。
+
+多个入口域名均可访问控制台与 MCP，浏览器请求按当前 Host 进行同源校验，无需域名白名单。BASE_URL 只决定文档、MCP接入和分享链接的主地址；未设置时使用隧道路由中第一个指向本容器的有效域名。密码、Token与CSRF校验保持有效，反向代理需保留外部Host。

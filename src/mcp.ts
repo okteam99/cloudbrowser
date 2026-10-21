@@ -11,7 +11,7 @@ export type Dispatch = (
   operationId: string,
 ) => Promise<any>;
 export function createMcpServer(owner: string, call: Dispatch) {
-  const server = new McpServer({ name: 'cloudbrowser', version: '0.9.0' });
+  const server = new McpServer({ name: 'cloudbrowser', version: '0.9.1' });
   for (const [name, d] of Object.entries(definitions)) {
     // SDK discovery requires an object at the root. Keep full cross-field validation in the handler.
     let inputSchema = d.schema;

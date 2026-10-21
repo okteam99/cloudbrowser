@@ -20,7 +20,7 @@ async function fake(path: string, mode = 'ready') {
 + const server = http.createServer((req, res) => {
 +  if (req.url === '/ready') { res.statusCode = mode === 'unready' ? 503 : 200; res.end(); }
 +  else if (req.url === '/quicktunnel') res.end(JSON.stringify({hostname: mode === 'evil' ? 'fixture.trycloudflare.com.evil.test' : 'sample-fixture.trycloudflare.com'}));
-+  else res.end(JSON.stringify({version: 1, config: {ingress: [{hostname: 'fixed.example.com', service:'http://localhost:8080'}, {service:'http_status:404'}]}}));
++  else res.end(JSON.stringify({version: 1, config: {ingress: [{hostname: 'fixed.example.com', service:'http://localhost:8080'}, ...(mode === 'multi' ? [{hostname:'alias.example.com',service:'http://127.0.0.1:8080'}] : []), {service:'http_status:404'}]}}));
 + });
 + server.listen(0, '127.0.0.1', () => {
 +  process.stderr.write('Starting metrics server on 127.0.');
@@ -86,6 +86,10 @@ test('Named tunnel needs only token and auto-discovers its stable hostname; expl
       assert.equal(tunnel.url, 'https://fixed.example.com');
       await tunnel.close();
     }
+    await fake(path, 'multi');
+    const automatic = await startCloudflareTunnel(cfg);
+    assert.equal(automatic.url, 'https://fixed.example.com');
+    await automatic.close();
     const tunnel = await startCloudflareTunnel({
       ...cfg,
       baseUrl: 'https://chosen.example.com/browser',
@@ -99,9 +103,14 @@ test('Named tunnel needs only token and auto-discovers its stable hostname; expl
     assert.throws(() => validateTunnelConfig({ ...cfg, quickTunnel: true }), /mutually exclusive/);
     const routes = [{ hostname: 'one.example.com', service: 'http://localhost:8080' }];
     assert.equal(inferTunnelUrl({ ingress: routes }, 8080), 'https://one.example.com');
+    const multiple = [...routes, { hostname: 'two.example.com', service: 'http://127.0.0.1:8080' }];
+    assert.equal(inferTunnelUrl({ ingress: multiple }, 8080), 'https://one.example.com');
+    assert.equal(
+      inferTunnelUrl({ ingress: [...multiple].reverse() }, 8080),
+      'https://two.example.com',
+    );
     for (const ingress of [
       [],
-      [...routes, { hostname: 'two.example.com', service: 'http://127.0.0.1:8080' }],
       [{ hostname: '*.example.com', service: 'http://localhost:8080' }],
       [{ hostname: 'one.example.com', service: 'http://remote.test:8080' }],
     ])

@@ -51,7 +51,15 @@ docker run -d --init \
   bdpgogoup/cloudbrowser:20261021130216
 ```
 
-服务自动读取隧道配置，识别唯一指向本容器端口的域名，无需再填 `BASE_URL`。如果配置了多个符合条件的域名、通配符或路径规则，请增加 `-e BASE_URL=https://browser.example.com` 明确选择地址。只支持 Cloudflare 远程管理的命名隧道，不会代替用户购买域名或创建 DNS。
+服务自动读取隧道配置，按规则顺序选择第一个指向本容器端口的有效域名，无需再填 `BASE_URL`。可通过 `-e BASE_URL=https://browser.example.com` 优先指定主地址；只有通配符或路径规则、无法识别具体域名时也需显式指定。只支持 Cloudflare 远程管理的命名隧道，不会代替用户购买域名或创建 DNS。
+
+同一隧道可以配置多个域名，都可访问控制台和 MCP。`BASE_URL` 用于生成文档、MCP 接入和分享链接；未指定时，按隧道路由顺序使用第一个指向本容器的有效域名。指定主域名的例子：
+
+```sh
+-e BASE_URL=https://cloudbrowser.example.com
+```
+
+控制台不要求配置域名白名单；浏览器请求的 Origin 与当前请求的 Host 一致即可，密码、MCP Token 和 CSRF 校验保持有效。反向代理需保留外部访问的 Host。登录 Cookie 分别保存在当前访问域名下。
 
 Token 通过子进程环境传递，不出现在命令行参数、网页、MCP 返回值或普通日志中。Cloudflare 的连接器 Token 与本服务的 MCP Token 是两种独立凭据。
 
@@ -358,10 +366,10 @@ bash scripts/publish-docker.sh
 ## 源码构建及 stdio 接入
 
 ```sh
-docker build -t cloudbrowser:0.9.0 .
+docker build -t cloudbrowser:0.9.1 .
 ```
 
-将一行部署命令最后的镜像名换成 `cloudbrowser:0.9.0` 即可本地使用。
+将一行部署命令最后的镜像名换成 `cloudbrowser:0.9.1` 即可本地使用。
 
 兼容配置见 [本地 stdio](examples/mcp.local.json)、[SSH stdio](examples/mcp.ssh.json)。仍使用 `docker exec -i`，不得使用 `-t`。MCP_PRINCIPAL 是可信 SSH/Docker 接入中的命名空间，不是独立认证。
 
