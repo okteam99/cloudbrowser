@@ -319,7 +319,7 @@ test('network and console capture retain original contents with per-tab request 
       (v: any) =>
         v.entries.some(
           (r: any) => r.url.endsWith('/large') && r.response_body_status === 'too_large',
-        ),
+        ) && v.entries.some((r: any) => r.url.endsWith('/slow') && r.status === 'failed'),
     );
     assert.ok(network.entries.some((r: any) => r.redirect_from));
     assert.ok(network.entries.some((r: any) => r.status === 'failed'));
