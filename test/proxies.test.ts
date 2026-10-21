@@ -221,11 +221,11 @@ test(
       await call('close_instance', { instance_id: instance.instance_id });
       const events = JSON.stringify(await call('get_logs', { limit: 200 }));
       assert.ok(
-        !events.includes('line1') && !events.includes('saved-id') && !events.includes('wrong'),
+        events.includes('line1') && events.includes('saved-id') && !events.includes('wrong'),
       );
       assert.equal((await m.proxies.list()).length, 3);
       await m.logs.flush();
-      assert.ok(!(await readFile(join(dir, 'diagnostics/events.jsonl'), 'utf8')).includes('line1'));
+      assert.ok((await readFile(join(dir, 'diagnostics/events.jsonl'), 'utf8')).includes('line1'));
     } finally {
       for (const i of m.instances.values()) await m.close(i.owner, i.id);
       await m.logs.flush();

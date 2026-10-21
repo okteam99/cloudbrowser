@@ -11,6 +11,7 @@ import type { LogEvent } from './diagnostics.js';
 export type RecordingMeta = {
   id: string;
   instance_id: string;
+  task_description?: string;
   owner: string;
   created_at: string;
   ended_at?: string;
@@ -84,8 +85,9 @@ export class RecordingStore {
     owner: string,
     getPage: () =>
       { page: Page; page_id: string; deviceScaleFactor?: number; busy?: boolean } | undefined,
+    taskDescription?: string,
   ) {
-    const r = new InstanceRecorder(this, instance, owner, getPage);
+    const r = new InstanceRecorder(this, instance, owner, getPage, taskDescription);
     this.active.set(instance, r);
     await r.start();
     return r;
@@ -167,11 +169,13 @@ export class InstanceRecorder {
     owner: string,
     private getPage: () =>
       { page: Page; page_id: string; deviceScaleFactor?: number; busy?: boolean } | undefined,
+    taskDescription?: string,
   ) {
     const cfg = store.cfg;
     this.meta = {
       id: `rec_${randomUUID()}`,
       instance_id: instance,
+      task_description: taskDescription,
       owner,
       created_at: new Date().toISOString(),
       status: cfg.recordVideo ? 'recording' : 'live_only',

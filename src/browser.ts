@@ -331,6 +331,7 @@ export class BrowserManager {
     }
     return {
       instance_id: i.id,
+      task_description: i.options.task_description,
       active_page_id: i.activePageId,
       recording_id: this.recordings.active.get(i.id)?.meta.id,
       live_frame_at: this.recordings.active.get(i.id)?.latest?.time,
@@ -361,7 +362,7 @@ export class BrowserManager {
       ],
     };
   }
-  async create(owner: string, raw: unknown, operationId?: string) {
+  async create(owner: string, raw: unknown, operationId?: string, id = `ins_${randomUUID()}`) {
     if (this.instances.size + this.creating + this.closing >= this.cfg.maxInstances)
       throw new ToolError('INSTANCE_LIMIT', 'Maximum instances reached.');
     this.creating++;
@@ -369,7 +370,6 @@ export class BrowserManager {
       browser: Browser | undefined,
       server: BrowserServer | undefined,
       dir: string | undefined;
-    const id = `ins_${randomUUID()}`;
     let current: Instance | undefined,
       failed = false;
     this.logs.register({
@@ -388,6 +388,7 @@ export class BrowserManager {
     });
     try {
       const options = createSchema.parse(raw);
+      this.logs.update(id, { task_description: options.task_description });
       const proxy = await this.resolveProxy(options);
       gateway = await createGateway(this.policy, proxy);
       dir = await mkdtemp(join(this.cfg.dataDir, 'sessions', 'instance-'));
@@ -530,16 +531,21 @@ export class BrowserManager {
         },
       });
       const p = await context.newPage();
-      const recorder = await this.recordings.start(i.id, owner, () => {
-        const e = i.pages.get(i.activePageId ?? '') ?? Array.from(i.pages.values()).at(-1);
-        if (!e) return undefined;
-        return {
-          page: e.page,
-          page_id: Array.from(i.pages).find(([, v]) => v === e)![0],
-          deviceScaleFactor: i.options.mobile?.device_scale_factor ?? 1,
-          busy: i.busy,
-        };
-      });
+      const recorder = await this.recordings.start(
+        i.id,
+        owner,
+        () => {
+          const e = i.pages.get(i.activePageId ?? '') ?? Array.from(i.pages.values()).at(-1);
+          if (!e) return undefined;
+          return {
+            page: e.page,
+            page_id: Array.from(i.pages).find(([, v]) => v === e)![0],
+            deviceScaleFactor: i.options.mobile?.device_scale_factor ?? 1,
+            busy: i.busy,
+          };
+        },
+        options.task_description,
+      );
       this.logs.update(id, {
         recording: {
           recording_id: recorder.meta.id,
@@ -851,28 +857,45 @@ export class BrowserManager {
     operationId: string = randomUUID(),
   ): Promise<any> {
     if (name === 'get_logs') return this.logs.query(owner, a);
-    if (name === 'inspect_instance')
-      return this.inspect(owner, a.instance_id, a.probe ?? true, a.timeout_ms ?? 1500);
-    if (name === 'get_diagnostics') {
-      const i = this.instances.get(a.instance_id);
-      if (!i || i.owner !== owner)
-        throw new ToolError(
-          'INSTANCE_NOT_FOUND',
-          'Unknown live instance. Use get_logs or inspect_instance for retained history.',
-        );
-      return { events: i.events.slice(-a.limit), downloads: i.downloads };
-    }
     const started = Date.now();
     const own = this.instances.get(a.instance_id);
-    const id = own?.owner === owner ? own.id : undefined;
-    const track = ![
-      'health',
-      'list_instances',
-      'list_pages',
-      'get_instance',
-      'list_recordings',
-      'list_share_links',
-    ].includes(name);
+    let id =
+      name === 'create_instance'
+        ? `ins_${randomUUID()}`
+        : own?.owner === owner
+          ? own.id
+          : undefined;
+    if (!id && typeof a.instance_id === 'string') {
+      try {
+        id = this.logs.get(owner, a.instance_id).instance_id;
+      } catch {
+        /* Do not associate calls with another principal's instance. */
+      }
+    }
+    const fields: Record<string, string | number | boolean | null> = { tool: name };
+    if (['navigate', 'create_page'].includes(name) && typeof a.url === 'string') fields.url = a.url;
+    if (name === 'verify_environment' && typeof a.check_url === 'string') fields.url = a.check_url;
+    if (
+      ['navigate', 'interact'].includes(name) &&
+      typeof a.action === 'string' &&
+      [
+        'goto',
+        'reload',
+        'back',
+        'forward',
+        'click',
+        'fill',
+        'press',
+        'select',
+        'check',
+        'hover',
+        'scroll',
+      ].includes(a.action)
+    )
+      fields.action = a.action;
+
+    const track =
+      !!id || !['health', 'list_instances', 'list_recordings', 'list_share_links'].includes(name);
     if (track)
       this.logs.log({
         owner,
@@ -881,19 +904,22 @@ export class BrowserManager {
         component: 'operation',
         level: 'info',
         code: 'operation_started',
-        fields: { tool: name },
+        page_id: a.page_id,
+        arguments: a,
+        fields,
       });
     try {
-      const result = await this.dispatchOperation(owner, name, a, operationId);
+      const result = await this.dispatchOperation(owner, name, a, operationId, id);
       if (track)
         this.logs.log({
           owner,
-          instance_id: id ?? (name === 'create_instance' ? result.instance_id : undefined),
+          instance_id: id,
+          page_id: a.page_id,
           operation_id: operationId,
           component: 'operation',
           level: 'info',
           code: 'operation_succeeded',
-          fields: { tool: name, elapsed_ms: Date.now() - started },
+          fields: { ...fields, elapsed_ms: Date.now() - started },
         });
       return result;
     } catch (error) {
@@ -904,9 +930,11 @@ export class BrowserManager {
         component: 'operation',
         level: 'error',
         code: 'operation_failed',
+        page_id: a.page_id,
         fields: {
-          tool: name,
+          ...fields,
           error_code: publicError(error).code,
+          error_message: error instanceof Error ? error.message : String(error),
           elapsed_ms: Date.now() - started,
         },
       });
@@ -918,7 +946,19 @@ export class BrowserManager {
     name: string,
     a: any,
     operationId: string,
+    instanceId?: string,
   ): Promise<any> {
+    if (name === 'inspect_instance')
+      return this.inspect(owner, a.instance_id, a.probe ?? true, a.timeout_ms ?? 1500);
+    if (name === 'get_diagnostics') {
+      const i = this.instances.get(a.instance_id);
+      if (!i || i.owner !== owner)
+        throw new ToolError(
+          'INSTANCE_NOT_FOUND',
+          'Unknown live instance. Use get_logs or inspect_instance for retained history.',
+        );
+      return { events: i.events.slice(-a.limit), downloads: i.downloads };
+    }
     if (name === 'list_share_links') return this.shares.list(owner);
     if (name === 'revoke_share_link') return this.shares.revoke(owner, a.share_id);
     if (name === 'create_share_link') {
@@ -975,7 +1015,7 @@ export class BrowserManager {
     if (name === 'health')
       return {
         status: 'ok',
-        version: '0.8.1',
+        version: '0.9.0',
         base_url: this.cfg.baseUrl,
         public_url_mode: this.cfg.quickTunnel
           ? 'quick_tunnel'
@@ -1005,7 +1045,7 @@ export class BrowserManager {
         this.curlActive--;
       }
     }
-    if (name === 'create_instance') return this.create(owner, a, operationId);
+    if (name === 'create_instance') return this.create(owner, a, operationId, instanceId);
     if (name === 'list_instances')
       return Array.from(this.instances.values())
         .filter((i) => i.owner === owner)

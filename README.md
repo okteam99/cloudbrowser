@@ -2,7 +2,7 @@
 
 **让 AI 操作浏览器，实时直播、全程录屏，操作过程看得见。** 通过 MCP 将远程浏览器接入 AI Agent；打开控制台、输入访问密码，即可复制接入信息。
 
-实例创建时可指定 UA、页面视口、HTTP/SOCKS5 鉴权代理、语言与时区；支持点击、输入、iframe、多标签页、上传下载、截图及诊断。
+实例创建时可填写任务描述，并指定 UA、页面视口、HTTP/SOCKS5 鉴权代理、语言与时区；支持点击、输入、iframe、多标签页、上传下载、截图及诊断。
 
 ## 使用流程
 
@@ -128,6 +128,7 @@ Agent 必须支持远程 Streamable HTTP MCP 及自定义 Authorization 请求�
 
 ```json
 {
+  "task_description": "验证移动端商品页、购物车和下载流程",
   "user_agent": "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
   "viewport": { "width": 412, "height": 915 },
   "mobile": { "enabled": true, "touch": true, "device_scale_factor": 2 },
@@ -265,7 +266,7 @@ Agent 调用 `list_proxies` 查询列表，可传 `country: "US"`、`protocol: "
 
 可指定 `method`、`headers`、UTF-8 `body`、`follow_redirects`、`timeout_ms`、`max_bytes` 和 `response_encoding`（text / base64）。返回状态码、响应头、响应体、最终 URL 和耗时。默认 GET、15 秒、64 KiB、不跟随跳转；最长60秒、最大响应1 MiB、最多5次跳转，请求体最多64 KiB。HTTP 4xx/5xx 原样返回状态码；网络失败和超限返回工具错误。不会执行 Shell、自动重试或在代理失败后直连。请求可能已到达目标，写请求超时后应确认状态再重试。
 
-目标遵循 `ALLOWED_HOSTS` 和内网访问限制，跳转目标也经过代理网关检查。HTTP 请求并发上限与 `MAX_INSTANCES` 相同，但不占浏览器实例名额。响应可能包含目标站点的敏感信息，按需要使用并保存；诊断日志不记录请求头、请求体和响应体。
+目标遵循 `ALLOWED_HOSTS` 和内网访问限制，跳转目标也经过代理网关检查。HTTP 请求并发上限与 `MAX_INSTANCES` 相同，但不占浏览器实例名额。响应可能包含目标站点的敏感信息，按需要使用并保存；调用日志会保留传入的请求参数，不保存响应体。
 
 原内联 `proxy` 参数和 `proxy_ref` 仍兼容，与 `proxy_id` 三选一。可选挂载旧配置：
 
@@ -288,7 +289,19 @@ Agent 调用 `list_proxies` 查询列表，可传 `country: "US"`、`protocol: "
 
 ## MCP 日志与故障排查
 
-`get_logs` 查询脱敏的持久化事件，`inspect_instance` 查询当前或历史实例状态。实例关闭、浏览器崩溃、管理进程重启后，只要保留 `/data` 且记录未被清理，仍可排查；新日志能力无法补回升级前未记录的证据。
+`get_logs` 查询持久化事件，`inspect_instance` 查询当前或历史实例状态。实例关闭、浏览器崩溃、管理进程重启后，只要保留 `/data` 且记录未被清理，仍可排查；新日志能力无法补回升级前未记录的证据。
+
+创建实例时可填写可选的 `task_description`（去除首尾空格后1–1000字符），任务目标会显示在实时实例、直播详情和历史录屏中，并保存在实例历史和录屏元信息里。未填写的旧实例显示“未填写任务描述”。
+
+实时实例和历史录屏每行都有“查看调用日志”入口：按调用显示时间、功能、成功/失败/执行中、耗时及目标；展开可查看完整参数、原始错误信息、页面 ID 和 operation_id。支持结果筛选，每5秒自动更新。实例关闭后、服务重启后仍可查询保留期内的日志。
+
+通过 MCP 查看实例功能调用：
+
+```json
+{"instance_id":"ins_...","component":"operation","limit":200}
+```
+
+`operation_started` 包含完整校验后参数 `arguments`；同一 `operation_id` 的 `operation_succeeded` / `operation_failed` 包含耗时、结果和原始错误信息。创建、打开网页、点击/输入、截屏、关闭实例等调用均会记录。`get_logs` 本身和不指定实例的列表/健康轮询不记录为实例调用。
 
 卡住时先调用 `inspect_instance`：
 
@@ -317,7 +330,7 @@ Agent 调用 `list_proxies` 查询列表，可传 `country: "US"`、`protocol: "
 
 日志默认保留7天、最多约16 MiB，分4段轮转；实例状态最多保留1000个结束记录。高频页面事件超过队列上限会丢弃并通过 `dropped_events` 明确报告，避免日志本身拖垮服务；`write_errors` / `last_write_error` 报告存储故障。历史被轮转或过期清理后无法补回。
 
-日志不记录认证头、Cookie、请求/响应正文、输入内容和原始 console 文本；保留错误类型、HTTP状态、网络错误码及脱敏URL。MCP仅能查询当前 principal 的实例事件和通用服务事件，不接受任意服务器文件路径。公开分享链接和公开文档不能访问日志。
+功能调用日志不脱敏：完整 URL、调用参数（包括输入值、显式传入的凭据或请求头/正文）及原始错误消息按原文保存。页面诊断事件仍只记录事件类别、HTTP状态、网络错误码及去除查询参数的URL，不采集原始 console 文本和响应正文。MCP仅能查询当前 principal 的实例事件和通用服务事件，不接受任意服务器文件路径。公开分享链接和公开文档不能访问日志。
 
 服务或容器整个不可用时，MCP也无法响应。请先在服务器上保留以下输出，再恢复服务：
 
@@ -345,10 +358,10 @@ bash scripts/publish-docker.sh
 ## 源码构建及 stdio 接入
 
 ```sh
-docker build -t cloudbrowser:0.8.1 .
+docker build -t cloudbrowser:0.9.0 .
 ```
 
-将一行部署命令最后的镜像名换成 `cloudbrowser:0.8.1` 即可本地使用。
+将一行部署命令最后的镜像名换成 `cloudbrowser:0.9.0` 即可本地使用。
 
 兼容配置见 [本地 stdio](examples/mcp.local.json)、[SSH stdio](examples/mcp.ssh.json)。仍使用 `docker exec -i`，不得使用 `-t`。MCP_PRINCIPAL 是可信 SSH/Docker 接入中的命名空间，不是独立认证。
 

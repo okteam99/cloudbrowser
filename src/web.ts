@@ -121,7 +121,7 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         return;
       }
       if (path === '/healthz') {
-        json(res, { status: 'ok', version: '0.8.1' });
+        json(res, { status: 'ok', version: '0.9.0' });
         return;
       }
       if (path === '/mcp') {
@@ -347,6 +347,32 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
       }
       if (path === '/api/instances' && req.method === 'GET') {
         json(res, { max_instances: cfg.maxInstances, instances: manager.adminInstances() });
+        return;
+      }
+      const instanceLogs = /^\/api\/instances\/(ins_[a-f0-9-]{36})\/logs$/.exec(path);
+      if (instanceLogs && req.method === 'GET') {
+        const parsed = definitions.get_logs.schema.safeParse({
+          instance_id: instanceLogs[1],
+          component: requestUrl.searchParams.get('component') ?? undefined,
+          level: requestUrl.searchParams.get('level') ?? undefined,
+          after_seq: requestUrl.searchParams.has('after_seq')
+            ? Number(requestUrl.searchParams.get('after_seq'))
+            : undefined,
+          limit: requestUrl.searchParams.has('limit')
+            ? Number(requestUrl.searchParams.get('limit'))
+            : 200,
+        });
+        if (!parsed.success) {
+          json(res, { error: 'Invalid log query' }, 400);
+          return;
+        }
+        try {
+          json(res, await manager.logs.adminInstanceLogs(instanceLogs[1], parsed.data));
+        } catch (error) {
+          if (error instanceof ToolError && error.code === 'INSTANCE_NOT_FOUND')
+            json(res, { error: publicError(error) }, 404);
+          else throw error;
+        }
         return;
       }
       if (path === '/api/recordings' && req.method === 'GET') {

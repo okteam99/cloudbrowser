@@ -26,6 +26,13 @@ export const proxySchema = z
   });
 export const createSchema = z
   .object({
+    task_description: z
+      .string()
+      .trim()
+      .min(1)
+      .max(1000)
+      .describe('Task objective shown in the console and retained with instance history.')
+      .optional(),
     user_agent: z.string().min(1).max(1024).optional(),
     viewport: z
       .object({

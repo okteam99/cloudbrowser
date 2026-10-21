@@ -68,9 +68,9 @@ test('durable logs rotate, resume after partial writes, redact known secrets and
       log.log({
         owner: n % 2 ? 'alice' : 'bob',
         instance_id: n % 2 ? id : undefined,
-        component: 'operation',
+        component: 'page',
         level: n % 3 ? 'info' : 'error',
-        code: 'operation_failed',
+        code: 'request_failed',
         fields: {
           tool: 'navigate',
           filler: 'x'.repeat(250),
@@ -195,7 +195,18 @@ test('browser process crash remains inspectable after cleanup and restart withou
     )) {
       const content = await readFile(join(dir, 'diagnostics', name), 'utf8');
       assert.ok(!content.includes('PAGE_SECRET_SHOULD_NOT_BE_SAVED'));
-      assert.ok(!content.includes('QUERY_SECRET_SHOULD_NOT_BE_SAVED'));
+      const pageRows = content
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line))
+        .filter((row) => row.component === 'page');
+      assert.ok(!JSON.stringify(pageRows).includes('QUERY_SECRET_SHOULD_NOT_BE_SAVED'));
+      const operationRows = content
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line))
+        .filter((row) => row.component === 'operation');
+      assert.ok(JSON.stringify(operationRows).includes('QUERY_SECRET_SHOULD_NOT_BE_SAVED'));
     }
     await manager.shutdown();
     const restarted = new BrowserManager(cfg);
@@ -395,9 +406,18 @@ test('closing a short-lived instance still finalizes at least one recorded frame
 test('event bursts have a bounded queue and report dropped events without losing a service warning', async () => {
   const { Diagnostics } = await import('../src/diagnostics.js');
   const dir = await mkdtemp(join(tmpdir(), 'mcp-log-burst-'));
-  const log = new Diagnostics({ ...config(), dataDir: dir });
+  const log = new Diagnostics({ ...config(), dataDir: dir, maxLogBytes: 65536 });
   await log.init();
   try {
+    log.log({
+      owner: 'alice',
+      component: 'operation',
+      level: 'info',
+      code: 'operation_started',
+      arguments: { value: 'x'.repeat(65536) },
+    });
+    await log.flush();
+    assert.equal(log.droppedEvents, 1);
     for (let n = 0; n < 5000; n++)
       log.log({ owner: 'alice', component: 'page', level: 'warn', code: 'console' });
     log.log({ component: 'service', level: 'error', code: 'memory_pressure' });
@@ -406,6 +426,109 @@ test('event bursts have a bounded queue and report dropped events without losing
     assert.ok(result.entries.some((r) => r.code === 'memory_pressure'));
   } finally {
     await log.flush();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('task objectives and complete per-instance function calls survive closure and restart', async () => {
+  const http = await import('node:http');
+  const { createSchema } = await import('../src/config.js');
+  const fixture = http.createServer((_req, res) => {
+    res.setHeader('content-type', 'text/html');
+    res.end('<input id="password" type="password">');
+  });
+  await new Promise<void>((r) => fixture.listen(0, '127.0.0.1', r));
+  const dir = await mkdtemp(join(tmpdir(), 'mcp-call-history-'));
+  const cfg = { ...config(), dataDir: dir, recordVideo: true, allowPrivate: true };
+  const manager = new BrowserManager(cfg);
+  await manager.init();
+  const task = '验证登录与下载，保留每一步调用记录';
+  assert.equal(createSchema.safeParse({ task_description: '  ' }).success, false);
+  assert.equal(createSchema.safeParse({ task_description: 'x'.repeat(1001) }).success, false);
+  try {
+    const i = await manager.execute('alice', 'create_instance', {
+      task_description: '  ' + task + '  ',
+    });
+    const id = i.instance_id;
+    const args = { instance_id: id, page_id: i.pages[0].page_id };
+    assert.equal(i.task_description, task);
+    const url = `http://127.0.0.1:${(fixture.address() as any).port}/?token=full-query#section`;
+    await manager.execute('alice', 'navigate', { ...args, action: 'goto', url });
+    manager.logs.registerSecret('full-input-password');
+    await manager.execute('alice', 'interact', {
+      ...args,
+      action: 'fill',
+      target: { css: '#password' },
+      value: 'full-input-password',
+    });
+    await manager.execute('alice', 'screenshot', args);
+    await assert.rejects(
+      manager.execute('alice', 'wait_for', {
+        ...args,
+        target: { css: '#missing' },
+        timeout_ms: 100,
+      }),
+      /Timeout/i,
+    );
+    await manager.execute('alice', 'close_instance', { instance_id: id });
+    const options = { instance_id: id, component: 'operation', limit: 200 };
+    const calls = await manager.execute('alice', 'get_logs', options);
+    for (const tool of [
+      'create_instance',
+      'navigate',
+      'interact',
+      'screenshot',
+      'close_instance',
+    ]) {
+      const start = calls.entries.find(
+        (r: any) => r.code === 'operation_started' && r.fields.tool === tool,
+      );
+      const end = calls.entries.find(
+        (r: any) => r.code === 'operation_succeeded' && r.fields.tool === tool,
+      );
+      assert.ok(start && end, tool);
+      assert.equal(start.operation_id, end.operation_id);
+      assert.ok(end.fields.elapsed_ms >= 0);
+    }
+    assert.equal(calls.entries.find((r: any) => r.arguments?.url)?.arguments.url, url);
+    assert.ok(calls.entries.some((r: any) => r.arguments?.value === 'full-input-password'));
+    assert.ok(
+      calls.entries.some(
+        (r: any) =>
+          r.code === 'operation_failed' &&
+          r.fields.error_code === 'TIMEOUT' &&
+          r.fields.error_message.includes('#missing'),
+      ),
+    );
+    await assert.rejects(manager.execute('bob', 'get_logs', options), {
+      code: 'INSTANCE_NOT_FOUND',
+    });
+    assert.equal(
+      (await manager.logs.adminInstanceLogs(id, { limit: 200 })).instance.task_description,
+      task,
+    );
+    assert.equal((await manager.recordings.list())[0].task_description, task);
+    await manager.shutdown();
+    const restored = new BrowserManager(cfg);
+    await restored.init();
+    try {
+      assert.equal(
+        (await restored.execute('alice', 'inspect_instance', { instance_id: id, probe: false }))
+          .instance.task_description,
+        task,
+      );
+      assert.equal((await restored.recordings.list())[0].task_description, task);
+      assert.ok(
+        (
+          await restored.logs.adminInstanceLogs(id, { component: 'operation', limit: 200 })
+        ).entries.some((r) => r.arguments?.value === 'full-input-password'),
+      );
+    } finally {
+      await restored.shutdown();
+    }
+  } finally {
+    await manager.shutdown();
+    await new Promise<void>((r) => fixture.close(() => r()));
     await rm(dir, { recursive: true, force: true });
   }
 });

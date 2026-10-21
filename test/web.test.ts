@@ -323,15 +323,31 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
       const r: any = await client!.callTool({ name, arguments: args });
       return JSON.parse(r.content[0].text);
     };
+    const taskDescription = '验证移动端页面与下载流程 <任务目标>';
     const result = await call('create_instance', {
+      task_description: taskDescription,
       viewport: { width: 390, height: 844 },
       mobile: { enabled: true, touch: true, device_scale_factor: 2 },
     });
     assert.equal(result.status, 'succeeded', JSON.stringify(result));
     const id = result.data.instance_id;
+    assert.equal(result.data.task_description, taskDescription);
+    const logUrl = `${base}/api/instances/${id}/logs`;
+    assert.equal((await fetch(logUrl)).status, 401);
+    assert.equal((await fetch(logUrl + '?limit=201', { headers })).status, 400);
+    assert.equal((await fetch(logUrl + '?component=wrong', { headers })).status, 400);
+    assert.equal(
+      (
+        await fetch(`${base}/api/instances/ins_00000000-0000-0000-0000-000000000099/logs`, {
+          headers,
+        })
+      ).status,
+      404,
+    );
     const ids = { instance_id: id, page_id: result.data.pages[0].page_id };
     assert.equal((await call('create_instance')).error.code, 'INSTANCE_LIMIT');
-    await call('navigate', { ...ids, url: fixtureUrl });
+    await call('navigate', { ...ids, url: fixtureUrl + '/?token=complete-url#original' });
+    await call('screenshot', ids);
     await call('interact', { ...ids, action: 'click', target: { role: 'button', name: 'Change' } });
     viewer = await chromium.launch({ headless: true });
     const viewerContext = await viewer.newContext({ viewport: { width: 1280, height: 900 } });
@@ -351,6 +367,22 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
       { timeout: 10000 },
     );
 
+    assert.equal(
+      await viewerPage.locator('.live-instance-task .instance-task-full').innerText(),
+      taskDescription,
+    );
+    await viewerPage.getByRole('button', { name: `查看实例日志 ${id}`, exact: true }).click();
+    const logDrawer = viewerPage.getByRole('dialog', { name: /实例调用日志/ });
+    await logDrawer.getByText(taskDescription, { exact: true }).waitFor();
+    await logDrawer.getByText('navigate', { exact: true }).waitFor();
+    await logDrawer.getByText('screenshot', { exact: true }).waitFor();
+    const navigateRow = logDrawer.locator('.ant-table-row').filter({ hasText: 'navigate' });
+    await navigateRow.locator('.ant-table-row-expand-icon').click();
+    await logDrawer
+      .locator('.instance-log-detail pre')
+      .filter({ hasText: 'complete-url#original' })
+      .waitFor();
+    await logDrawer.locator('.ant-drawer-close').click();
     assert.equal(
       await viewerPage.locator('.instance-proxy-address').innerText(),
       '直连（未使用代理）',
@@ -490,12 +522,30 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     assert.equal((await pendingWait).error.code, 'TIMEOUT');
 
     await call('close_instance', { instance_id: id });
+    const loggedCalls = await (
+      await fetch(logUrl + '?component=operation&limit=200', { headers })
+    ).json();
+    assert.equal(loggedCalls.instance.task_description, taskDescription);
+    assert.ok(
+      loggedCalls.entries.some(
+        (e: any) => e.code === 'operation_succeeded' && e.fields.tool === 'close_instance',
+      ),
+    );
+    assert.ok(
+      loggedCalls.entries.every((e: any) => e.component === 'operation' && !('owner' in e)),
+    );
+    const newerCalls = await (
+      await fetch(logUrl + '?after_seq=' + loggedCalls.next_after_seq, { headers })
+    ).json();
+    assert.deepEqual(newerCalls.entries, []);
+
     let history: any[] = [];
     for (let n = 0; n < 20; n++) {
       history = (await (await fetch(base + '/api/recordings', { headers })).json()) as any[];
       if (history[0]?.status === 'completed') break;
       await new Promise((r) => setTimeout(r, 100));
     }
+    assert.equal(history[0].task_description, taskDescription);
     assert.equal(history[0].status, 'completed', JSON.stringify(history));
     assert.ok(history[0].frames >= 2);
     assert.ok(history[0].bytes > 0);
@@ -543,6 +593,17 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     ).data;
 
     await viewerPage.getByRole('menuitem', { name: '历史录屏' }).click();
+    await viewerPage.getByLabel('搜索录像', { exact: true }).fill('移动端页面');
+    await viewerPage.getByRole('button', { name: `查看实例日志 ${id}`, exact: true }).click();
+    await logDrawer.getByText('close_instance', { exact: true }).waitFor();
+    await logDrawer.getByText('wait_for', { exact: true }).waitFor();
+    await logDrawer.getByLabel('筛选调用结果').click();
+    await viewerPage.locator('.ant-select-dropdown').getByText('失败', { exact: true }).click();
+    await logDrawer.getByText('TIMEOUT', { exact: true }).waitFor();
+    assert.equal(await logDrawer.getByText('close_instance', { exact: true }).count(), 0);
+    await logDrawer.getByRole('tab', { name: '全部事件' }).click();
+    await logDrawer.getByText('instance_closed', { exact: true }).waitFor();
+    await logDrawer.locator('.ant-drawer-close').click();
     await viewerPage.getByRole('button', { name: '播放录像' }).click();
     await viewerPage.getByLabel('历史录像播放器').waitFor();
     await viewerPage.waitForFunction(
@@ -577,6 +638,11 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
       401,
       'Sessions expire on restart',
     );
+    const restoredLogs = await (
+      await fetch(logUrl + '?component=operation', { headers: auth })
+    ).json();
+    assert.equal(restoredLogs.instance.task_description, taskDescription);
+    assert.ok(restoredLogs.entries.some((e: any) => e.fields?.tool === 'close_instance'));
     const persisted = await fetch(base + '/api/recordings', { headers: auth });
     assert.equal(persisted.status, 200);
     assert.equal(((await persisted.json()) as any[]).length, recordingsBefore);

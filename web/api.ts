@@ -25,6 +25,7 @@ export type Connection = {
 };
 export type BrowserInstance = {
   instance_id: string;
+  task_description?: string;
   status: string;
   owner: string;
   created_at: string;
@@ -44,6 +45,7 @@ export type BrowserInstance = {
 export type Recording = {
   id: string;
   instance_id: string;
+  task_description?: string;
   owner: string;
   created_at: string;
   ended_at?: string;
@@ -54,6 +56,26 @@ export type Recording = {
   height: number;
   bytes: number;
   error?: string;
+};
+export type InstanceLogEvent = {
+  seq: number;
+  time: string;
+  level: 'info' | 'warn' | 'error';
+  component: string;
+  code: string;
+  page_id?: string;
+  operation_id?: string;
+  fields?: Record<string, string | number | boolean | null>;
+  arguments?: Record<string, unknown>;
+};
+export type InstanceLogs = {
+  instance: { instance_id: string; task_description?: string; status: string; ended_at?: string };
+  entries: InstanceLogEvent[];
+  next_after_seq: number;
+  has_more: boolean;
+  history_truncated: boolean;
+  write_errors: number;
+  dropped_events: number;
 };
 export type SavedProxy = {
   proxy_id: string;

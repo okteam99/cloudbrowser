@@ -27,9 +27,11 @@ export type LogEvent = {
   page_id?: string;
   operation_id?: string;
   fields?: Record<string, string | number | boolean | null>;
+  arguments?: Record<string, unknown>;
 };
 export type InstanceRecord = {
   instance_id: string;
+  task_description?: string;
   owner: string;
   created_at: string;
   updated_at: string;
@@ -179,11 +181,19 @@ export class Diagnostics {
       ? Object.fromEntries(
           Object.entries(event.fields)
             .slice(0, 20)
-            .map(([k, v]) => [k, typeof v === 'string' ? this.cleanText(v) : v]),
+            .map(([k, v]) => [
+              k,
+              typeof v === 'string' && event.component !== 'operation' ? this.cleanText(v) : v,
+            ]),
         )
       : undefined;
     const row: LogEvent = { ...event, fields, seq: ++this.next, time: new Date().toISOString() };
     const line = JSON.stringify(row) + '\n';
+    if (Buffer.byteLength(line) > this.cfg.maxLogBytes / 4) {
+      this.queuedEvents--;
+      this.droppedEvents++;
+      return;
+    }
     this.enqueue(async () => {
       try {
         if (this.fileSize + Buffer.byteLength(line) > this.cfg.maxLogBytes / 4) {
@@ -222,6 +232,14 @@ export class Diagnostics {
       throw new ToolError('INSTANCE_NOT_FOUND', 'Unknown or expired instance history.');
     const { owner: _owner, ...safe } = record;
     return structuredClone(safe);
+  }
+  async adminInstanceLogs(id: string, options: Parameters<Diagnostics['query']>[1]) {
+    const record = this.records.get(id);
+    if (!record) throw new ToolError('INSTANCE_NOT_FOUND', 'Unknown or expired instance history.');
+    return {
+      instance: this.get(record.owner, id),
+      ...(await this.query(record.owner, { ...options, instance_id: id })),
+    };
   }
   private async readEvents() {
     const all: LogEvent[] = [];

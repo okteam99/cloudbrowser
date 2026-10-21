@@ -24,7 +24,7 @@ export const definitions: Record<
 > = {
   get_logs: {
     description:
-      'Query durable, bounded, redacted service/browser/page/operation/recorder/tunnel events. Survives instance closure and manager restart when the data volume is preserved. Only this principal and generic service events are visible. No raw console text, credentials, request bodies or arbitrary file paths. Omit after_seq for recent events; use returned next_after_seq to read newer events.',
+      'Query durable, bounded service/browser/page/operation/recorder/tunnel events. Operation events retain full validated arguments, URLs and original error messages without redaction; filter component=operation for function call history. Survives instance closure and manager restart when the data volume is preserved. Only this principal and generic service events are visible. Logs require authentication and may contain credentials or input values in operation arguments. No arbitrary file access. Omit after_seq for recent events; use returned next_after_seq to read newer events.',
     schema: z
       .object({
         instance_id: id.optional(),
@@ -155,7 +155,7 @@ export const definitions: Record<
   },
   create_instance: {
     description:
-      'Create an isolated Chromium instance with fixed UA, viewport and optional authenticated HTTP/SOCKS5 proxy. Use proxy_id from list_proxies, inline proxy, or legacy proxy_ref (mutually exclusive). No direct fallback. No proxy means explicit direct mode.',
+      'Create an isolated Chromium instance with optional task_description (1–1000 characters, shown in console/history), UA, viewport and optional authenticated HTTP/SOCKS5 proxy. Use proxy_id from list_proxies, inline proxy, or legacy proxy_ref (mutually exclusive). No direct fallback. No proxy means explicit direct mode.',
     schema: createSchema,
   },
   list_instances: {

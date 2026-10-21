@@ -4,7 +4,7 @@
 
 1. 从用户目标确定 URL、设备、代理和允许的写入操作。只使用用户授权的账号、文件与站点。
 2. `list_proxies` 选择代理；不把国家标签当作已验证的出口。
-3. `create_instance` 指定 UA、viewport、mobile、locale、timezone、proxy_id，保存 instance_id 和初始 page_id。
+3. `create_instance` 用 task_description 简要说明任务目标，指定 UA、viewport、mobile、locale、timezone、proxy_id，保存 instance_id 和初始 page_id。
 4. `verify_environment` 检查真实 IP、UA 和设备属性；失败时报告环境失败，不能当作目标网站故障。
 5. `navigate` 打开目标；`snapshot` 获取可见结构与元素。
 6. `interact` 使用 role/name 或当前快照 ref。页面变化后重新读取，不猜测过期引用。
@@ -30,6 +30,10 @@
 用户需要公开观看时，在实例运行期间调用 `create_share_link`，传 `kind=live`、`instance_id` 及所需 `expires_in_seconds`，将返回的 `url` 交给用户。实例关闭后，通过 `list_recordings` 查找对应录像，再以 `kind=recording`、`recording_id` 创建独立回放链接。不要将管理员 Token 或原始鉴权媒体地址当作公开分享链接。
 
 链接无需登录，持有者可看到对应内容。告知有效期并保存 `share_id`，需要收回时调用 `revoke_share_link`；可用 `list_share_links` 查询状态。完整 URL 只在创建结果中返回，后续列表不返回密钥。
+
+## 查看实例操作过程
+
+使用 `get_logs({"instance_id":"ins_...","component":"operation","limit":200})` 查询功能调用，按 operation_id 关联开始与结果，查看完整 arguments、耗时、错误码和原始错误信息。调用参数和 URL 不脱敏。使用返回的 next_after_seq 增量查询新事件；has_more=true 时继续读取。实例关闭后和服务重启后仍可在保留期内查询；控制台实时实例和历史录屏的日志入口展示相同记录。
 
 ## 实例退出或疑似卡死
 

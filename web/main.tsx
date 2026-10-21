@@ -74,6 +74,7 @@ import {
 import 'antd/dist/reset.css';
 import './styles.css';
 import { ProxiesPage } from './proxies';
+import { InstanceLogDrawer } from './instance-logs';
 
 const { Title, Text, Paragraph } = Typography;
 type Section = 'overview' | 'instances' | 'history' | 'proxies' | 'connect' | 'docs';
@@ -262,6 +263,7 @@ function Dashboard() {
   const service = useService();
   const [watching, setWatching] = useState<string>();
   const [playing, setPlaying] = useState<Recording>();
+  const [logging, setLogging] = useState<{ instance_id: string; task_description?: string }>();
   const [guideOpen, setGuideOpen] = useState(false);
   const { message } = App.useApp();
   const choose = useCallback((key: string) => {
@@ -318,7 +320,7 @@ function Dashboard() {
                 <span className="status-dot" />
                 远程浏览器服务
               </div>
-              <Text>cloudbrowser · v0.8.1</Text>
+              <Text>cloudbrowser · v0.9.0</Text>
             </div>
           </Layout.Sider>
         )}
@@ -497,6 +499,7 @@ function Dashboard() {
                         loading={service.loading}
                         watching={watching}
                         onWatch={watch}
+                        onLogs={setLogging}
                         compact
                       />
                     </Card>
@@ -540,6 +543,7 @@ function Dashboard() {
                     recordings={service.recordings.slice(0, 5)}
                     loading={service.loading}
                     onPlay={setPlaying}
+                    onLogs={setLogging}
                     compact
                   />
                 </Card>
@@ -589,6 +593,7 @@ function Dashboard() {
                         loading={service.loading}
                         watching={watching}
                         onWatch={setWatching}
+                        onLogs={setLogging}
                       />
                     </Card>
                   </Col>
@@ -606,6 +611,7 @@ function Dashboard() {
                 recordings={service.recordings}
                 loading={service.loading}
                 onPlay={setPlaying}
+                onLogs={setLogging}
               />
             )}
             {section === 'proxies' && <ProxiesPage />}
@@ -631,6 +637,7 @@ function Dashboard() {
           </Layout.Content>
         </Layout>
       </Layout>
+      <InstanceLogDrawer instance={logging} onClose={() => setLogging(undefined)} />
       <Modal
         title="Agent 接入信息"
         open={guideOpen}
@@ -693,6 +700,15 @@ function Dashboard() {
                     <Text code copyable>
                       {playing.instance_id}
                     </Text>
+                  ),
+                },
+                {
+                  key: 'task',
+                  label: '任务目标',
+                  children: (
+                    <span className="instance-task-full">
+                      {playing.task_description ?? '未填写任务描述'}
+                    </span>
                   ),
                 },
                 { key: 'created', label: '开始时间', children: displayTime(playing.created_at) },
@@ -867,17 +883,26 @@ function LiveInstanceDetails({
     </div>
   );
 }
+function TaskDescription({ value }: { value?: string }) {
+  return (
+    <Tooltip title={value ?? '未填写任务描述'}>
+      <div className="instance-task-summary">{value ?? '未填写任务描述'}</div>
+    </Tooltip>
+  );
+}
 function InstanceTable({
   instances,
   loading,
   watching,
   onWatch,
+  onLogs,
   compact = false,
 }: {
   instances: BrowserInstance[];
   loading: boolean;
   watching?: string;
   onWatch: (id: string) => void;
+  onLogs: (instance: BrowserInstance) => void;
   compact?: boolean;
 }) {
   const columns: TableColumnsType<BrowserInstance> = [
@@ -889,6 +914,7 @@ function InstanceTable({
           <Avatar shape="square" className="soft-icon blue" icon={<DesktopOutlined />} />
           <div className="instance-table-text">
             <Text strong>实例 {compactId(i.instance_id)}</Text>
+            <TaskDescription value={i.task_description} />
             <div className="cell-secondary">
               <Text type="secondary">
                 {i.viewport.width} × {i.viewport.height}
@@ -904,18 +930,29 @@ function InstanceTable({
     {
       title: '操作',
       key: 'action',
-      width: 94,
+      width: 126,
       align: 'right',
       render: (_, i) => (
-        <Button
-          type={watching === i.instance_id ? 'default' : 'link'}
-          size="small"
-          icon={<PlayCircleOutlined />}
-          aria-label={`观看实例 ${i.instance_id}`}
-          onClick={() => onWatch(i.instance_id)}
-        >
-          {watching === i.instance_id ? '观看中' : '观看'}
-        </Button>
+        <Space size={0}>
+          <Button
+            type={watching === i.instance_id ? 'default' : 'link'}
+            size="small"
+            icon={<PlayCircleOutlined />}
+            aria-label={`观看实例 ${i.instance_id}`}
+            onClick={() => onWatch(i.instance_id)}
+          >
+            {watching === i.instance_id ? '观看中' : '观看'}
+          </Button>
+          <Tooltip title="查看调用日志">
+            <Button
+              type="text"
+              size="small"
+              icon={<FileTextOutlined />}
+              aria-label={`查看实例日志 ${i.instance_id}`}
+              onClick={() => onLogs(i)}
+            />
+          </Tooltip>
+        </Space>
       ),
     },
   ];
@@ -1038,7 +1075,17 @@ function LiveViewer({
           <Text type="secondary">实时画面仅供查看，操作由 Agent 执行</Text>
         )}
       </div>
-      {instance && <LiveInstanceDetails instance={instance} onCopy={onCopy} />}
+      {instance && (
+        <>
+          <div className="live-instance-task">
+            <Text type="secondary">任务目标</Text>
+            <Paragraph className="instance-task-full">
+              {instance.task_description ?? '未填写任务描述'}
+            </Paragraph>
+          </div>
+          <LiveInstanceDetails instance={instance} onCopy={onCopy} />
+        </>
+      )}
     </Card>
   );
 }
@@ -1046,23 +1093,28 @@ function RecordingTable({
   recordings,
   loading,
   onPlay,
+  onLogs,
   compact = false,
 }: {
   recordings: Recording[];
   loading: boolean;
   onPlay: (r: Recording) => void;
+  onLogs: (r: Recording) => void;
   compact?: boolean;
 }) {
   const columns: TableColumnsType<Recording> = [
     {
       title: '浏览器实例',
       dataIndex: 'instance_id',
-      render: (id) => (
+      render: (id, r) => (
         <Space>
           <span className="table-record-icon">
             <VideoCameraOutlined />
           </span>
-          <Text strong>实例 {compactId(id)}</Text>
+          <div className="recording-task-cell">
+            <Text strong>实例 {compactId(id)}</Text>
+            <TaskDescription value={r.task_description} />
+          </div>
         </Space>
       ),
     },
@@ -1093,28 +1145,39 @@ function RecordingTable({
     {
       title: '操作',
       key: 'action',
-      width: 110,
+      width: 150,
       align: 'right',
       render: (_, r) => (
-        <Tooltip
-          title={
-            r.status === 'recording'
-              ? '实例结束后可播放'
-              : r.bytes === 0
-                ? '暂无可播放内容'
-                : undefined
-          }
-        >
-          <Button
-            type="link"
-            size="small"
-            icon={<PlayCircleOutlined />}
-            disabled={r.bytes === 0 || ['recording', 'finalizing'].includes(r.status)}
-            onClick={() => onPlay(r)}
+        <Space size={0}>
+          <Tooltip
+            title={
+              r.status === 'recording'
+                ? '实例结束后可播放'
+                : r.bytes === 0
+                  ? '暂无可播放内容'
+                  : undefined
+            }
           >
-            播放录像
-          </Button>
-        </Tooltip>
+            <Button
+              type="link"
+              size="small"
+              icon={<PlayCircleOutlined />}
+              disabled={r.bytes === 0 || ['recording', 'finalizing'].includes(r.status)}
+              onClick={() => onPlay(r)}
+            >
+              播放录像
+            </Button>
+          </Tooltip>
+          <Tooltip title="查看调用日志">
+            <Button
+              type="text"
+              size="small"
+              icon={<FileTextOutlined />}
+              aria-label={`查看实例日志 ${r.instance_id}`}
+              onClick={() => onLogs(r)}
+            />
+          </Tooltip>
+        </Space>
       ),
     },
   ];
@@ -1155,17 +1218,21 @@ function HistoryPage({
   recordings,
   loading,
   onPlay,
+  onLogs,
 }: {
   recordings: Recording[];
   loading: boolean;
   onPlay: (r: Recording) => void;
+  onLogs: (r: Recording) => void;
 }) {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
   const filtered = recordings.filter(
     (r) =>
       (status === 'all' || r.status === status) &&
-      `${r.instance_id} ${r.id}`.toLowerCase().includes(query.toLowerCase()),
+      `${r.instance_id} ${r.id} ${r.task_description ?? ''}`
+        .toLowerCase()
+        .includes(query.toLowerCase()),
   );
   return (
     <Card
@@ -1180,7 +1247,7 @@ function HistoryPage({
       <div className="table-toolbar">
         <Input.Search
           allowClear
-          placeholder="搜索实例或录像 ID"
+          placeholder="搜索任务、实例或录像 ID"
           aria-label="搜索录像"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -1199,7 +1266,7 @@ function HistoryPage({
           ]}
         />
       </div>
-      <RecordingTable recordings={filtered} loading={loading} onPlay={onPlay} />
+      <RecordingTable recordings={filtered} loading={loading} onPlay={onPlay} onLogs={onLogs} />
       <Text type="secondary" className="table-footnote">
         录像记录当前活动页面；异常结束的录像可能不完整。
       </Text>

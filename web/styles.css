@@ -1504,3 +1504,49 @@ input {
   width: 22px;
   padding: 0;
 }
+
+.instance-task-summary {
+  color: #475569;
+  font-size: 12px;
+  line-height: 20px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 100%;
+}
+.live-instance-task {
+  padding: 0 18px 14px;
+  font-size: 12px;
+}
+.live-instance-task .ant-typography {
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.instance-task-full {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.recording-task-cell {
+  min-width: 0;
+  max-width: 280px;
+}
+.instance-log-heading {
+  margin-bottom: 12px;
+}
+.instance-log-heading .instance-task-full {
+  margin: 6px 0;
+}
+.instance-log-id {
+  overflow-wrap: anywhere;
+  font:
+    11px/1.7 ui-monospace,
+    monospace;
+}
+.instance-log-detail {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font:
+    11px/1.8 ui-monospace,
+    monospace;
+  margin: 0;
+}

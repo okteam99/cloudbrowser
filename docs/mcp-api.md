@@ -1,4 +1,4 @@
-# MCP 接口 V0.8
+# MCP 接口 V0.9
 
 推荐使用 `BASE_URL/mcp` 的 Streamable HTTP，携带 `Authorization: Bearer <登录网页自动生成的 Token>`。网页登录后可复制完整配置。兼容 MCP stdio，通过 SSH 或 docker exec 接入。HTTP 调用共享 web principal，stdio 仍按 MCP_PRINCIPAL 隔离。
 
@@ -25,11 +25,11 @@
 | `health` | `{}` | 服务状态与容量 |
 | `list_proxies` | 可选 country（两位大写国家码）、protocol（socks5/http/https）、enabled_only（默认true）、status（healthy/unhealthy/unknown/checking/disabled） | proxy_id、兼容 proxy_ref、名称、地址、国家、启用状态、status、health（checked_at / next_check_at / latency_ms / observed_ip / http_status / error_code / checking）、鉴权标记；不返回用户名或密码 |
 | `check_proxy` | proxy、proxy_id、proxy_ref 三选一；可选 check_url | 临时浏览器查询出口，始终清理；不验证国家 |
-| `create_instance` | UA、viewport、proxy/proxy_id/proxy_ref、mobile、locale、timezone、生命周期 | instance_id、pages、实际设备属性、警告 |
+| `create_instance` | 可选 task_description（1–1000字符）、UA、viewport、proxy/proxy_id/proxy_ref、mobile、locale、timezone、生命周期 | instance_id、task_description、pages、实际设备属性、警告 |
 | `get_instance` | instance_id | 配置和页面，隐藏凭据 |
 | `list_instances` | `{}` | 同 principal 的实例 |
 | `verify_environment` | instance_id；可选 check_url | 实际设备属性、IP 查询响应；不自动判断国家 |
-| `close_instance` | instance_id | 关闭状态，关闭后 ID 不再可用 |
+| `close_instance` | instance_id | 关闭状态，关闭后 ID 不能执行浏览器操作，保留期内可查日志与历史状态 |
 | `list_operations` | limit 默认20，最多100 | 同 principal 最近操作的 ID、工具、时间与状态 |
 | `get_operation` | operation_id | 最近调用的结果，或 running；仅当前 principal 可查 |
 
@@ -37,6 +37,7 @@
 
 ```json
 {
+  "task_description": "验证移动端商品页、购物车和下载流程",
   "user_agent": "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
   "viewport": {"width": 412, "height": 915},
   "mobile": {"enabled": true, "touch": true, "device_scale_factor": 2},
@@ -92,7 +93,7 @@
 {"proxy_id":"proxy_...","url":"https://api.ipify.org?format=json","method":"GET"}
 ```
 
-返回 `proxy_id`、`status_code`、`final_url`、`elapsed_ms`、`redirect_count`、`headers`（name/value 数组）、`bytes`、`encoding`、`body`。4xx/5xx 是有效 HTTP 结果；连接、TLS、超时和大小超限是工具错误。响应不写入诊断日志，但 `get_operation` 可在内存保留期内读取操作结果，响应内容可能包含目标站点的敏感信息。
+返回 `proxy_id`、`status_code`、`final_url`、`elapsed_ms`、`redirect_count`、`headers`（name/value 数组）、`bytes`、`encoding`、`body`。4xx/5xx 是有效 HTTP 结果；连接、TLS、超时和大小超限是工具错误。响应体不写入日志；调用参数按原文写入功能调用日志，但 `get_operation` 可在内存保留期内读取操作结果，响应内容可能包含目标站点的敏感信息。
 
 每次请求必须指定启用的保存代理，不自动直连、重试或执行 Shell。内网和域名限制与浏览器网关一致，对跳转也生效。并发请求上限等于 `MAX_INSTANCES`，不占浏览器名额。超时或断线不代表写请求未执行，先确认再重试。`list_proxies` 中的国家是管理员填写的标记，启用不代表健康。平台默认每5分钟、启动和配置变化时自动检测；用 `list_proxies({"protocol":"socks5","status":"healthy"})` 选择最近检测正常的线路。结果只能说明到检测目标的本次连通性；可用 `proxy_curl` 验证实际目标或可信 IP 服务。超过两个检测周期的旧结果视为 unknown；检测中为 checking，停用为 disabled。历史 health 信息会保留，默认查询仍只过滤停用项以保持兼容。
 
@@ -179,7 +180,11 @@ inspect_instance和get_logs不占用浏览器执行锁；get_diagnostics也可�
 
 资源指标包括管理进程RSS、宿主空闲内存/负载、可读时的cgroup内存及OOM计数、数据卷空间。非Linux、未设置内存限额或无权限时部分字段为null。SIGKILL、断开或超时不能单独证明OOM，容器内的OOM计数也不能单独归因于某个实例。
 
-只记录事件码、错误类型、HTTP状态、脱敏URL等元信息；不记录原始console/异常消息、输入值、正文、Cookie或认证头。浏览器原生stderr和编码器stderr仅提取固定故障类别，不返回原始输出。日志查询和状态探测不会挤占最近500个业务操作结果的缓存；这两个只读工具失败后可重新查询。
+功能调用使用 component=operation，按 instance_id 和 operation_id 关联开始、成功或失败事件。operation_started.arguments 保存完整校验后参数；fields 包括 tool、action、完整url；结束事件包含 elapsed_ms，失败还包含 error_code 与原始 error_message。不对调用参数、URL和错误信息脱敏，输入值和显式传入的认证信息也会原样保存。工具结果的正文、图片和文件不重复写入日志。
+
+控制台实时实例、历史录屏均可按实例查看调用日志，支持结果筛选与5秒自动更新。创建时的可选 task_description（首尾空格会去除，1–1000字符）同时保存在实例状态与录屏元信息，可由 get_instance/list_instances、inspect_instance、list_recordings 读取。旧记录无该字段；公开分享页不会附带任务描述和日志。
+
+其他诊断事件记录事件码、错误类型、HTTP状态、脱敏URL等元信息，不记录原始console文本和响应正文。浏览器原生stderr和编码器stderr仅提取固定故障类别，不返回原始输出。日志查询和状态探测不会挤占最近500个业务操作结果的缓存；这两个只读工具失败后可重新查询。
 
 进程重启后，先前仍活跃且没有关闭记录的实例标记manager_interrupted；这表示管理进程中断，不能据此确认浏览器或宿主机的具体故障。此前未采集的事件无法追溯。整个服务不可用时需由部署方检查docker logs和docker inspect的状态摘要。
 
