@@ -307,7 +307,11 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
         return rows.length === 1 && rows[0].enabled === false;
       }, base);
       await page.getByLabel('筛选状态', { exact: true }).click();
-      await page.getByText('已停用', { exact: true }).filter({ visible: true }).last().click();
+      await page
+        .locator('.ant-select-dropdown')
+        .filter({ visible: true })
+        .getByText('已停用', { exact: true })
+        .click();
       await page.getByText('显示 1 / 1', { exact: true }).waitFor();
       await page.getByLabel('搜索代理', { exact: true }).fill('missing-proxy');
       await page.getByText('没有符合筛选条件的代理', { exact: true }).waitFor();
