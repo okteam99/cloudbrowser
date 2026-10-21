@@ -42,4 +42,4 @@
 
 ## 使用平台代理
 
-需要指定国家或代理时，先调用 `list_proxies`（可按 country / protocol 筛选），再把返回的 `proxy_id` 传给 `create_instance`。如需先测出口或直接验证接口，调用 `proxy_curl`，无需启动浏览器。国家是人工标记，必须通过可信 IP 服务验证实际出口。不要把代理凭据写进 Prompt、日志或报告。修改配置不会改变已经创建的实例。
+需要指定国家或代理时，先调用 `list_proxies`（可按 country / protocol / status 筛选；优先 status="healthy"），再把返回的 `proxy_id` 传给 `create_instance`。如需先测出口或直接验证接口，调用 `proxy_curl`，无需启动浏览器。国家是人工标记，必须通过可信 IP 服务验证实际出口。不要把代理凭据写进 Prompt、日志或报告。修改配置不会改变已经创建的实例。

@@ -27,6 +27,7 @@ import { ShareStore } from './shares.js';
 import { Diagnostics, resources } from './diagnostics.js';
 import { ToolError, publicError, safeUrl } from './errors.js';
 import { ProxyStore } from './proxies.js';
+import { ProxyHealthMonitor } from './proxy-health.js';
 import { proxyCurl } from './proxy-http.js';
 
 type PageEntry = {
@@ -81,6 +82,7 @@ export class BrowserManager {
   shares: ShareStore;
   logs: Diagnostics;
   proxies: ProxyStore;
+  proxyHealth: ProxyHealthMonitor;
   private curlActive = 0;
   private creating = 0;
   private closing = 0;
@@ -89,6 +91,14 @@ export class BrowserManager {
     this.policy = new NetworkPolicy(cfg);
     this.logs = new Diagnostics(cfg);
     this.proxies = new ProxyStore(cfg);
+    this.proxyHealth = new ProxyHealthMonitor(this.proxies, cfg, this.policy, (code, fields) =>
+      this.logs.log({
+        component: 'service',
+        level: code.endsWith('failed') ? 'warn' : 'info',
+        code,
+        fields,
+      }),
+    );
     this.recordings = new RecordingStore(cfg, (event) => this.logs.log(event));
     this.shares = new ShareStore(cfg.dataDir);
   }
@@ -721,6 +731,7 @@ export class BrowserManager {
     return Array.from(this.instances.values(), (i) => ({ ...this.summary(i), owner: i.owner }));
   }
   async shutdown() {
+    await this.proxyHealth.stop();
     await Promise.allSettled(
       Array.from(this.instances.values(), (i) => this.close(i.owner, i.id, 'service_shutdown')),
     );
@@ -931,7 +942,7 @@ export class BrowserManager {
     if (name === 'health')
       return {
         status: 'ok',
-        version: '0.7.0',
+        version: '0.8.0',
         base_url: this.cfg.baseUrl,
         public_url_mode: this.cfg.quickTunnel
           ? 'quick_tunnel'

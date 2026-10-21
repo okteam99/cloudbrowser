@@ -72,6 +72,8 @@ export function config() {
     logRetentionHours: integer('LOG_RETENTION_HOURS', 168, 1, 8760),
     socket: process.env.MCP_SOCKET ?? '/tmp/docker-browser-mcp.sock',
     proxyFile: process.env.PROXY_CONFIG ?? '/config/proxies.json',
+    proxyCheckUrl: process.env.PROXY_CHECK_URL ?? 'https://api.ipify.org?format=json',
+    proxyCheckIntervalSeconds: integer('PROXY_CHECK_INTERVAL_SECONDS', 300, 30, 86400),
     maxInstances: integer('MAX_INSTANCES', 10, 1, 100),
     webPort,
     webPassword: process.env.WEB_PASSWORD,

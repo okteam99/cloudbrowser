@@ -67,6 +67,7 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
         WEB_PASSWORD: 'test-password-123',
         WEB_PORT: String(port),
         ALLOW_PRIVATE_NETWORKS: 'true',
+        PROXY_CHECK_URL: fixtureUrl,
         MAX_INSTANCES: '1',
         RECORD_VIDEO: 'true',
       },
@@ -103,6 +104,7 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     assert.match(await root.text(), /访问密码/);
     assert.equal((await fetch(base + '/api/connection')).status, 401);
     assert.equal((await fetch(base + '/api/proxies')).status, 401);
+    assert.equal((await fetch(base + '/api/proxy-health')).status, 401);
     assert.equal((await fetch(base + '/mcp', { method: 'POST', body: '{}' })).status, 401);
     const publicGuide = await fetch(base + '/docs/agent-guide.md', {
       headers: { Origin: 'https://agent.example' },
@@ -201,7 +203,7 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
       await page.getByRole('heading', { name: '一步，把云浏览器连接到你的 Agent' }).waitFor();
       await page.getByRole('menuitem', { name: '代理管理' }).click();
       await page.getByRole('button', { name: '添加代理' }).click();
-      await page.getByLabel('名称（可选）').fill('UI 测试代理');
+      await page.getByLabel('名称（可选）').fill('美国 · UI 测试代理');
       await page.getByLabel('服务器 IP / 域名').fill('203.0.113.2');
       await page.getByLabel('用户名', { exact: true }).fill('ui-user');
       const password = page.getByLabel('密码（明文）', { exact: true });
@@ -209,6 +211,17 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
       await password.fill('ui-proxy-password');
       await page.getByRole('button', { name: '保存代理' }).click();
       await page.getByText('ui-proxy-password', { exact: true }).waitFor();
+      assert.equal(await page.locator('.proxy-name').innerText(), 'UI 测试代理');
+      assert.match(await page.locator('.proxy-id').innerText(), /^proxy_.+\.\.\..+$/);
+      const fullProxyId = await page
+        .locator('.proxy-table .ant-table-row')
+        .getAttribute('data-row-key');
+      await page.getByRole('button', { name: '复制代理 ID UI 测试代理', exact: true }).click();
+      assert.equal(await page.evaluate(() => navigator.clipboard.readText()), fullProxyId);
+      assert.ok(
+        (await page.locator('.proxy-table tbody .ant-table-row').boundingBox())!.height <= 60,
+        'Proxy row should remain compact',
+      );
       await page.getByRole('button', { name: '编辑代理 UI 测试代理', exact: true }).click();
       assert.equal(await page.getByLabel('服务器 IP / 域名').inputValue(), '203.0.113.2');
       await page.getByLabel('密码（明文）', { exact: true }).fill('ui-proxy-updated');
@@ -219,6 +232,13 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
         const rows = await (await fetch(base + '/api/proxies')).json();
         return rows.length === 1 && rows[0].enabled === false;
       }, base);
+      await page.getByLabel('筛选状态', { exact: true }).click();
+      await page.getByText('已停用', { exact: true }).filter({ visible: true }).last().click();
+      await page.getByText('显示 1 / 1', { exact: true }).waitFor();
+      await page.getByLabel('搜索代理', { exact: true }).fill('missing-proxy');
+      await page.getByText('没有符合筛选条件的代理', { exact: true }).waitFor();
+      await page.getByRole('button', { name: '重置筛选', exact: true }).click();
+      await page.getByText('ui-proxy-updated', { exact: true }).waitFor();
       await page.getByRole('switch', { name: '启用代理 UI 测试代理', exact: true }).click();
       await page.waitForFunction(
         async (base) => (await (await fetch(base + '/api/proxies')).json())[0]?.enabled === true,

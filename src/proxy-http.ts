@@ -45,9 +45,16 @@ export const proxyCurlSchema = z
 // curl config is passed through stdin, never a shell or command-line credentials. -q ignores ~/.curlrc.
 const quote = (value: string) =>
   `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t').replace(/\v/g, '\\v')}"`;
-export async function proxyCurl(policy: NetworkPolicy, proxy: Proxy, input: unknown) {
+export async function proxyCurl(
+  policy: NetworkPolicy,
+  proxy: Proxy,
+  input: unknown,
+  signal?: AbortSignal,
+) {
   const a = proxyCurlSchema.parse(input);
+  signal?.throwIfAborted();
   await policy.url(a.url);
+  signal?.throwIfAborted();
   const dir = await mkdtemp(join(tmpdir(), 'cloudbrowser-http-'));
   let gateway: Awaited<ReturnType<typeof createGateway>> | undefined;
   try {
@@ -78,7 +85,14 @@ export async function proxyCurl(policy: NetworkPolicy, proxy: Proxy, input: unkn
       let size = 0,
         stderr = '',
         tooLarge = false,
-        expired = false;
+        expired = false,
+        cancelled = false;
+      const onAbort = () => {
+        cancelled = true;
+        child.kill('SIGKILL');
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
+      if (signal?.aborted) onAbort();
       const timer = setTimeout(() => {
         expired = true;
         child.kill('SIGKILL');
@@ -95,11 +109,14 @@ export async function proxyCurl(policy: NetworkPolicy, proxy: Proxy, input: unkn
         if (stderr.length < 262144) stderr += part.toString();
       });
       child.once('error', () => {
+        signal?.removeEventListener('abort', onAbort);
         clearTimeout(timer);
         reject(new ToolError('CURL_UNAVAILABLE', 'curl executable is unavailable.'));
       });
       child.once('close', (code) => {
+        signal?.removeEventListener('abort', onAbort);
         clearTimeout(timer);
+        if (cancelled) return reject(new ToolError('CHECK_CANCELLED', 'HTTP request cancelled.'));
         if (tooLarge)
           return reject(
             new ToolError(

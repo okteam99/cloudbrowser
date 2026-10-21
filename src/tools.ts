@@ -119,7 +119,7 @@ export const definitions: Record<
   },
   list_proxies: {
     description:
-      'List platform proxies with proxy_id, name, declared country, protocol, server, enabled status and authentication flag; no credentials. Enabled proxies are configured candidates, not guaranteed live or geolocated. Defaults to enabled only. Use proxy_id in create_instance, check_proxy or proxy_curl.',
+      'List platform proxies with proxy_id, name, declared country, protocol, server, health status, latest check time/latency/error and authentication flag; no credentials. Checks run every 5 minutes by default. Use status=healthy for recent successful checks; a probe does not guarantee target-site access or country. Defaults to enabled only. Use proxy_id in create_instance, check_proxy or proxy_curl.',
     schema: z
       .object({
         country: z
@@ -128,6 +128,7 @@ export const definitions: Record<
           .optional(),
         protocol: z.enum(['socks5', 'http', 'https']).optional(),
         enabled_only: z.boolean().default(true),
+        status: z.enum(['healthy', 'unhealthy', 'unknown', 'checking', 'disabled']).optional(),
       })
       .strict(),
     readOnly: true,

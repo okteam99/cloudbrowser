@@ -61,6 +61,23 @@ export type SavedProxy = {
   password: string;
   enabled: boolean;
   updated_at: string;
+  status: 'healthy' | 'unhealthy' | 'unknown' | 'checking' | 'disabled';
+  health: {
+    status: 'healthy' | 'unhealthy' | 'unknown';
+    checking: boolean;
+    checked_at?: string;
+    next_check_at?: string;
+    latency_ms?: number;
+    observed_ip?: string;
+    http_status?: number;
+    error_code?: string;
+  };
+};
+export type ProxyMonitor = {
+  running: boolean;
+  interval_seconds: number;
+  checking: number;
+  queued: number;
 };
 export async function mutate<T>(
   path: string,

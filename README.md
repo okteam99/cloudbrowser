@@ -21,7 +21,7 @@ docker run -d --init \
   --shm-size=1g \
   -e WEB_PASSWORD='替换为你的强密码' \
   -v browser-mcp-data:/data \
-  bdpgogoup/cloudbrowser:20261020233007
+  bdpgogoup/cloudbrowser:20261021091630
 ```
 
 查看自动生成的 HTTPS 地址：
@@ -48,7 +48,7 @@ docker run -d --init \
   -e WEB_PASSWORD='替换为你的强密码' \
   -e CF_TUNNEL_TOKEN='替换为隧道的连接器Token' \
   -v browser-mcp-data:/data \
-  bdpgogoup/cloudbrowser:20261020233007
+  bdpgogoup/cloudbrowser:20261021091630
 ```
 
 服务自动读取隧道配置，识别唯一指向本容器端口的域名，无需再填 `BASE_URL`。如果配置了多个符合条件的域名、通配符或路径规则，请增加 `-e BASE_URL=https://browser.example.com` 明确选择地址。只支持 Cloudflare 远程管理的命名隧道，不会代替用户购买域名或创建 DNS。
@@ -68,7 +68,7 @@ docker run -d --init \
   -e BASE_URL=http://localhost:8080 \
   -e WEB_PASSWORD='替换为你的强密码' \
   -v browser-mcp-data:/data \
-  bdpgogoup/cloudbrowser:20261020233007
+  bdpgogoup/cloudbrowser:20261021091630
 ```
 
 部署到远程服务器时，将 `BASE_URL` 改为实际可访问地址；部署方负责 DNS、反向代理、HTTPS 或端口映射接通容器8080。`BASE_URL` 可带路径前缀。
@@ -228,6 +228,8 @@ Agent 可通过 MCP 创建无需登录的只读观看链接；链接使用 `BASE
 | `LOG_RETENTION_HOURS` | 168 | 诊断事件和结束实例状态的最长保留时间 |
 | `ARTIFACT_RETENTION_HOURS` | 168 | 产物及历史录像保留时间 |
 | `PROXY_CONFIG` | /config/proxies.json | 首次启动时导入的代理文件 |
+| `PROXY_CHECK_INTERVAL_SECONDS` | 300 | 自动检测周期，秒；30–86400 |
+| `PROXY_CHECK_URL` | https://api.ipify.org?format=json | 检测目标，遵循目标访问策略 |
 | `DATA_DIR` | /data（Docker） | 数据存储位置 |
 | `ALLOWED_HOSTS` | 空 | 可选目标白名单，逗号分隔，支持 *.example.com |
 | `ALLOW_PRIVATE_NETWORKS` | false | 显式允许内网测试，会扩大访问范围 |
@@ -239,11 +241,15 @@ Web 模式始终要求 WEB_PASSWORD。自动隧道失败时会退出，不会回
 
 ## 代理管理与 HTTP 请求
 
-登录控制台，打开 **代理管理**，点击 **添加代理**。填写服务器 IP / 域名、端口，选择国家 / 地区，填写用户名和密码；默认 SOCKS5，也支持 HTTP / HTTPS。名称可不填。支持编辑、启停、删除和复制代理 ID；密码按明文显示。
+登录控制台，打开 **代理管理**，点击 **添加代理**。填写服务器 IP / 域名、端口，选择国家 / 地区，填写用户名和密码；默认 SOCKS5，也支持 HTTP / HTTPS。名称可不填，默认使用服务器地址。支持编辑、启停、删除和复制完整代理 ID；密码按明文显示。列表默认每页20条，ID 中间省略、名称不重复显示国家，支持按关键词、国家、状态和协议筛选。
 
-配置保存在 `/data/proxies.json`，使用数据卷即可在重建容器后保留。国家是手动标记，不代表系统已验证出口地理位置；“启用”表示允许被选用，不保证当前连通。修改、停用或删除代理只影响新的浏览器和 HTTP 请求，已运行实例保留原有配置。
+配置保存在 `/data/proxies.json`，使用数据卷即可在重建容器后保留。国家是手动标记，不代表系统已验证出口地理位置；“启用”表示允许被选用，与检测状态分开。修改、停用或删除代理只影响新的浏览器和 HTTP 请求，已运行实例保留原有配置。
 
-Agent 调用 `list_proxies` 查询列表，可传 `country: "US"`、`protocol: "socks5"`；默认仅返回启用项。返回 ID、名称、地址、国家和鉴权标记，不返回用户名或密码。然后按 ID 创建实例：
+服务启动后立即检测已启用代理，之后默认每5分钟自动检查；新增、修改连接信息或重新启用时也会检查。最多并行3个检测，不启动浏览器、不占浏览器实例名额。通过代理请求检测目标，2xx 视为本次连通成功；网络、超时或非2xx 返回异常。状态包括正常、异常、待检测、检测中、已停用；悬停可查看耗时、时间、错误码和可识别的出口IP。可点击“立即检测”重新检查。失败不自动停用，也不回退直连。检测仅反映到指定目标的最近一次结果，不能保证其他网站可用或国家正确。
+
+检测结果单独保存在 `/data/proxy-health.json`，配置保存在原 `/data/proxies.json`；重启保留历史并重新检查，超过两个周期的结果视为待检测。修改、删除或停用期间返回的旧检测结果不会覆盖新配置。检测缓存损坏会重新检测，不会阻止服务启动。
+
+Agent 调用 `list_proxies` 查询列表，可传 `country: "US"`、`protocol: "socks5"`、`status: "healthy"`；默认仅返回启用项，不会自动排除异常项以保持兼容。返回 ID、名称、地址、国家、鉴权标记、status 和 health（时间、耗时、失败码等），不返回用户名或密码。然后按 ID 创建实例：
 
 ```json
 {"proxy_id":"proxy_由平台生成的ID","viewport":{"width":390,"height":844}}
@@ -337,10 +343,10 @@ bash scripts/publish-docker.sh
 ## 源码构建及 stdio 接入
 
 ```sh
-docker build -t cloudbrowser:0.7.0 .
+docker build -t cloudbrowser:0.8.0 .
 ```
 
-将一行部署命令最后的镜像名换成 `cloudbrowser:0.7.0` 即可本地使用。
+将一行部署命令最后的镜像名换成 `cloudbrowser:0.8.0` 即可本地使用。
 
 兼容配置见 [本地 stdio](examples/mcp.local.json)、[SSH stdio](examples/mcp.ssh.json)。仍使用 `docker exec -i`，不得使用 `-t`。MCP_PRINCIPAL 是可信 SSH/Docker 接入中的命名空间，不是独立认证。
 
@@ -348,7 +354,7 @@ docker build -t cloudbrowser:0.7.0 .
 
 前端源码位于 `web/`，使用 React + Ant Design。`npm run build` 同时进行类型检查、构建服务端和打包前端（含 gzip 资源）；Docker 镜像只需运行编译产物。
 
-需要 Node.js 22+、FFmpeg，以及 Playwright Chromium：
+需要 Node.js 22+、FFmpeg、curl，以及 Playwright Chromium：
 
 ```sh
 npm ci

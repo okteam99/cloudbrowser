@@ -235,6 +235,7 @@ export async function daemon() {
       });
     }
     web = await startWeb(manager, cfg, dispatch);
+    manager.proxyHealth.start();
     if (tunnel)
       process.stderr.write(
         `Public HTTPS URL: ${cfg.baseUrl}\nMCP URL: ${cfg.baseUrl}/mcp\n${cfg.quickTunnel ? 'Quick Tunnel URLs change on restart.' : 'Named tunnel uses the configured stable hostname.'}\n`,

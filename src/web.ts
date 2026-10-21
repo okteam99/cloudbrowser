@@ -121,7 +121,7 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         return;
       }
       if (path === '/healthz') {
-        json(res, { status: 'ok', version: '0.7.0' });
+        json(res, { status: 'ok', version: '0.8.0' });
         return;
       }
       if (path === '/mcp') {
@@ -245,6 +245,10 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         json(res, { error: 'Authentication required' }, 401);
         return;
       }
+      if (path === '/api/proxy-health' && req.method === 'GET') {
+        json(res, manager.proxyHealth.status());
+        return;
+      }
       const proxyRoute = /^\/api\/proxies(?:\/([^/]+))?$/.exec(path);
       if (proxyRoute) {
         if (req.method === 'GET' && !proxyRoute[1]) {
@@ -257,6 +261,10 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         }
         if (!bearer && (!session || req.headers['x-csrf-token'] !== session)) {
           json(res, { error: 'Invalid session' }, 403);
+          return;
+        }
+        if (proxyRoute[1] === 'check' && req.method === 'POST') {
+          json(res, manager.proxyHealth.requestAll(), 202);
           return;
         }
         const id = proxyRoute[1] ? decodeURIComponent(proxyRoute[1]) : undefined;

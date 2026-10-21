@@ -1,4 +1,4 @@
-# MCP 接口 V0.7
+# MCP 接口 V0.8
 
 推荐使用 `BASE_URL/mcp` 的 Streamable HTTP，携带 `Authorization: Bearer <登录网页自动生成的 Token>`。网页登录后可复制完整配置。兼容 MCP stdio，通过 SSH 或 docker exec 接入。HTTP 调用共享 web principal，stdio 仍按 MCP_PRINCIPAL 隔离。
 
@@ -23,7 +23,7 @@
 | --- | --- | --- |
 | `list_recordings` | 可选 instance_id | 当前 principal 的录像、状态、playback_url；播放仍需网页登录或相同 Bearer |
 | `health` | `{}` | 服务状态与容量 |
-| `list_proxies` | 可选 country（两位大写国家码）、protocol（socks5/http/https）、enabled_only（默认true） | proxy_id、兼容 proxy_ref、名称、地址、国家、启用状态、鉴权标记；不返回用户名或密码 |
+| `list_proxies` | 可选 country（两位大写国家码）、protocol（socks5/http/https）、enabled_only（默认true）、status（healthy/unhealthy/unknown/checking/disabled） | proxy_id、兼容 proxy_ref、名称、地址、国家、启用状态、status、health（checked_at / next_check_at / latency_ms / observed_ip / http_status / error_code / checking）、鉴权标记；不返回用户名或密码 |
 | `check_proxy` | proxy、proxy_id、proxy_ref 三选一；可选 check_url | 临时浏览器查询出口，始终清理；不验证国家 |
 | `create_instance` | UA、viewport、proxy/proxy_id/proxy_ref、mobile、locale、timezone、生命周期 | instance_id、pages、实际设备属性、警告 |
 | `get_instance` | instance_id | 配置和页面，隐藏凭据 |
@@ -94,7 +94,7 @@
 
 返回 `proxy_id`、`status_code`、`final_url`、`elapsed_ms`、`redirect_count`、`headers`（name/value 数组）、`bytes`、`encoding`、`body`。4xx/5xx 是有效 HTTP 结果；连接、TLS、超时和大小超限是工具错误。响应不写入诊断日志，但 `get_operation` 可在内存保留期内读取操作结果，响应内容可能包含目标站点的敏感信息。
 
-每次请求必须指定启用的保存代理，不自动直连、重试或执行 Shell。内网和域名限制与浏览器网关一致，对跳转也生效。并发请求上限等于 `MAX_INSTANCES`，不占浏览器名额。超时或断线不代表写请求未执行，先确认再重试。`list_proxies` 中的国家是管理员填写的标记，启用不代表健康；可用该工具查询可信 IP 服务验证实际出口。
+每次请求必须指定启用的保存代理，不自动直连、重试或执行 Shell。内网和域名限制与浏览器网关一致，对跳转也生效。并发请求上限等于 `MAX_INSTANCES`，不占浏览器名额。超时或断线不代表写请求未执行，先确认再重试。`list_proxies` 中的国家是管理员填写的标记，启用不代表健康。平台默认每5分钟、启动和配置变化时自动检测；用 `list_proxies({"protocol":"socks5","status":"healthy"})` 选择最近检测正常的线路。结果只能说明到检测目标的本次连通性；可用 `proxy_curl` 验证实际目标或可信 IP 服务。超过两个检测周期的旧结果视为 unknown；检测中为 checking，停用为 disabled。历史 health 信息会保留，默认查询仍只过滤停用项以保持兼容。
 
 ## 页面与定位
 
