@@ -62,6 +62,7 @@ async function fixture() {
   const i = await call('create_instance', { task_description: 'Capabilities test' });
   const ids = { instance_id: i.instance_id, page_id: i.pages[0].page_id };
   await call('navigate', { ...ids, url });
+  await call('wait_for', { ...ids, target: { frame: 'iframe', css: 'h1' }, timeout_ms: 5000 });
   return {
     manager,
     call,
