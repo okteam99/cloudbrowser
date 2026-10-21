@@ -186,12 +186,34 @@ test(
         before,
         'Bad proxy authentication must never fall back to the direct destination',
       );
+      await m.proxies.recordHealth(proxy.proxy_id, proxy.updated_at, {
+        status: 'healthy',
+        observed_ip: '8.8.8.8',
+        checked_at: new Date().toISOString(),
+      });
       const instance = await call('create_instance', {
         proxy_id: proxy.proxy_id,
         user_agent: 'SavedProxy/1.0',
       });
+      assert.equal(instance.egress.ip, '8.8.8.8');
+      assert.equal(instance.egress.source, 'proxy_check');
+      assert.ok(!JSON.stringify(instance.egress).includes('pass'));
       const ids = { instance_id: instance.instance_id, page_id: instance.pages[0].page_id };
       await call('navigate', { ...ids, url });
+      const changed = await m.proxies.save(
+        { ...fields, port: socksPort, username: 'changed' },
+        proxy.proxy_id,
+      );
+      await m.proxies.recordHealth(changed.proxy_id, changed.updated_at, {
+        status: 'healthy',
+        observed_ip: '1.1.1.1',
+        checked_at: new Date().toISOString(),
+      });
+      assert.equal(
+        (await call('get_instance', { instance_id: instance.instance_id })).egress.ip,
+        null,
+        'A changed proxy must not supply the existing instance exit sample',
+      );
       await m.proxies.save({ ...fields, port: socksPort, enabled: false }, proxy.proxy_id);
       await assert.rejects(() => request(), /disabled/);
       await assert.rejects(() => call('create_instance', { proxy_id: proxy.proxy_id }), /disabled/);

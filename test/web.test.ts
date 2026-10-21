@@ -48,7 +48,12 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
   const dir = await mkdtemp(join(tmpdir(), 'mcp-web-'));
   const port = await freePort();
   const base = `http://127.0.0.1:${port}/browser`;
-  const fixture = http.createServer((_req, res) => {
+  const fixture = http.createServer((req, res) => {
+    if (req.url === '/ip') {
+      res.setHeader('content-type', 'application/json');
+      res.end('{"ip":"8.8.4.4"}');
+      return;
+    }
     res.setHeader('content-type', 'text/html');
     res.end(
       '<meta name="viewport" content="width=device-width,initial-scale=1"><title>Live fixture</title><h1>Live recording test</h1><button onclick="document.body.style.background=\'green\'">Change</button>',
@@ -345,6 +350,22 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
       undefined,
       { timeout: 10000 },
     );
+
+    assert.equal(
+      await viewerPage.locator('.instance-proxy-address').innerText(),
+      '直连（未使用代理）',
+    );
+    assert.equal(await viewerPage.locator('.instance-egress').innerText(), '未检测');
+    assert.ok(
+      (await viewerPage.locator('.instance-user-agent').innerText()).includes(
+        result.data.actual.user_agent,
+      ),
+    );
+    await call('verify_environment', { instance_id: id, check_url: fixtureUrl + '/ip' });
+    await viewerPage.waitForFunction(
+      () => document.querySelector('.instance-egress')?.textContent?.trim() === '8.8.4.4',
+    );
+    assert.ok((await viewerPage.locator('.instance-environment').innerText()).includes('8.8.4.4'));
 
     const liveShare = (await call('create_share_link', { kind: 'live', instance_id: id })).data;
     assert.ok(liveShare.url.startsWith(base + '/share/'));

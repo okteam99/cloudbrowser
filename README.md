@@ -21,7 +21,7 @@ docker run -d --init \
   --shm-size=1g \
   -e WEB_PASSWORD='替换为你的强密码' \
   -v browser-mcp-data:/data \
-  bdpgogoup/cloudbrowser:20261021091630
+  bdpgogoup/cloudbrowser:20261021122415
 ```
 
 查看自动生成的 HTTPS 地址：
@@ -48,7 +48,7 @@ docker run -d --init \
   -e WEB_PASSWORD='替换为你的强密码' \
   -e CF_TUNNEL_TOKEN='替换为隧道的连接器Token' \
   -v browser-mcp-data:/data \
-  bdpgogoup/cloudbrowser:20261021091630
+  bdpgogoup/cloudbrowser:20261021122415
 ```
 
 服务自动读取隧道配置，识别唯一指向本容器端口的域名，无需再填 `BASE_URL`。如果配置了多个符合条件的域名、通配符或路径规则，请增加 `-e BASE_URL=https://browser.example.com` 明确选择地址。只支持 Cloudflare 远程管理的命名隧道，不会代替用户购买域名或创建 DNS。
@@ -68,7 +68,7 @@ docker run -d --init \
   -e BASE_URL=http://localhost:8080 \
   -e WEB_PASSWORD='替换为你的强密码' \
   -v browser-mcp-data:/data \
-  bdpgogoup/cloudbrowser:20261021091630
+  bdpgogoup/cloudbrowser:20261021122415
 ```
 
 部署到远程服务器时，将 `BASE_URL` 改为实际可访问地址；部署方负责 DNS、反向代理、HTTPS 或端口映射接通容器8080。`BASE_URL` 可带路径前缀。
@@ -164,6 +164,8 @@ Agent 必须支持远程 Streamable HTTP MCP 及自定义 Authorization 请求�
 | 单实例录像上限 | 128 MiB |
 | 历史录像总配额 | 1 GiB |
 | 保留时间 | 7 天 |
+
+实例列表与实时预览显示代理地址、UA 和最近检测的出口 IP。UA 默认值会显示浏览器实际 UA；列表缩略显示，预览区可查看并复制完整内容。出口标记“实例检测”或“代理检测”并提供时间：前者来自该实例的 `verify_environment`，后者来自未改变的保存代理的最近健康检查样本；代理检查不等于当前浏览器连接的实测结果。没有检测数据时显示“未检测”，不会把代理服务器地址当作已验证出口 IP。读取列表不发起新的外部请求。
 
 控制台和公开观看页使用逐帧 JPEG 刷新（最多约2 FPS），兼容 Cloudflare 的流式缓冲。另保留 MJPEG 媒体接口供直接连接使用；多个观看者共享同一份实例采样，不重复启动浏览器或截图任务。实例内新页面和最近操作的页面成为活动页面，直播和录像随之切换；不会同时录制所有标签页。
 
@@ -343,10 +345,10 @@ bash scripts/publish-docker.sh
 ## 源码构建及 stdio 接入
 
 ```sh
-docker build -t cloudbrowser:0.8.0 .
+docker build -t cloudbrowser:0.8.1 .
 ```
 
-将一行部署命令最后的镜像名换成 `cloudbrowser:0.8.0` 即可本地使用。
+将一行部署命令最后的镜像名换成 `cloudbrowser:0.8.1` 即可本地使用。
 
 兼容配置见 [本地 stdio](examples/mcp.local.json)、[SSH stdio](examples/mcp.ssh.json)。仍使用 `docker exec -i`，不得使用 `-t`。MCP_PRINCIPAL 是可信 SSH/Docker 接入中的命名空间，不是独立认证。
 

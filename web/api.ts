@@ -33,7 +33,12 @@ export type BrowserInstance = {
   locale: string;
   timezone: string;
   active_page_id?: string;
-  proxy: { server: string; authenticated: boolean } | null;
+  proxy: { server: string; authenticated: boolean; proxy_id?: string } | null;
+  egress?: {
+    ip: string | null;
+    source: 'unknown' | 'instance_check' | 'proxy_check';
+    checked_at: string | null;
+  };
   pages: { page_id: string; url: string }[];
 };
 export type Recording = {

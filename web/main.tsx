@@ -318,7 +318,7 @@ function Dashboard() {
                 <span className="status-dot" />
                 远程浏览器服务
               </div>
-              <Text>cloudbrowser · v0.8</Text>
+              <Text>cloudbrowser · v0.8.1</Text>
             </div>
           </Layout.Sider>
         )}
@@ -751,6 +751,96 @@ function Metric({
     </Card>
   );
 }
+function instanceUa(i: BrowserInstance) {
+  return i.user_agent === 'browser default' ? '浏览器默认（未指定 UA）' : i.user_agent;
+}
+function proxyAddress(i: BrowserInstance) {
+  if (!i.proxy) return '直连';
+  try {
+    return new URL(i.proxy.server).host;
+  } catch {
+    return i.proxy.server;
+  }
+}
+function egressSource(i: BrowserInstance) {
+  return i.egress?.source === 'instance_check'
+    ? '实例检测'
+    : i.egress?.source === 'proxy_check'
+      ? '代理检测'
+      : '未检测';
+}
+function networkHint(i: BrowserInstance) {
+  return [
+    i.proxy ? `代理地址：${i.proxy.server}` : '未使用代理，直接连接',
+    `出口 IP：${i.egress?.ip ?? '未检测'}`,
+    `来源：${egressSource(i)}`,
+    i.egress?.checked_at
+      ? `检测时间：${new Date(i.egress.checked_at).toLocaleString('zh-CN')}`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('；');
+}
+function InstanceEnvironment({ instance: i }: { instance: BrowserInstance }) {
+  return (
+    <div className="instance-environment">
+      <Tooltip title={networkHint(i)}>
+        <div className="instance-environment-line">
+          <span className="instance-env-label">
+            {i.egress?.ip ? '出口' : i.proxy ? '代理' : '网络'}
+          </span>
+          <span className="instance-env-value">{i.egress?.ip ?? proxyAddress(i)}</span>
+          {i.egress?.ip && <span className="instance-env-source">{egressSource(i)}</span>}
+        </div>
+      </Tooltip>
+      <Tooltip title={instanceUa(i)}>
+        <div className="instance-environment-line">
+          <span className="instance-env-label">UA</span>
+          <span className="instance-env-value">{instanceUa(i)}</span>
+        </div>
+      </Tooltip>
+    </div>
+  );
+}
+function LiveInstanceDetails({ instance: i }: { instance: BrowserInstance }) {
+  const ua = instanceUa(i),
+    ip = i.egress?.ip;
+  return (
+    <div className="live-instance-details">
+      <div className="live-instance-detail">
+        <Text type="secondary">代理地址</Text>
+        <Text
+          className="instance-proxy-address"
+          copyable={i.proxy ? { text: i.proxy.server } : false}
+        >
+          {i.proxy?.server ?? '直连（未使用代理）'}
+        </Text>
+      </div>
+      <div className="live-instance-detail">
+        <Text type="secondary">出口 IP</Text>
+        <Space size={8} wrap>
+          <Text className="instance-egress" copyable={ip ? { text: ip } : false}>
+            {ip ?? '未检测'}
+          </Text>
+          {ip && (
+            <Tooltip title={networkHint(i)}>
+              <Tag bordered={false}>{egressSource(i)}</Tag>
+            </Tooltip>
+          )}
+        </Space>
+      </div>
+      <div className="live-instance-detail live-instance-ua">
+        <Text type="secondary">UA</Text>
+        <Paragraph
+          className="instance-user-agent"
+          copyable={{ text: ua, tooltips: ['复制 UA', '已复制'] }}
+        >
+          {ua}
+        </Paragraph>
+      </div>
+    </div>
+  );
+}
 function InstanceTable({
   instances,
   loading,
@@ -769,9 +859,9 @@ function InstanceTable({
       title: '浏览器实例',
       dataIndex: 'instance_id',
       render: (_, i) => (
-        <Space align="start">
+        <div className="instance-table-identity">
           <Avatar shape="square" className="soft-icon blue" icon={<DesktopOutlined />} />
-          <div>
+          <div className="instance-table-text">
             <Text strong>实例 {compactId(i.instance_id)}</Text>
             <div className="cell-secondary">
               <Text type="secondary">
@@ -779,8 +869,9 @@ function InstanceTable({
               </Text>
               {!compact && <Text type="secondary"> · {i.pages.length} 个标签页</Text>}
             </div>
+            <InstanceEnvironment instance={i} />
           </div>
-        </Space>
+        </div>
       ),
     },
     { title: '状态', dataIndex: 'status', width: 88, render: (s) => <StatusTag status={s} /> },
@@ -804,6 +895,8 @@ function InstanceTable({
   ];
   return (
     <Table
+      className="instance-table"
+      tableLayout="fixed"
       rowKey="instance_id"
       columns={columns}
       dataSource={instances}
@@ -906,13 +999,14 @@ function LiveViewer({ instance }: { instance?: BrowserInstance }) {
             <Text strong>实例 {compactId(instance.instance_id)}</Text>
             <Text type="secondary">
               {instance.viewport.width} × {instance.viewport.height} ·{' '}
-              {instance.proxy ? '代理出口' : '直连出口'}
+              {instance.proxy ? '代理连接' : '直连'}
             </Text>
           </>
         ) : (
           <Text type="secondary">实时画面仅供查看，操作由 Agent 执行</Text>
         )}
       </div>
+      {instance && <LiveInstanceDetails instance={instance} />}
     </Card>
   );
 }

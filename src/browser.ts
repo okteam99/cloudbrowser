@@ -11,6 +11,7 @@ import {
 } from 'playwright';
 import type { Server } from 'proxy-chain';
 import { randomUUID } from 'node:crypto';
+import { isIP } from 'node:net';
 import { mkdir, mkdtemp, rm, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
@@ -54,6 +55,8 @@ type Instance = {
   gateway: Server;
   options: InstanceOptions;
   proxy?: Proxy;
+  userAgent?: string;
+  egress?: { ip: string; source: 'instance_check'; checked_at: string };
   pages: Map<string, PageEntry>;
   created: number;
   touched: number;
@@ -299,6 +302,33 @@ export class BrowserManager {
     return options.proxy ? proxySchema.parse(options.proxy) : undefined;
   }
   private summary(i: Instance) {
+    let egress: {
+      ip: string | null;
+      source: 'unknown' | 'proxy_check' | 'instance_check';
+      checked_at: string | null;
+    } = i.egress ?? { ip: null, source: 'unknown', checked_at: null };
+    if (!i.egress && i.proxy) {
+      const proxyId = i.options.proxy_id ?? i.options.proxy_ref;
+      const p = proxyId ? this.proxies.list().find((p) => p.proxy_id === proxyId) : undefined;
+      // A proxy inventory check is only a sample, and only applies to the instance's unchanged connection settings.
+      if (
+        p &&
+        new URL(`${p.protocol}://${p.host}:${p.port}`).href === new URL(i.proxy.server).href &&
+        p.username === (i.proxy.username ?? '') &&
+        p.password === (i.proxy.password ?? '') &&
+        p.health.status === 'healthy' &&
+        p.health.observed_ip &&
+        isIP(p.health.observed_ip) &&
+        p.health.checked_at &&
+        Date.now() - Date.parse(p.health.checked_at) <= this.cfg.proxyCheckIntervalSeconds * 2000
+      ) {
+        egress = {
+          ip: p.health.observed_ip,
+          source: 'proxy_check',
+          checked_at: p.health.checked_at,
+        };
+      }
+    }
     return {
       instance_id: i.id,
       active_page_id: i.activePageId,
@@ -310,7 +340,8 @@ export class BrowserManager {
       status: i.crashed ? 'crashed' : 'ready',
       created_at: new Date(i.created).toISOString(),
       viewport: i.options.viewport,
-      user_agent: i.options.user_agent ?? 'browser default',
+      user_agent: i.userAgent ?? i.options.user_agent ?? 'browser default',
+      egress,
       locale: i.options.locale,
       timezone: i.options.timezone,
       mobile: i.options.mobile,
@@ -519,7 +550,9 @@ export class BrowserManager {
           sampling_failures: 0,
         },
       });
-      return { ...this.summary(i), actual: await this.environment(p) };
+      const actual = await this.environment(p);
+      i.userAgent = actual.user_agent;
+      return { ...this.summary(i), actual };
     } catch (e) {
       failed = true;
       const message = e instanceof Error ? e.message : '';
@@ -942,7 +975,7 @@ export class BrowserManager {
     if (name === 'health')
       return {
         status: 'ok',
-        version: '0.8.0',
+        version: '0.8.1',
         base_url: this.cfg.baseUrl,
         public_url_mode: this.cfg.quickTunnel
           ? 'quick_tunnel'
@@ -1064,12 +1097,19 @@ export class BrowserManager {
         } catch {
           parsed = null;
         }
+        const observedIp = typeof parsed?.ip === 'string' && isIP(parsed.ip) ? parsed.ip : null;
+        if (observedIp)
+          i.egress = {
+            ip: observedIp,
+            source: 'instance_check',
+            checked_at: new Date().toISOString(),
+          };
         return {
           instance_id: i.id,
           check_url: u,
           status: response.status(),
           actual: await this.environment(p),
-          observed_ip: parsed?.ip ?? null,
+          observed_ip: observedIp,
           response: content,
           country: null,
           note: 'Verify observed_ip and any country assertion using a trusted source; HTTP success alone is not a proxy verification.',

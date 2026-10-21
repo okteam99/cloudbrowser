@@ -102,11 +102,18 @@ test('real Chromium: device, isolation, interaction, popup, iframe, download, up
       check_url: url + '/ip',
     });
     assert.equal(env.observed_ip, '127.0.0.1');
+    const metadata = await call('get_instance', { instance_id: i.instance_id });
+    assert.equal(metadata.egress.ip, '127.0.0.1');
+    assert.equal(metadata.egress.source, 'instance_check');
+    assert.ok(metadata.egress.checked_at);
     assert.match(env.response, /TestAndroid/);
     const screen = await call('screenshot', { ...ids, full_page: false });
     assert.equal(screen.mime, 'image/png');
     const i2 = await call('create_instance', {});
     assert.notEqual(i2.instance_id, i.instance_id);
+    assert.equal(i2.user_agent, i2.actual.user_agent);
+    assert.match(i2.user_agent, /Mozilla/);
+    assert.equal(i2.egress.ip, null);
     await m.instances
       .get(i.instance_id)!
       .context.addCookies([{ name: 'secret', value: 'one', url }]);

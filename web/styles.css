@@ -1398,3 +1398,93 @@ input {
     width: 100%;
   }
 }
+
+.instance-table-identity {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+.instance-table-identity .ant-avatar {
+  flex: 0 0 auto;
+}
+.instance-table-text {
+  min-width: 0;
+  flex: 1;
+}
+.instance-table-text > .ant-typography {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.instance-table .cell-secondary {
+  margin-top: 2px;
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.instance-table .cell-secondary .ant-typography {
+  font-size: 10px;
+}
+.instance-environment {
+  margin-top: 5px;
+}
+.instance-environment-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  line-height: 17px;
+  min-width: 0;
+}
+.instance-env-label {
+  color: #94a1b6;
+  flex: 0 0 24px;
+}
+.instance-env-value {
+  color: #65758c;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  font-family: ui-monospace, monospace;
+}
+.instance-env-source {
+  flex: 0 0 auto;
+  font-size: 9px;
+  color: #94a1b6;
+}
+.live-instance-details {
+  border-top: 1px solid #edf0f5;
+  padding: 14px 18px 0;
+  display: grid;
+  gap: 10px;
+}
+.live-instance-detail {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 12px;
+  font-size: 12px;
+}
+.live-instance-detail > .ant-typography {
+  font-size: 12px;
+  margin: 0;
+}
+.live-instance-detail .instance-proxy-address,
+.live-instance-detail .instance-egress {
+  font-family: ui-monospace, monospace;
+  overflow-wrap: anywhere;
+}
+.live-instance-detail .instance-user-agent {
+  font:
+    11px/1.7 ui-monospace,
+    monospace;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  color: #65758c;
+}
+.live-instance-details .ant-tag {
+  font-size: 10px;
+}

@@ -225,3 +225,5 @@ inspect_instance和get_logs不占用浏览器执行锁；get_diagnostics也可�
 仅设置 WEB_PASSWORD 即可默认启动匿名 Quick Tunnel；设置 CF_TUNNEL_TOKEN 后使用命名隧道并自动识别域名。设置 BASE_URL 可指定自管入口，或在命名隧道有多个域名时选择主入口。日志给出 Public HTTPS URL 与 MCP URL；网页登录后生成的连接配置和分享链接使用该地址。匿名地址会在隧道重建后变化，应重新复制 MCP 配置和生成分享链接；已有分享授权不会延长过期时间。命名隧道的域名需提前在 Cloudflare 绑定并指向 localhost:8080。
 
 本服务 Streamable HTTP 使用 JSON 响应，不依赖 Quick Tunnel 不支持的 SSE。所有模式保留原有密码、MCP Bearer、分享密钥和所有者隔离。
+
+实例摘要（`create_instance`、`list_instances`、`get_instance`）的 `user_agent` 为创建时从浏览器读取的实际值；`egress` 包含 `ip`、`source`（instance_check / proxy_check / unknown）、`checked_at`。实例检测由 `verify_environment` 的有效 IP 响应更新；代理检查样本只在代理 ID、地址和凭据与实例固定配置一致且仍新鲜时采用，不能保证当前连接出口相同。未知值返回 null，列表读取不额外访问外部服务。
