@@ -286,7 +286,7 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
         await page.getByLabel('产物存储配额（GB）', { exact: true }).inputValue(),
         '201',
       );
-      await page.getByRole('menuitem', { name: 'MCP 接入' }).click();
+      await page.getByRole('menuitem', { name: 'MCP&API' }).click();
       await page.getByLabel('MCP 地址', { exact: true }).waitFor();
       assert.equal(await page.getByLabel('MCP 地址', { exact: true }).inputValue(), base + '/mcp');
       assert.ok(

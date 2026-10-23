@@ -99,7 +99,7 @@ MCP（Streamable HTTP）：https://browser.example.com/mcp
 
 公开文档仅提供通用说明；真实 Token 仍通过登录后的复制操作获取。复制内容包含服务访问凭据，请只交给可信使用方。
 
-控制台使用 React + Ant Design，包含工作台、实时实例、历史录屏、代理管理、MCP 接入、系统设置和文档中心，并适配手机屏幕。所有前端资源随镜像打包，不依赖外部 CDN。
+控制台使用 React + Ant Design，包含工作台、实时实例、历史录屏、代理管理、MCP&API、系统设置和文档中心，并适配手机屏幕。所有前端资源随镜像打包，不依赖外部 CDN。
 
 不需要 SSH 配置或 Chrome 插件。原 stdio / SSH 接入方式仍保留。
 

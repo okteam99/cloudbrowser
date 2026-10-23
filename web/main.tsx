@@ -90,7 +90,7 @@ const navItems = [
   { key: 'instances', icon: <VideoCameraOutlined />, label: '实时实例' },
   { key: 'history', icon: <HistoryOutlined />, label: '历史录屏' },
   { key: 'proxies', icon: <SafetyCertificateOutlined />, label: '代理管理' },
-  { key: 'connect', icon: <ApiOutlined />, label: 'MCP 接入' },
+  { key: 'connect', icon: <ApiOutlined />, label: 'MCP&API' },
   { key: 'settings', icon: <SettingOutlined />, label: '系统设置' },
   { key: 'docs', icon: <FileTextOutlined />, label: '使用文档' },
 ];
@@ -99,7 +99,7 @@ const sectionTitles: Record<Section, { title: string; description: string }> = {
   instances: { title: '实时实例', description: '选择一个实例，实时查看当前活动标签页。' },
   history: { title: '历史录屏', description: '回看已结束的浏览器会话，定位问题、还原过程。' },
   proxies: { title: '代理管理', description: '配置国家和代理线路，由 Agent 按代理 ID 选择使用。' },
-  connect: { title: 'MCP 接入', description: '复制接入说明，把远程浏览器交给 Agent。' },
+  connect: { title: 'MCP&API', description: '复制接入说明，把远程浏览器交给 Agent。' },
   docs: { title: '使用文档', description: '从首次连接到日常使用，你需要的信息都在这里。' },
   settings: { title: '系统设置', description: '查看存储用量，调整配额和截图保留期限。' },
 };
