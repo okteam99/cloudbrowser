@@ -259,6 +259,12 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
       await page.getByRole('button', { name: '复制 Agent 接入信息' }).waitFor({ timeout: 5000 });
       await page.getByRole('menuitem', { name: '系统设置' }).click();
       await page.getByLabel('产物存储配额（GB）', { exact: true }).waitFor();
+      await page.waitForFunction(() => {
+        const input = document.querySelector<HTMLInputElement>(
+          'input[aria-label="产物存储配额（GB）"]',
+        );
+        return input && !input.disabled;
+      });
       assert.equal(
         await page.getByLabel('产物存储配额（GB）', { exact: true }).inputValue(),
         '200',
@@ -270,6 +276,12 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
       await page.getByText('存储设置已保存并生效', { exact: true }).waitFor();
       await page.reload();
       await page.getByLabel('产物存储配额（GB）', { exact: true }).waitFor();
+      await page.waitForFunction(() => {
+        const input = document.querySelector<HTMLInputElement>(
+          'input[aria-label="产物存储配额（GB）"]',
+        );
+        return input && !input.disabled;
+      });
       assert.equal(
         await page.getByLabel('产物存储配额（GB）', { exact: true }).inputValue(),
         '201',
