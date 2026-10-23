@@ -8,6 +8,8 @@ import type { BrowserManager } from './browser.js';
 import { WebAuth } from './auth.js';
 import { createMcpServer, type Dispatch } from './mcp.js';
 import { definitions } from './tools.js';
+import { invokeTool, failedCall, toolHttpStatus } from './tool-api.js';
+import { toolCatalog, toolOpenApi } from './api-schema.js';
 import { dashboard, loginPage, sharePage } from './web-ui.js';
 import { publicError } from './errors.js';
 import { frameMedia, liveMedia, videoMedia } from './media.js';
@@ -20,15 +22,21 @@ import {
   instanceDocumentMarkdown,
 } from './instance-document.js';
 
-async function body(req: IncomingMessage, limit = 1048576) {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const c of req) {
-    size += c.length;
-    if (size > limit) throw Error('Body too large');
-    chunks.push(Buffer.from(c));
-  }
-  return Buffer.concat(chunks).toString('utf8');
+function body(req: IncomingMessage, limit = 1048576): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    req.on('data', (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > limit) {
+        chunks.length = 0;
+        reject(new ToolError('REQUEST_TOO_LARGE', 'JSON body exceeds the size limit.'));
+      } else chunks.push(Buffer.from(chunk));
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+    req.on('aborted', () => reject(new Error('Request aborted')));
+  });
 }
 const json = (res: ServerResponse, value: unknown, status = 200) => {
   res.statusCode = status;
@@ -118,7 +126,12 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
     try {
       if (path === '/docs/agent-guide.md' && ['GET', 'HEAD'].includes(req.method ?? '')) {
         // Only static, generic documentation is public. Never interpolate deployment credentials or state.
-        const files = ['docs/agent-connection.md', 'docs/mcp-api.md', 'docs/agent-workflow.md'];
+        const files = [
+          'docs/agent-connection.md',
+          'docs/http-api.md',
+          'docs/mcp-api.md',
+          'docs/agent-workflow.md',
+        ];
         const parts = await Promise.all(
           files.map((file) => readFile(`${docsRoot}${file}`, 'utf8')),
         );
@@ -157,7 +170,65 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         return;
       }
       if (path === '/healthz') {
-        json(res, { status: 'ok', version: '0.12.0' });
+        json(res, { status: 'ok', version: '0.13.0' });
+        return;
+      }
+      const toolRoute = /^\/api\/tools\/([^/]+)$/.exec(path);
+      if (toolRoute) {
+        let operationId: string = randomUUID();
+        const reply = (result: ReturnType<typeof failedCall>, status = toolHttpStatus(result)) => {
+          res.setHeader('x-operation-id', operationId);
+          json(res, result, status);
+        };
+        if (!bearer) {
+          res.setHeader('www-authenticate', 'Bearer realm="cloudbrowser"');
+          reply(failedCall(operationId, 'UNAUTHORIZED', 'Bearer token required.'), 401);
+          return;
+        }
+        if (req.method !== 'POST') {
+          res.setHeader('allow', 'POST');
+          reply(failedCall(operationId, 'METHOD_NOT_ALLOWED', 'Use POST.'), 405);
+          return;
+        }
+        const key = req.headers['idempotency-key'];
+        if (key !== undefined) {
+          if (
+            typeof key !== 'string' ||
+            !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(key)
+          ) {
+            reply(failedCall(operationId, 'INVALID_ARGUMENT', 'Idempotency-Key must be a UUID.'));
+            return;
+          }
+          operationId = key.toLowerCase();
+        }
+        if (
+          req.headers['content-type']?.split(';')[0].trim().toLowerCase() !== 'application/json'
+        ) {
+          reply(
+            failedCall(
+              operationId,
+              'UNSUPPORTED_MEDIA_TYPE',
+              'Use Content-Type: application/json.',
+            ),
+          );
+          return;
+        }
+        try {
+          const args = JSON.parse(await body(req));
+          reply(await invokeTool('web', toolRoute[1], args, dispatch, operationId));
+        } catch (error) {
+          if (error instanceof SyntaxError)
+            reply(failedCall(operationId, 'INVALID_ARGUMENT', 'Malformed JSON body.'));
+          else if (error instanceof ToolError)
+            reply(failedCall(operationId, error.code, error.message));
+          else
+            reply({
+              operation_id: operationId,
+              status: 'unknown',
+              data: null,
+              error: publicError(error),
+            });
+        }
         return;
       }
       if (path === '/mcp') {
@@ -347,6 +418,17 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         json(res, { error: 'Authentication required' }, 401);
         return;
       }
+      if (path === '/api/tools' || path === '/api/openapi.json') {
+        if (req.method !== 'GET') {
+          res.setHeader('allow', 'GET');
+          json(res, { error: 'Use GET' }, 405);
+        } else
+          json(
+            res,
+            path === '/api/tools' ? await toolCatalog(baseUrl) : await toolOpenApi(baseUrl),
+          );
+        return;
+      }
       if (path === '/api/settings') {
         if (req.method === 'GET') {
           json(res, {
@@ -454,6 +536,9 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
           mcp_config,
           agent_instructions,
           agent_guide_url,
+          api_base_url: `${baseUrl}/api`,
+          openapi_url: `${baseUrl}/api/openapi.json`,
+          api_instructions: `请接入以下远程浏览器 HTTP API，先阅读同一份 MCP & API 公开文档并获取接口列表，再按我的要求操作浏览器。\nAPI：${baseUrl}/api\n认证请求头：Authorization: Bearer ${auth.token}\n公开文档：${agent_guide_url}`,
           tool_count: Object.keys(definitions).length,
           live_transport: 'frames',
           max_instances: cfg.maxInstances,

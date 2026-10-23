@@ -1,7 +1,7 @@
 import http from 'node:http';
 import { mkdir, chmod, unlink, open, readFile, stat, rename } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { z } from 'zod';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { resources } from './diagnostics.js';
@@ -43,7 +43,14 @@ export async function daemon() {
   manager.logs.log({ component: 'service', level: 'info', code: 'manager_started' });
   const operations = new Map<
     string,
-    { owner: string; name: string; created_at: string; promise: Promise<any>; result?: any }
+    {
+      owner: string;
+      name: string;
+      fingerprint: string;
+      created_at: string;
+      promise: Promise<any>;
+      result?: any;
+    }
   >();
   const order: string[] = [];
   const auditPath = `${cfg.dataDir}/audit.jsonl`;
@@ -53,7 +60,7 @@ export async function daemon() {
   const dispatch: Dispatch = async (owner, name, args, operationId) => {
     if (!/^[a-zA-Z0-9_-]{1,64}$/.test(owner))
       throw new ToolError('INVALID_PRINCIPAL', 'Invalid principal.');
-    const def = definitions[name];
+    const def = Object.hasOwn(definitions, name) ? definitions[name] : undefined;
     if (!def) throw new ToolError('UNKNOWN_TOOL', 'Unknown tool.');
     const parsed = def.schema.parse(args);
     if (name === 'list_operations')
@@ -83,8 +90,24 @@ export async function daemon() {
       };
     }
     const old = operations.get(operationId);
+    const fingerprint = createHash('sha256')
+      .update(
+        JSON.stringify(parsed, (_key, value) =>
+          value && typeof value === 'object' && !Array.isArray(value)
+            ? Object.fromEntries(
+                Object.entries(value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+              )
+            : value,
+        ),
+      )
+      .digest('hex');
     if (old) {
       if (old.owner !== owner) throw new ToolError('OPERATION_NOT_FOUND', 'Unknown operation.');
+      if (old.name !== name || old.fingerprint !== fingerprint)
+        throw new ToolError(
+          'OPERATION_ID_CONFLICT',
+          'This operation ID was already used with a different tool or arguments.',
+        );
       return old.promise;
     }
     const promise = (async () => {
@@ -142,7 +165,13 @@ export async function daemon() {
         'get_console_logs',
       ].includes(name)
     ) {
-      operations.set(operationId, { owner, name, created_at: new Date().toISOString(), promise });
+      operations.set(operationId, {
+        owner,
+        name,
+        fingerprint,
+        created_at: new Date().toISOString(),
+        promise,
+      });
       order.push(operationId);
       if (order.length > 500) operations.delete(order.shift()!);
     }

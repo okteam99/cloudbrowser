@@ -1,3 +1,4 @@
+import { ApiDocs } from './api-docs.js';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
@@ -338,7 +339,7 @@ function Dashboard() {
                 <span className="status-dot" />
                 远程浏览器服务
               </div>
-              <Text>cloudbrowser · v0.12.0</Text>
+              <Text>cloudbrowser · v0.13.0</Text>
             </div>
           </Layout.Sider>
         )}
@@ -1449,7 +1450,7 @@ function ConnectionPage({
         <div>
           <Title level={4}>一步，把云浏览器连接到你的 Agent</Title>
           <Paragraph type="secondary">
-            一句话、MCP 地址、认证信息和一个公开文档链接。
+            MCP 与 API 共用一份公开接入文档，复制地址和认证信息即可开始。
             <br />
             <Typography.Link href={connection.agent_guide_url} target="_blank" rel="noreferrer">
               查看公开接入文档
@@ -1470,146 +1471,164 @@ function ConnectionPage({
           </Button>
         </Space>
       </Card>
-      <Row gutter={[20, 20]}>
-        <Col xs={24} xl={15}>
-          <Card
-            title={
-              <Space>
-                <LinkOutlined />
-                连接信息
-              </Space>
-            }
-            className="section-card"
-          >
-            <div className="field-label">
-              <Text strong>MCP 地址</Text>
-              <Tag color="blue" bordered={false}>
-                Streamable HTTP
-              </Tag>
-            </div>
-            <Space.Compact block>
-              <Input
-                id="mcp-endpoint"
-                aria-label="MCP 地址"
-                readOnly
-                value={connection.mcp_url}
-                className="mono-input"
-              />
-              <Button
-                icon={<CopyOutlined />}
-                aria-label="复制 MCP 地址"
-                onClick={() => onCopy(connection.mcp_url)}
-              />
-            </Space.Compact>
-            <div className="field-label field-spaced">
-              <Text strong>访问 Token</Text>
-              <Text type="secondary">Authorization: Bearer</Text>
-            </div>
-            <Space.Compact block>
-              <Input.Password
-                aria-label="访问 Token"
-                readOnly
-                value={token}
-                className="mono-input"
-                visibilityToggle={{ visible: reveal, onVisibleChange: setReveal }}
-              />
-              <Button
-                icon={<CopyOutlined />}
-                aria-label="复制访问 Token"
-                onClick={() => onCopy(token)}
-              />
-            </Space.Compact>
-            <Alert
-              className="token-note"
-              type="info"
-              showIcon
-              title="Token 与网页密码独立"
-              description="更换部署密码并重启后，旧 Token 会失效。请只把接入信息交给可信 Agent。"
-            />
-          </Card>
-          <Card
-            title={
-              <Space>
-                <CodeOutlined />
-                客户端配置
-              </Space>
-            }
-            extra={
-              <Button
-                icon={<CopyOutlined />}
-                onClick={() => onCopy(JSON.stringify(connection.mcp_config, null, 2))}
-              >
-                复制 MCP 配置
-              </Button>
-            }
-            className="section-card spaced-card"
-          >
-            <Tabs
-              items={[
-                {
-                  key: 'json',
-                  label: '通用 JSON',
-                  children: (
-                    <pre id="config" className="code-block">
-                      {reveal ? JSON.stringify(connection.mcp_config, null, 2) : masked}
-                    </pre>
-                  ),
-                },
-                {
-                  key: 'codex',
-                  label: 'Codex TOML',
-                  children: (
-                    <>
-                      <pre className="code-block">{toml}</pre>
+      <Tabs
+        items={[
+          {
+            key: 'mcp',
+            label: 'MCP 接入',
+            children: (
+              <Row gutter={[20, 20]}>
+                <Col xs={24} xl={15}>
+                  <Card
+                    title={
+                      <Space>
+                        <LinkOutlined />
+                        连接信息
+                      </Space>
+                    }
+                    className="section-card"
+                  >
+                    <div className="field-label">
+                      <Text strong>MCP 地址</Text>
+                      <Tag color="blue" bordered={false}>
+                        Streamable HTTP
+                      </Tag>
+                    </div>
+                    <Space.Compact block>
+                      <Input
+                        id="mcp-endpoint"
+                        aria-label="MCP 地址"
+                        readOnly
+                        value={connection.mcp_url}
+                        className="mono-input"
+                      />
                       <Button
-                        size="small"
                         icon={<CopyOutlined />}
-                        onClick={() =>
-                          onCopy(
-                            `[mcp_servers.cloudbrowser]\nurl = ${JSON.stringify(connection.mcp_url)}\n\n[mcp_servers.cloudbrowser.http_headers]\nAuthorization = ${JSON.stringify(server.headers.Authorization)}`,
-                          )
-                        }
+                        aria-label="复制 MCP 地址"
+                        onClick={() => onCopy(connection.mcp_url)}
+                      />
+                    </Space.Compact>
+                    <div className="field-label field-spaced">
+                      <Text strong>访问 Token</Text>
+                      <Text type="secondary">Authorization: Bearer</Text>
+                    </div>
+                    <Space.Compact block>
+                      <Input.Password
+                        aria-label="访问 Token"
+                        readOnly
+                        value={token}
+                        className="mono-input"
+                        visibilityToggle={{ visible: reveal, onVisibleChange: setReveal }}
+                      />
+                      <Button
+                        icon={<CopyOutlined />}
+                        aria-label="复制访问 Token"
+                        onClick={() => onCopy(token)}
+                      />
+                    </Space.Compact>
+                    <Alert
+                      className="token-note"
+                      type="info"
+                      showIcon
+                      title="Token 与网页密码独立"
+                      description="更换部署密码并重启后，旧 Token 会失效。请只把接入信息交给可信 Agent。"
+                    />
+                  </Card>
+                  <Card
+                    title={
+                      <Space>
+                        <CodeOutlined />
+                        客户端配置
+                      </Space>
+                    }
+                    extra={
+                      <Button
+                        icon={<CopyOutlined />}
+                        onClick={() => onCopy(JSON.stringify(connection.mcp_config, null, 2))}
                       >
-                        复制完整 TOML
+                        复制 MCP 配置
                       </Button>
-                    </>
-                  ),
-                },
-              ]}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} xl={9}>
-          <Card title="接入检查" className="section-card">
-            <Steps
-              direction="vertical"
-              size="small"
-              items={[
-                { title: '复制接入信息', description: '地址、认证与公开文档一次复制' },
-                {
-                  title: '配置到 Agent 的 MCP 客户端',
-                  description: '支持 Streamable HTTP 和自定义请求头',
-                },
-                { title: '让 Agent 检查连接', description: '调用 health 后即可创建浏览器实例' },
-              ]}
-            />
-            <div className="connection-facts">
-              <div>
-                <Text type="secondary">可用工具</Text>
-                <Text strong>{connection.tool_count} 个</Text>
-              </div>
-              <div>
-                <Text type="secondary">实例上限</Text>
-                <Text strong>{connection.max_instances} 个</Text>
-              </div>
-              <div>
-                <Text type="secondary">鉴权方式</Text>
-                <Text strong>Bearer Token</Text>
-              </div>
-            </div>
-          </Card>
-        </Col>
-      </Row>
+                    }
+                    className="section-card spaced-card"
+                  >
+                    <Tabs
+                      items={[
+                        {
+                          key: 'json',
+                          label: '通用 JSON',
+                          children: (
+                            <pre id="config" className="code-block">
+                              {reveal ? JSON.stringify(connection.mcp_config, null, 2) : masked}
+                            </pre>
+                          ),
+                        },
+                        {
+                          key: 'codex',
+                          label: 'Codex TOML',
+                          children: (
+                            <>
+                              <pre className="code-block">{toml}</pre>
+                              <Button
+                                size="small"
+                                icon={<CopyOutlined />}
+                                onClick={() =>
+                                  onCopy(
+                                    `[mcp_servers.cloudbrowser]\nurl = ${JSON.stringify(connection.mcp_url)}\n\n[mcp_servers.cloudbrowser.http_headers]\nAuthorization = ${JSON.stringify(server.headers.Authorization)}`,
+                                  )
+                                }
+                              >
+                                复制完整 TOML
+                              </Button>
+                            </>
+                          ),
+                        },
+                      ]}
+                    />
+                  </Card>
+                </Col>
+                <Col xs={24} xl={9}>
+                  <Card title="接入检查" className="section-card">
+                    <Steps
+                      direction="vertical"
+                      size="small"
+                      items={[
+                        { title: '复制接入信息', description: '地址、认证与公开文档一次复制' },
+                        {
+                          title: '配置到 Agent 的 MCP 客户端',
+                          description: '支持 Streamable HTTP 和自定义请求头',
+                        },
+                        {
+                          title: '让 Agent 检查连接',
+                          description: '调用 health 后即可创建浏览器实例',
+                        },
+                      ]}
+                    />
+                    <div className="connection-facts">
+                      <div>
+                        <Text type="secondary">可用工具</Text>
+                        <Text strong>{connection.tool_count} 个</Text>
+                      </div>
+                      <div>
+                        <Text type="secondary">实例上限</Text>
+                        <Text strong>{connection.max_instances} 个</Text>
+                      </div>
+                      <div>
+                        <Text type="secondary">鉴权方式</Text>
+                        <Text strong>Bearer Token</Text>
+                      </div>
+                    </div>
+                  </Card>
+                </Col>
+              </Row>
+            ),
+          },
+          {
+            key: 'api',
+            label: 'API 文档',
+            children: <ApiDocs connection={connection} onCopy={onCopy} />,
+          },
+        ]}
+      />
     </>
   );
 }

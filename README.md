@@ -99,6 +99,10 @@ MCP（Streamable HTTP）：https://browser.example.com/mcp
 
 公开文档仅提供通用说明；真实 Token 仍通过登录后的复制操作获取。复制内容包含服务访问凭据，请只交给可信使用方。
 
+MCP 与 HTTP API 共用同一套浏览器能力，也共用公开 Markdown 文档 `BASE_URL/docs/agent-guide.md`。无需登录即可读取文档，真实 Token 单独从控制台复制。**MCP&API** 页面可切换 MCP 配置与 API 文档，搜索全部工具及参数并复制 cURL、Python、JavaScript 示例。
+
+直接 API 调用：`POST BASE_URL/api/tools/{工具名}`，携带 `Authorization: Bearer <Token>` 和 `Content-Type: application/json`，正文使用与 MCP 相同的参数。`GET BASE_URL/api/tools` 发现工具，`GET BASE_URL/api/openapi.json` 获取 OpenAPI 描述；两者需登录或 Bearer 认证。MCP 和 API 共享实例及操作日志，可交替调用。
+
 控制台使用 React + Ant Design，包含工作台、实时实例、历史录屏、代理管理、MCP&API、系统设置和文档中心，并适配手机屏幕。所有前端资源随镜像打包，不依赖外部 CDN。
 
 不需要 SSH 配置或 Chrome 插件。原 stdio / SSH 接入方式仍保留。
@@ -430,10 +434,10 @@ bash scripts/publish-docker.sh
 ## 源码构建及 stdio 接入
 
 ```sh
-docker build -t cloudbrowser:0.12.0 .
+docker build -t cloudbrowser:0.13.0 .
 ```
 
-将一行部署命令最后的镜像名换成 `cloudbrowser:0.12.0` 即可本地使用。
+将一行部署命令最后的镜像名换成 `cloudbrowser:0.13.0` 即可本地使用。
 
 兼容配置见 [本地 stdio](examples/mcp.local.json)、[SSH stdio](examples/mcp.ssh.json)。仍使用 `docker exec -i`，不得使用 `-t`。MCP_PRINCIPAL 是可信 SSH/Docker 接入中的命名空间，不是独立认证。
 

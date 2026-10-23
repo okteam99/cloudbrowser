@@ -294,6 +294,16 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
         'Token should be masked by default',
       );
       await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+      await page.getByRole('tab', { name: 'API 文档', exact: true }).click();
+      await page.getByLabel('API 地址', { exact: true }).waitFor();
+      assert.equal(await page.getByLabel('API 地址', { exact: true }).inputValue(), base + '/api');
+      await page.getByText('接口参考 · 42 项能力', { exact: true }).waitFor();
+      await page.getByRole('button', { name: '复制 API 接入信息' }).click();
+      const apiPrompt = await page.evaluate(() => navigator.clipboard.readText());
+      assert.ok(apiPrompt.includes(base + '/docs/agent-guide.md'));
+      assert.ok(apiPrompt.includes('Authorization: Bearer '));
+      assert.equal(apiPrompt.split('\n').length, 4);
+      await page.getByRole('tab', { name: 'MCP 接入', exact: true }).click();
       await page.getByRole('button', { name: '复制 MCP 配置' }).click();
       const copied = JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
       assert.equal(copied.mcpServers['cloudbrowser'].url, base + '/mcp');

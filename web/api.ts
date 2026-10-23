@@ -18,6 +18,9 @@ export type Bootstrap = {
 export type Connection = {
   base_url: string;
   mcp_url: string;
+  api_base_url: string;
+  openapi_url: string;
+  api_instructions: string;
   agent_instructions: string;
   agent_guide_url: string;
   mcp_config: {

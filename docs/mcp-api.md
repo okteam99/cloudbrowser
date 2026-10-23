@@ -1,8 +1,8 @@
-# MCP 接口 V0.12
+# 共用工具参考 V0.13（MCP & API）
 
 推荐使用 `BASE_URL/mcp` 的 Streamable HTTP，携带 `Authorization: Bearer <登录网页自动生成的 Token>`。网页登录后可复制完整配置。兼容 MCP stdio，通过 SSH 或 docker exec 接入。HTTP 调用共享 web principal，stdio 仍按 MCP_PRINCIPAL 隔离。
 
-全部参数和默认值见 [机器可读 Schema](mcp-tools.json)，可通过标准 MCP `tools/list` 实时发现。以下展示工具 arguments，不是 HTTP 请求。
+全部参数和默认值见 [机器可读 Schema](mcp-tools.json)，可通过标准 MCP `tools/list` 实时发现。以下展示工具 arguments，也就是 `POST /api/tools/{工具名}` 的 JSON 请求体。
 
 ## 返回值
 
@@ -285,7 +285,7 @@ inspect_instance和get_logs不占用浏览器执行锁；get_diagnostics也可�
 
 所有地址均相对于 BASE_URL。`/` 为密码登录及说明/监看页；`POST /login`、`POST /logout` 管理 Cookie 会话。`GET /healthz` 仅返回无敏感信息的存活状态。
 
-`GET /docs/agent-guide.md`（支持 HEAD）无需登录：提供与当前镜像一致的通用接入指南、完整接口参考和 Agent 工作流。内容不包含部署凭据或实例数据，允许跨来源匿名读取。网页登录后的复制内容只包含一句话、MCP 地址、认证头和这个公开文档链接。
+`GET /docs/agent-guide.md`（支持 HEAD）无需登录：提供与当前镜像一致的通用接入指南、完整接口参考和 Agent 工作流。内容不包含部署凭据或实例数据，允许跨来源匿名读取。控制台的 MCP 和 API 接入信息共用这个公开文档链接；复制内容只包含一句话、对应地址、认证头和文档链接。
 
 以下路由均需要登录 Cookie 或相同 Bearer Token：
 
