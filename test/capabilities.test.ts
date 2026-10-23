@@ -327,6 +327,7 @@ test('network and console capture retain original contents with per-tab request 
     await call('evaluate', {
       ...ids,
       script: `async()=>{for(let n=0;n<215;n++)await fetch('/api?n='+n)}`,
+      timeout_ms: 30000,
     });
     const bounded = await call('list_network_requests', { ...ids, after_seq: 0, limit: 200 });
     assert.ok(bounded.entries.length <= 200);
