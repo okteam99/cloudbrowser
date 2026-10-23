@@ -4,7 +4,7 @@
 
 1. 从用户目标确定 URL、设备、代理和允许的写入操作。只使用用户授权的账号、文件与站点。
 2. `list_proxies` 选择代理；不把国家标签当作已验证的出口。
-3. `create_instance` 用 task_description 简要说明任务目标，指定 UA、viewport、mobile、locale、timezone、proxy_id，保存 instance_id 和初始 page_id。
+3. `create_instance` 用 task_description 简要说明任务目标，指定 UA、viewport、mobile、locale、timezone、proxy_id，保存 instance_id、初始 page_id 和 details_url。
 4. `verify_environment` 检查真实 IP、UA 和设备属性；失败时报告环境失败，不能当作目标网站故障。
 5. `navigate` 打开目标；`snapshot` 获取可见结构与元素。
 6. `interact` 使用 role/name 或当前快照 ref。页面变化后重新读取，不猜测过期引用。
@@ -12,6 +12,12 @@
 8. 下载：`list_downloads` → `wait_for` download_id → `get_artifact` 分块获取并校验 SHA-256。文件存在不等于内容有效。
 9. 异常：保留首次失败，采集 snapshot、screenshot、get_diagnostics。根据错误最多有限重试；提交类操作结果不明时先查状态。
 10. `close_instance` 清理，无论成功或失败都要执行。最后报告步骤、结论、证据和未完成项。
+
+## 实例详情与 AI 读取
+
+报告结果或异常时附上 `details_url`，用户可从同一地址查看直播、录屏、状态、属性和调用日志；实例结束后仍可回溯保留期内的数据。链接默认带空参数 `?access_token=`，不要自动把真实 Token 填进默认返回链接。
+
+普通用户打开链接后登录；AI 若需要直接读取，可填入现有 MCP Bearer Token，并追加 `&format=json` 或 `&format=markdown`。也可保持空查询参数，通过 `Authorization: Bearer <TOKEN>` 请求头读取。接口返回当前/历史状态、标签页、媒体与日志地址，以及最近200条原文日志；返回的媒体/日志地址同样保留空 Token 提示，需要时由调用方填入。访问详情不会执行浏览器操作或延长实例存活时间。Token 无效/失效时返回 401，全部历史数据过期时返回 404。
 
 ## 列表与详情页场景
 

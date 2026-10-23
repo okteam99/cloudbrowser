@@ -13,6 +13,12 @@ import { publicError } from './errors.js';
 import { frameMedia, liveMedia, videoMedia } from './media.js';
 import { ZodError } from 'zod';
 import { ToolError } from './errors.js';
+import { instanceLoginTarget } from './instance-details.js';
+import {
+  instanceDocument,
+  instanceDocumentHtml,
+  instanceDocumentMarkdown,
+} from './instance-document.js';
 
 async function body(req: IncomingMessage, limit = 1048576) {
   const chunks: Buffer[] = [];
@@ -97,7 +103,18 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
     else if (prefix && path.startsWith(prefix + '/')) path = path.slice(prefix.length);
     const session = auth.cookie(req.headers.cookie);
     const bearer = auth.bearer(req.headers.authorization);
-    const authorized = Boolean(session || bearer);
+    const queryToken = requestUrl.searchParams.get('access_token');
+    const queryAllowed =
+      ['GET', 'HEAD'].includes(req.method ?? '') &&
+      /^(?:\/instances\/ins_[a-f0-9-]{36}|\/api\/instances\/ins_[a-f0-9-]{36}(?:\/(?:logs|frame|live))?|\/api\/recordings\/rec_[a-f0-9-]{36}\/video)$/.test(
+        path,
+      );
+    const queryAuthenticated = queryAllowed && !!queryToken && auth.bearer(`Bearer ${queryToken}`);
+    const authorized = Boolean(session || bearer || queryAuthenticated);
+    if (queryAllowed) {
+      if (queryAuthenticated && !session) res.setHeader('referrer-policy', 'no-referrer');
+      res.setHeader('x-robots-tag', 'noindex, nofollow');
+    }
     try {
       if (path === '/docs/agent-guide.md' && ['GET', 'HEAD'].includes(req.method ?? '')) {
         // Only static, generic documentation is public. Never interpolate deployment credentials or state.
@@ -140,7 +157,7 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         return;
       }
       if (path === '/healthz') {
-        json(res, { status: 'ok', version: '0.11.0' });
+        json(res, { status: 'ok', version: '0.12.0' });
         return;
       }
       if (path === '/mcp') {
@@ -170,6 +187,7 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
       }
       if (path === '/login' && req.method === 'POST') {
         const form = new URLSearchParams(await body(req, 8192));
+        const returnTo = instanceLoginTarget(form.get('return_to'), prefix);
         const pass = form.get('password') ?? '';
         if (pass.length > 1024) {
           json(res, { error: 'Invalid password' }, 400);
@@ -182,13 +200,17 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
             `browser_session=${result.session}; HttpOnly; SameSite=Strict; Path=${prefix || ''}/; Max-Age=86400${base.protocol === 'https:' ? '; Secure' : ''}`,
           );
           res.statusCode = 303;
-          res.setHeader('location', `${prefix}/`);
+          res.setHeader('location', returnTo ?? `${prefix}/`);
           res.end();
         } else {
           res.statusCode = result.limited ? 429 : 401;
           res.setHeader('content-type', 'text/html; charset=utf-8');
           res.end(
-            loginPage(prefix, result.limited ? '尝试过多，请在 10 分钟后重试。' : '密码不正确。'),
+            loginPage(
+              prefix,
+              result.limited ? '尝试过多，请在 10 分钟后重试。' : '密码不正确。',
+              returnTo,
+            ),
           );
         }
         return;
@@ -196,6 +218,67 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
       if (path === '/' && req.method === 'GET') {
         res.setHeader('content-type', 'text/html; charset=utf-8');
         res.end(session ? dashboard(prefix, session) : loginPage(prefix));
+        return;
+      }
+      const detailPage = /^\/instances\/(ins_[a-f0-9-]{36})$/.exec(path);
+      if (detailPage && req.method === 'GET') {
+        const format =
+          requestUrl.searchParams.get('format') ??
+          (req.headers.accept?.includes('application/json')
+            ? 'json'
+            : req.headers.accept?.includes('text/markdown')
+              ? 'markdown'
+              : 'html');
+        if (!['html', 'json', 'markdown'].includes(format)) {
+          json(res, { error: 'Invalid detail format' }, 400);
+          return;
+        }
+        if (!authorized) {
+          if (format !== 'html') json(res, { error: 'Authentication required' }, 401);
+          else {
+            res.statusCode = queryToken ? 401 : 200;
+            res.setHeader('content-type', 'text/html; charset=utf-8');
+            res.end(
+              loginPage(
+                prefix,
+                queryToken ? 'access_token 无效或已失效，请登录。' : '',
+                `${prefix}${path}`,
+              ),
+            );
+          }
+          return;
+        }
+        try {
+          const doc = await instanceDocument(manager, detailPage[1], baseUrl);
+          if (format === 'json') json(res, doc);
+          else if (format === 'markdown') {
+            res.setHeader('content-type', 'text/markdown; charset=utf-8');
+            res.end(instanceDocumentMarkdown(doc));
+          } else {
+            res.setHeader('content-type', 'text/html; charset=utf-8');
+            res.end(
+              dashboard(prefix, session ?? '', {
+                instance_id: detailPage[1],
+                access_token: !session && queryAuthenticated ? queryToken! : undefined,
+                summary: instanceDocumentHtml(doc),
+              }),
+            );
+          }
+        } catch (error) {
+          if (!(error instanceof ToolError) || error.code !== 'INSTANCE_NOT_FOUND') throw error;
+          if (format !== 'html') json(res, { error: publicError(error) }, 404);
+          else {
+            res.statusCode = 404;
+            res.setHeader('content-type', 'text/html; charset=utf-8');
+            res.end(
+              dashboard(prefix, session ?? '', {
+                instance_id: detailPage[1],
+                access_token: !session && queryAuthenticated ? queryToken! : undefined,
+                summary: '<main><h1>实例不存在或历史记录已过期</h1></main>',
+              }),
+            );
+          }
+        }
         return;
       }
       const shared = /^\/share\/([A-Za-z0-9_-]{43})(?:\/(media|status|frame))?$/.exec(path);
@@ -395,6 +478,17 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         json(res, { max_instances: cfg.maxInstances, instances: manager.adminInstances() });
         return;
       }
+      const instanceDetail = /^\/api\/instances\/(ins_[a-f0-9-]{36})$/.exec(path);
+      if (instanceDetail && req.method === 'GET') {
+        try {
+          json(res, await manager.adminInstanceDetails(instanceDetail[1]));
+        } catch (error) {
+          if (error instanceof ToolError && error.code === 'INSTANCE_NOT_FOUND')
+            json(res, { error: publicError(error) }, 404);
+          else throw error;
+        }
+        return;
+      }
       const instanceLogs = /^\/api\/instances\/(ins_[a-f0-9-]{36})\/logs$/.exec(path);
       if (instanceLogs && req.method === 'GET') {
         const parsed = definitions.get_logs.schema.safeParse({
@@ -432,7 +526,11 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
       }
       const live = /^\/api\/instances\/(ins_[a-f0-9-]{36})\/live$/.exec(path);
       const allowed = () =>
-        Boolean(auth.cookie(req.headers.cookie) || auth.bearer(req.headers.authorization));
+        Boolean(
+          auth.cookie(req.headers.cookie) ||
+          auth.bearer(req.headers.authorization) ||
+          (queryAllowed && queryToken && auth.bearer(`Bearer ${queryToken}`)),
+        );
       if (live && req.method === 'GET') {
         liveMedia(manager, cfg, res, streams, live[1], allowed);
         return;

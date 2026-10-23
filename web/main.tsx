@@ -73,12 +73,15 @@ import {
   type BrowserInstance,
   type Connection,
   type Recording,
+  instancePath,
 } from './api';
 import 'antd/dist/reset.css';
 import './styles.css';
 import { ProxiesPage } from './proxies';
 import { InstanceLogDrawer } from './instance-logs';
 import { SettingsPage } from './settings';
+import { InstanceDetailsPage } from './instance-details';
+import { LiveImage } from './live-image';
 
 const { Title, Text, Paragraph } = Typography;
 type Section = 'overview' | 'instances' | 'history' | 'proxies' | 'connect' | 'docs' | 'settings';
@@ -164,6 +167,9 @@ function Login() {
             action={`${bootstrap.base}/login`}
             onSubmit={() => setSubmitting(true)}
           >
+            {bootstrap.return_to && (
+              <input type="hidden" name="return_to" value={bootstrap.return_to} />
+            )}
             <Form component={false} layout="vertical">
               <Form.Item label={<label htmlFor="access-password">访问密码</label>}>
                 <Input.Password
@@ -266,6 +272,8 @@ function Dashboard() {
   const [section, setSection] = useState<Section>(initial in sectionTitles ? initial : 'overview');
   const [mobileMenu, setMobileMenu] = useState(false);
   const screens = Grid.useBreakpoint();
+  const detailId = bootstrap.instance_id;
+  const pageTitle = detailId ? '实例详情' : sectionTitles[section].title;
   const service = useService();
   const [watching, setWatching] = useState<string>();
   const [playing, setPlaying] = useState<Recording>();
@@ -274,6 +282,10 @@ function Dashboard() {
   const { message } = App.useApp();
   const choose = useCallback((key: string) => {
     if (!(key in sectionTitles)) return;
+    if (bootstrap.instance_id) {
+      window.location.assign(`${bootstrap.base}/#${key}`);
+      return;
+    }
     setSection(key as Section);
     window.history.replaceState(null, '', `#${key}`);
     setMobileMenu(false);
@@ -308,7 +320,7 @@ function Dashboard() {
     <Menu
       theme="dark"
       mode="inline"
-      selectedKeys={[section]}
+      selectedKeys={[detailId ? 'instances' : section]}
       items={navItems}
       onClick={({ key }) => choose(key)}
     />
@@ -326,7 +338,7 @@ function Dashboard() {
                 <span className="status-dot" />
                 远程浏览器服务
               </div>
-              <Text>cloudbrowser · v0.11.0</Text>
+              <Text>cloudbrowser · v0.12.0</Text>
             </div>
           </Layout.Sider>
         )}
@@ -353,26 +365,36 @@ function Dashboard() {
               )}
               <Text className="topbar-product">浏览器控制台</Text>
               <span className="topbar-divider" />
-              <Text type="secondary">{sectionTitles[section].title}</Text>
+              <Text type="secondary">{pageTitle}</Text>
             </Space>
             <Space size={20}>
               <Badge
                 status={service.error ? 'warning' : service.lastUpdated ? 'success' : 'processing'}
                 text={service.error ? '连接异常' : service.lastUpdated ? '服务已连接' : '正在连接'}
               />
-              <form method="post" action={`${bootstrap.base}/logout`}>
-                <input type="hidden" name="csrf" value={bootstrap.csrf} />
-                <Button type="text" htmlType="submit" icon={<LogoutOutlined />}>
-                  退出
+              {bootstrap.access_token ? (
+                <Button href={`${bootstrap.base}/`} icon={<LockOutlined />}>
+                  登录控制台
                 </Button>
-              </form>
+              ) : (
+                <form method="post" action={`${bootstrap.base}/logout`}>
+                  <input type="hidden" name="csrf" value={bootstrap.csrf} />
+                  <Button type="text" htmlType="submit" icon={<LogoutOutlined />}>
+                    退出
+                  </Button>
+                </form>
+              )}
             </Space>
           </Layout.Header>
           <Layout.Content className="page-content">
             <div className="page-heading">
               <div>
-                <Title level={2}>{sectionTitles[section].title}</Title>
-                <Paragraph type="secondary">{sectionTitles[section].description}</Paragraph>
+                <Title level={2}>{pageTitle}</Title>
+                <Paragraph type="secondary">
+                  {detailId
+                    ? '在同一地址查看实例直播、录屏、状态、属性与日志。'
+                    : sectionTitles[section].description}
+                </Paragraph>
               </div>
               <Space>
                 <Text type="secondary" className="updated-time">
@@ -398,238 +420,250 @@ function Dashboard() {
                 className="service-alert"
               />
             )}
-            {section === 'overview' && (
+            {detailId ? (
+              <InstanceDetailsPage instanceId={detailId} />
+            ) : (
               <>
-                <Row gutter={[20, 20]} className="stats-row">
-                  <Col xs={24} md={8}>
-                    <Metric
-                      label="活跃浏览器"
-                      value={service.instances.length}
-                      suffix={service.capacity !== undefined ? ` / ${service.capacity}` : ''}
-                      icon={<DesktopOutlined />}
-                      color="blue"
-                      note="每个实例使用独立浏览器会话"
-                      loading={service.loading}
-                    />
-                  </Col>
-                  <Col xs={24} md={8}>
-                    <Metric
-                      label="历史录屏"
-                      value={service.recordings.filter((r) => r.status !== 'recording').length}
-                      icon={<HistoryOutlined />}
-                      color="purple"
-                      note="随时回看已结束的执行过程"
-                      loading={service.loading}
-                    />
-                  </Col>
-                  <Col xs={24} md={8}>
-                    <Metric
-                      label="可用 MCP 工具"
-                      value={service.connection?.tool_count}
-                      icon={<ApiOutlined />}
-                      color="green"
-                      note="覆盖页面操作、下载和诊断"
-                      loading={!service.connection}
-                    />
-                  </Col>
-                </Row>
-                <Card className="welcome-card" bordered={false}>
-                  <div className="welcome-copy">
-                    <Tag icon={<CheckCircleFilled />} color="blue" bordered={false}>
-                      你的远程浏览器已就绪
-                    </Tag>
-                    <Title level={3}>从连接 Agent 开始</Title>
-                    <Paragraph>
-                      复制接入信息，Agent 按公开文档即可操作浏览器。
-                      <br />
-                      你可以在这里实时观看，也可以稍后回看录像。
-                    </Paragraph>
-                    <Space wrap>
-                      <Button
-                        type="primary"
-                        icon={<CopyOutlined />}
-                        size="large"
-                        disabled={!service.connection}
-                        onClick={copyGuide}
-                        aria-label="复制 Agent 接入信息"
-                      >
-                        复制 Agent 接入信息
-                      </Button>
-                      <Button
-                        size="large"
-                        icon={<ArrowRightOutlined />}
-                        onClick={() => choose('connect')}
-                      >
-                        查看接入配置
-                      </Button>
-                    </Space>
-                  </div>
-                  <div className="welcome-visual" aria-hidden="true">
-                    <div className="mini-window">
-                      <div className="mini-window-bar">
-                        <i />
-                        <i />
-                        <i />
+                {section === 'overview' && (
+                  <>
+                    <Row gutter={[20, 20]} className="stats-row">
+                      <Col xs={24} md={8}>
+                        <Metric
+                          label="活跃浏览器"
+                          value={service.instances.length}
+                          suffix={service.capacity !== undefined ? ` / ${service.capacity}` : ''}
+                          icon={<DesktopOutlined />}
+                          color="blue"
+                          note="每个实例使用独立浏览器会话"
+                          loading={service.loading}
+                        />
+                      </Col>
+                      <Col xs={24} md={8}>
+                        <Metric
+                          label="历史录屏"
+                          value={service.recordings.filter((r) => r.status !== 'recording').length}
+                          icon={<HistoryOutlined />}
+                          color="purple"
+                          note="随时回看已结束的执行过程"
+                          loading={service.loading}
+                        />
+                      </Col>
+                      <Col xs={24} md={8}>
+                        <Metric
+                          label="可用 MCP 工具"
+                          value={service.connection?.tool_count}
+                          icon={<ApiOutlined />}
+                          color="green"
+                          note="覆盖页面操作、下载和诊断"
+                          loading={!service.connection}
+                        />
+                      </Col>
+                    </Row>
+                    <Card className="welcome-card" bordered={false}>
+                      <div className="welcome-copy">
+                        <Tag icon={<CheckCircleFilled />} color="blue" bordered={false}>
+                          你的远程浏览器已就绪
+                        </Tag>
+                        <Title level={3}>从连接 Agent 开始</Title>
+                        <Paragraph>
+                          复制接入信息，Agent 按公开文档即可操作浏览器。
+                          <br />
+                          你可以在这里实时观看，也可以稍后回看录像。
+                        </Paragraph>
+                        <Space wrap>
+                          <Button
+                            type="primary"
+                            icon={<CopyOutlined />}
+                            size="large"
+                            disabled={!service.connection}
+                            onClick={copyGuide}
+                            aria-label="复制 Agent 接入信息"
+                          >
+                            复制 Agent 接入信息
+                          </Button>
+                          <Button
+                            size="large"
+                            icon={<ArrowRightOutlined />}
+                            onClick={() => choose('connect')}
+                          >
+                            查看接入配置
+                          </Button>
+                        </Space>
                       </div>
-                      <div className="mini-window-content">
-                        <div className="mini-agent">
-                          <ThunderboltOutlined />
-                        </div>
-                        <div className="mini-connector" />
-                        <div className="mini-browser">
-                          <DesktopOutlined />
+                      <div className="welcome-visual" aria-hidden="true">
+                        <div className="mini-window">
+                          <div className="mini-window-bar">
+                            <i />
+                            <i />
+                            <i />
+                          </div>
+                          <div className="mini-window-content">
+                            <div className="mini-agent">
+                              <ThunderboltOutlined />
+                            </div>
+                            <div className="mini-connector" />
+                            <div className="mini-browser">
+                              <DesktopOutlined />
+                            </div>
+                          </div>
+                          <span>Agent 指令 · 浏览器执行</span>
                         </div>
                       </div>
-                      <span>Agent 指令 · 浏览器执行</span>
-                    </div>
-                  </div>
-                </Card>
-                <Row gutter={[20, 20]}>
-                  <Col xs={24} xl={16}>
+                    </Card>
+                    <Row gutter={[20, 20]}>
+                      <Col xs={24} xl={16}>
+                        <Card
+                          title={
+                            <Space>
+                              <VideoCameraOutlined />
+                              运行中的实例
+                            </Space>
+                          }
+                          extra={
+                            <Button type="link" onClick={() => choose('instances')}>
+                              查看全部 <ArrowRightOutlined />
+                            </Button>
+                          }
+                          className="section-card"
+                        >
+                          <InstanceTable
+                            instances={service.instances}
+                            loading={service.loading}
+                            watching={watching}
+                            onWatch={watch}
+                            onLogs={setLogging}
+                            compact
+                          />
+                        </Card>
+                      </Col>
+                      <Col xs={24} xl={8}>
+                        <Card title="快速开始" className="section-card quickstart-card">
+                          <Steps
+                            direction="vertical"
+                            size="small"
+                            current={service.instances.length ? 2 : 0}
+                            items={[
+                              {
+                                title: '复制接入说明',
+                                description: '包含服务地址、鉴权和操作文档',
+                              },
+                              {
+                                title: '交给你的 Agent',
+                                description: '描述目标，由 Agent 创建并操作浏览器',
+                              },
+                              {
+                                title: '观看或回看',
+                                description: '在实时实例和历史录屏中查看过程',
+                              },
+                            ]}
+                          />
+                          <Button block icon={<FileTextOutlined />} onClick={() => choose('docs')}>
+                            查看使用文档
+                          </Button>
+                        </Card>
+                      </Col>
+                    </Row>
                     <Card
                       title={
                         <Space>
-                          <VideoCameraOutlined />
-                          运行中的实例
+                          <HistoryOutlined />
+                          最近录屏
                         </Space>
                       }
                       extra={
-                        <Button type="link" onClick={() => choose('instances')}>
-                          查看全部 <ArrowRightOutlined />
+                        <Button type="link" onClick={() => choose('history')}>
+                          全部录屏 <ArrowRightOutlined />
                         </Button>
                       }
-                      className="section-card"
+                      className="section-card spaced-card"
                     >
-                      <InstanceTable
-                        instances={service.instances}
+                      <RecordingTable
+                        recordings={service.recordings.slice(0, 5)}
                         loading={service.loading}
-                        watching={watching}
-                        onWatch={watch}
+                        onPlay={setPlaying}
                         onLogs={setLogging}
                         compact
                       />
                     </Card>
-                  </Col>
-                  <Col xs={24} xl={8}>
-                    <Card title="快速开始" className="section-card quickstart-card">
-                      <Steps
-                        direction="vertical"
-                        size="small"
-                        current={service.instances.length ? 2 : 0}
-                        items={[
-                          { title: '复制接入说明', description: '包含服务地址、鉴权和操作文档' },
-                          {
-                            title: '交给你的 Agent',
-                            description: '描述目标，由 Agent 创建并操作浏览器',
-                          },
-                          { title: '观看或回看', description: '在实时实例和历史录屏中查看过程' },
-                        ]}
-                      />
-                      <Button block icon={<FileTextOutlined />} onClick={() => choose('docs')}>
-                        查看使用文档
-                      </Button>
+                  </>
+                )}
+                {section === 'instances' && (
+                  <>
+                    <Card className="instance-summary" bordered={false}>
+                      <Flex justify="space-between" align="center" gap={24} wrap>
+                        <Space size={14}>
+                          <Avatar shape="square" size={48} className="soft-icon blue">
+                            <DesktopOutlined />
+                          </Avatar>
+                          <div>
+                            <Text type="secondary">当前实例容量</Text>
+                            <div className="capacity-number">
+                              {service.instances.length}
+                              <small> / {service.capacity ?? '—'}</small>
+                            </div>
+                          </div>
+                        </Space>
+                        <div className="capacity-progress">
+                          <Progress
+                            percent={
+                              service.capacity
+                                ? Math.round((service.instances.length / service.capacity) * 100)
+                                : 0
+                            }
+                            showInfo={false}
+                          />
+                          <Text type="secondary">由 Agent 创建实例，结束后自动释放资源</Text>
+                        </div>
+                        <Tag color="blue" icon={<VideoCameraOutlined />}>
+                          低帧率实时预览
+                        </Tag>
+                      </Flex>
                     </Card>
-                  </Col>
-                </Row>
-                <Card
-                  title={
-                    <Space>
-                      <HistoryOutlined />
-                      最近录屏
-                    </Space>
-                  }
-                  extra={
-                    <Button type="link" onClick={() => choose('history')}>
-                      全部录屏 <ArrowRightOutlined />
-                    </Button>
-                  }
-                  className="section-card spaced-card"
-                >
-                  <RecordingTable
-                    recordings={service.recordings.slice(0, 5)}
+                    <Row gutter={[20, 20]}>
+                      <Col xs={24} xl={11}>
+                        <Card
+                          title="浏览器实例"
+                          extra={<Tag>{service.instances.length} 个</Tag>}
+                          className="section-card"
+                        >
+                          <InstanceTable
+                            instances={service.instances}
+                            loading={service.loading}
+                            watching={watching}
+                            onWatch={setWatching}
+                            onLogs={setLogging}
+                          />
+                        </Card>
+                      </Col>
+                      <Col xs={24} xl={13}>
+                        <LiveViewer
+                          instance={service.instances.find((i) => i.instance_id === watching)}
+                          onCopy={copy}
+                        />
+                      </Col>
+                    </Row>
+                  </>
+                )}
+                {section === 'history' && (
+                  <HistoryPage
+                    recordings={service.recordings}
                     loading={service.loading}
                     onPlay={setPlaying}
                     onLogs={setLogging}
-                    compact
                   />
-                </Card>
+                )}
+                {section === 'proxies' && <ProxiesPage />}
+                {section === 'settings' && <SettingsPage />}
+                {section === 'connect' && (
+                  <ConnectionPage
+                    connection={service.connection}
+                    onCopy={copy}
+                    onGuide={() => setGuideOpen(true)}
+                  />
+                )}
+                {section === 'docs' && <DocsPage onConnect={() => choose('connect')} />}
               </>
             )}
-            {section === 'instances' && (
-              <>
-                <Card className="instance-summary" bordered={false}>
-                  <Flex justify="space-between" align="center" gap={24} wrap>
-                    <Space size={14}>
-                      <Avatar shape="square" size={48} className="soft-icon blue">
-                        <DesktopOutlined />
-                      </Avatar>
-                      <div>
-                        <Text type="secondary">当前实例容量</Text>
-                        <div className="capacity-number">
-                          {service.instances.length}
-                          <small> / {service.capacity ?? '—'}</small>
-                        </div>
-                      </div>
-                    </Space>
-                    <div className="capacity-progress">
-                      <Progress
-                        percent={
-                          service.capacity
-                            ? Math.round((service.instances.length / service.capacity) * 100)
-                            : 0
-                        }
-                        showInfo={false}
-                      />
-                      <Text type="secondary">由 Agent 创建实例，结束后自动释放资源</Text>
-                    </div>
-                    <Tag color="blue" icon={<VideoCameraOutlined />}>
-                      低帧率实时预览
-                    </Tag>
-                  </Flex>
-                </Card>
-                <Row gutter={[20, 20]}>
-                  <Col xs={24} xl={11}>
-                    <Card
-                      title="浏览器实例"
-                      extra={<Tag>{service.instances.length} 个</Tag>}
-                      className="section-card"
-                    >
-                      <InstanceTable
-                        instances={service.instances}
-                        loading={service.loading}
-                        watching={watching}
-                        onWatch={setWatching}
-                        onLogs={setLogging}
-                      />
-                    </Card>
-                  </Col>
-                  <Col xs={24} xl={13}>
-                    <LiveViewer
-                      instance={service.instances.find((i) => i.instance_id === watching)}
-                      onCopy={copy}
-                    />
-                  </Col>
-                </Row>
-              </>
-            )}
-            {section === 'history' && (
-              <HistoryPage
-                recordings={service.recordings}
-                loading={service.loading}
-                onPlay={setPlaying}
-                onLogs={setLogging}
-              />
-            )}
-            {section === 'proxies' && <ProxiesPage />}
-            {section === 'settings' && <SettingsPage />}
-            {section === 'connect' && (
-              <ConnectionPage
-                connection={service.connection}
-                onCopy={copy}
-                onGuide={() => setGuideOpen(true)}
-              />
-            )}
-            {section === 'docs' && <DocsPage onConnect={() => choose('connect')} />}
             <footer className="page-footer">
               <Text type="secondary">cloudbrowser</Text>
               <Space split={<span>·</span>}>
@@ -925,7 +959,9 @@ function InstanceTable({
         <div className="instance-table-identity">
           <Avatar shape="square" className="soft-icon blue" icon={<DesktopOutlined />} />
           <div className="instance-table-text">
-            <Text strong>实例 {compactId(i.instance_id)}</Text>
+            <Text strong>
+              <a href={instancePath(i.instance_id)}>实例 {compactId(i.instance_id)}</a>
+            </Text>
             <TaskDescription value={i.task_description} />
             <div className="cell-secondary">
               <Text type="secondary">
@@ -1124,7 +1160,9 @@ function RecordingTable({
             <VideoCameraOutlined />
           </span>
           <div className="recording-task-cell">
-            <Text strong>实例 {compactId(id)}</Text>
+            <Text strong>
+              <a href={instancePath(id)}>实例 {compactId(id)}</a>
+            </Text>
             <TaskDescription value={r.task_description} />
           </div>
         </Space>
@@ -1662,36 +1700,6 @@ function DocsPage({ onConnect }: { onConnect: () => void }) {
         </article>
       )}
     </Card>
-  );
-}
-function LiveImage(props: {
-  src: string;
-  alt: string;
-  className?: string;
-  onLoad: () => void;
-  onError: () => void;
-}) {
-  const [frame, setFrame] = useState(0);
-  const timer = useRef<number | undefined>(undefined);
-  useEffect(() => () => window.clearTimeout(timer.current), []);
-  const next = (delay: number) => {
-    window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setFrame((n) => n + 1), delay);
-  };
-  return (
-    <img
-      className={props.className}
-      alt={props.alt}
-      src={`${props.src}?frame=${frame}`}
-      onLoad={() => {
-        props.onLoad();
-        next(500);
-      }}
-      onError={() => {
-        props.onError();
-        next(1500);
-      }}
-    />
   );
 }
 function PublicViewer() {

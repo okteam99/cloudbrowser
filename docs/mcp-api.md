@@ -1,4 +1,4 @@
-# MCP 接口 V0.10
+# MCP 接口 V0.12
 
 推荐使用 `BASE_URL/mcp` 的 Streamable HTTP，携带 `Authorization: Bearer <登录网页自动生成的 Token>`。网页登录后可复制完整配置。兼容 MCP stdio，通过 SSH 或 docker exec 接入。HTTP 调用共享 web principal，stdio 仍按 MCP_PRINCIPAL 隔离。
 
@@ -25,7 +25,7 @@
 | `health` | `{}` | 服务状态与容量 |
 | `list_proxies` | 可选 country（两位大写国家码）、protocol（socks5/http/https）、enabled_only（默认true）、status（healthy/unhealthy/unknown/checking/disabled） | proxy_id、兼容 proxy_ref、名称、地址、国家、启用状态、status、health（checked_at / next_check_at / latency_ms / observed_ip / http_status / error_code / checking）、鉴权标记；不返回用户名或密码 |
 | `check_proxy` | proxy、proxy_id、proxy_ref 三选一；可选 check_url | 临时浏览器查询出口，始终清理；不验证国家 |
-| `create_instance` | 可选 task_description（1–1000字符）、storage_state_id、UA、viewport、proxy/proxy_id/proxy_ref、mobile、locale、timezone、生命周期 | instance_id、task_description、pages、实际设备属性、警告 |
+| `create_instance` | 可选 task_description（1–1000字符）、storage_state_id、UA、viewport、proxy/proxy_id/proxy_ref、mobile、locale、timezone、生命周期 | instance_id、details_url、task_description、pages、实际设备属性、警告 |
 | `get_instance` | instance_id | 配置和页面，隐藏凭据 |
 | `list_instances` | `{}` | 同 principal 的实例 |
 | `verify_environment` | instance_id；可选 check_url | 实际设备属性、IP 查询响应；不自动判断国家 |
@@ -300,6 +300,28 @@ inspect_instance和get_logs不占用浏览器执行锁；get_diagnostics也可�
 - `GET /docs/README.md`、`/docs/mcp-api.md`、`/docs/mcp-tools.json`、`/docs/agent-workflow.md`：完整文档。
 
 `POST /mcp` 只接受 Bearer 鉴权，不使用 Cookie。密码变更并重启后 Token 轮换；不把 Token 放在 URL 中。直播和录屏包含可见业务内容，请仅授权可信使用方。
+
+## 私有实例详情链接
+
+Web 模式下 `create_instance`、`get_instance`、`list_instances`、`inspect_instance` 以及 `list_recordings` 返回 `details_url`，优先采用 `BASE_URL`，格式为：
+
+```text
+{BASE_URL}/instances/{instance_id}?access_token=
+```
+
+空的 `access_token=` 是有意保留的鉴权提示，服务不会自动填入部署 Token。普通浏览器使用现有登录态；未登录时先输入访问密码，成功后回到当前实例。实例结束后链接不变，详情展示保留期内的状态、属性、录屏、标签页快照与原文调用日志。日志已过期但仍有录屏时仍可打开详情；全部记录过期返回 404。
+
+AI 可填写 MCP Bearer Token：`?access_token=<TOKEN>&format=json` 或 `&format=markdown`。也支持 `Authorization: Bearer <TOKEN>` 请求头；登录态有效时优先使用登录态。无登录态且 Token 错误/失效时返回 401，JSON/Markdown 未鉴权同样返回 401。
+
+详情文档的 `instance` 为历史状态，`current` 为当前实例摘要或 null，另有 `pages`、`recordings`、`logs_available`、最近200条 `logs` 和媒体/日志 `links`。默认 HTML 也提供服务端可读内容；`format=json` / `Accept: application/json` 返回 JSON，`format=markdown` / `Accept: text/markdown` 返回 Markdown。返回链接的 `access_token` 均保持空值；调用方按需填入，不自动传播真实 Token。
+
+`GET /api/instances/{id}` 提供状态、属性、标签页与录屏的只读摘要；详情页轮询此接口，不执行浏览器脚本、探测或延长实例空闲期限。以下只读接口也接受查询参数 `access_token`：
+
+- `GET /api/instances/{id}`、`GET /api/instances/{id}/logs`
+- `GET /api/instances/{id}/frame`、`GET /api/instances/{id}/live`
+- `GET/HEAD /api/recordings/{id}/video`
+
+此查询参数不用于 `/mcp`、代理或系统设置等管理接口。Token 访问不创建长期登录 Cookie；详情响应为 `no-store` / `no-referrer`。公开分享链接的授权机制保持独立。
 
 ## 自动 HTTPS 入口
 

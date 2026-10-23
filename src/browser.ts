@@ -36,6 +36,11 @@ import { readStorageState, storageLimit, deadline } from './browser-state.js';
 import sharp from 'sharp';
 import { operatingSystem, type BrowserEnvironment } from './browser-environment.js';
 import { SystemSettings } from './system-settings.js';
+import {
+  instanceDetailsUrl,
+  type InstanceProperties,
+  type InstancePage,
+} from './instance-details.js';
 
 type PageEntry = {
   page: Page;
@@ -358,6 +363,7 @@ export class BrowserManager {
     return {
       instance_id: i.id,
       task_description: i.options.task_description,
+      details_url: instanceDetailsUrl(this.cfg.baseUrl, i.id),
       active_page_id: i.activePageId,
       recording_id: this.recordings.active.get(i.id)?.meta.id,
       live_frame_at: this.recordings.active.get(i.id)?.latest?.time,
@@ -406,8 +412,22 @@ export class BrowserManager {
       egress: current.egress.ip ? current.egress : (i.environment?.egress ?? current.egress),
     };
     i.environment = environment;
-    this.logs.update(i.id, { environment: structuredClone(environment) });
-    await this.recordings.setEnvironment(i.id, environment).catch(() =>
+    const properties: InstanceProperties = {
+      viewport: current.viewport,
+      locale: current.locale,
+      timezone: current.timezone,
+      mobile: current.mobile,
+      proxy: current.proxy,
+      idle_timeout_seconds: current.idle_timeout_seconds,
+      max_lifetime_seconds: current.max_lifetime_seconds,
+    };
+    const pages = this.instancePages(i);
+    this.logs.update(i.id, {
+      environment: structuredClone(environment),
+      properties: structuredClone(properties),
+      pages,
+    });
+    await this.recordings.setEnvironment(i.id, environment, properties, pages).catch(() =>
       this.logs.log({
         owner: i.owner,
         instance_id: i.id,
@@ -862,6 +882,38 @@ export class BrowserManager {
   adminInstances() {
     return Array.from(this.instances.values(), (i) => ({ ...this.summary(i), owner: i.owner }));
   }
+  private instancePages(i: Instance): InstancePage[] {
+    return Array.from(i.pageData, ([page_id, data]) => {
+      const info = data.info(page_id, page_id === i.activePageId);
+      return { page_id, url: info.url, title: info.title, state: info.state, active: info.active };
+    });
+  }
+  async adminInstanceDetails(id: string) {
+    const active = this.instances.get(id);
+    const history = this.logs.adminGet(id);
+    const recordings = (await this.recordings.list()).filter((r) => r.instance_id === id);
+    const latest = recordings[0];
+    if (!history && !active && !latest)
+      throw new ToolError('INSTANCE_NOT_FOUND', 'Unknown or expired instance history.');
+    const instance = history ?? {
+      instance_id: id,
+      task_description: active?.options.task_description ?? latest?.task_description,
+      created_at: active ? new Date(active.created).toISOString() : latest?.created_at,
+      ended_at: latest?.ended_at,
+      status: active ? (active.crashed ? 'crashed' : 'active') : 'unknown',
+      environment: active?.environment ?? latest?.environment,
+      properties: latest?.properties,
+      pages: latest?.pages,
+    };
+    return {
+      details_url: instanceDetailsUrl(this.cfg.baseUrl, id),
+      instance,
+      current: active ? this.summary(active) : null,
+      pages: active ? this.instancePages(active) : (instance.pages ?? latest?.pages ?? []),
+      recordings: recordings.map(({ owner: _owner, ...recording }) => recording),
+      logs_available: !!history,
+    };
+  }
   async shutdown() {
     await this.proxyHealth.stop();
     await Promise.allSettled(
@@ -924,6 +976,7 @@ export class BrowserManager {
     if (recorder?.meta.status === 'failed') findings.push('recording_failed');
     return {
       instance: this.logs.get(owner, id),
+      details_url: instanceDetailsUrl(this.cfg.baseUrl, id),
       live: active
         ? {
             connected: active.browser.isConnected(),
@@ -1148,6 +1201,7 @@ export class BrowserManager {
         .filter((r) => r.owner === owner && (!a.instance_id || r.instance_id === a.instance_id))
         .map((r) => ({
           ...r,
+          details_url: instanceDetailsUrl(this.cfg.baseUrl, r.instance_id),
           playback_url: this.cfg.baseUrl
             ? `${this.cfg.baseUrl.replace(/\/$/, '')}/api/recordings/${r.id}/video`
             : undefined,
@@ -1161,7 +1215,7 @@ export class BrowserManager {
     if (name === 'health')
       return {
         status: 'ok',
-        version: '0.11.0',
+        version: '0.12.0',
         base_url: this.cfg.baseUrl,
         public_url_mode: this.cfg.quickTunnel
           ? 'quick_tunnel'

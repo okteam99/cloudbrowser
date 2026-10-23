@@ -8,12 +8,15 @@ import type { Config } from './config.js';
 import { ToolError, publicError } from './errors.js';
 import type { LogEvent } from './diagnostics.js';
 import type { BrowserEnvironment } from './browser-environment.js';
+import type { InstanceProperties, InstancePage } from './instance-details.js';
 
 export type RecordingMeta = {
   id: string;
   instance_id: string;
   task_description?: string;
   environment?: BrowserEnvironment;
+  properties?: InstanceProperties;
+  pages?: InstancePage[];
   owner: string;
   created_at: string;
   ended_at?: string;
@@ -60,10 +63,17 @@ export class RecordingStore {
     this.pending = work.catch(() => {});
     await work;
   }
-  async setEnvironment(instance: string, environment: BrowserEnvironment) {
+  async setEnvironment(
+    instance: string,
+    environment: BrowserEnvironment,
+    properties?: InstanceProperties,
+    pages?: InstancePage[],
+  ) {
     const recorder = this.active.get(instance);
     if (!recorder) return;
     recorder.meta.environment = structuredClone(environment);
+    if (properties) recorder.meta.properties = structuredClone(properties);
+    if (pages) recorder.meta.pages = structuredClone(pages);
     if (this.cfg.recordVideo) await this.persist(recorder.meta);
   }
   async list() {

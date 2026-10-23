@@ -157,12 +157,10 @@ const eventColumns: TableColumnsType<InstanceLogEvent> = [
   { title: '来源', dataIndex: 'component', width: 90 },
 ];
 
-export function InstanceLogDrawer({
+export function InstanceLogsPanel({
   instance,
-  onClose,
 }: {
-  instance?: { instance_id: string; task_description?: string };
-  onClose: () => void;
+  instance: { instance_id: string; task_description?: string };
 }) {
   const [kind, setKind] = useState('operation');
   const [status, setStatus] = useState('all');
@@ -221,18 +219,7 @@ export function InstanceLogDrawer({
   );
   const task = data?.instance.task_description ?? instance?.task_description;
   return (
-    <Drawer
-      title={
-        <Space>
-          <FileTextOutlined />
-          实例调用日志{instance && <Text type="secondary">{compactId(instance.instance_id)}</Text>}
-        </Space>
-      }
-      open={!!instance}
-      onClose={onClose}
-      size={920}
-      destroyOnHidden
-    >
+    <div className="instance-logs-panel">
       <div className="instance-log-heading">
         <Text type="secondary">任务目标</Text>
         <Paragraph className="instance-task-full">{task ?? '未填写任务描述'}</Paragraph>
@@ -342,6 +329,31 @@ export function InstanceLogDrawer({
         每 5 秒自动更新；首次展示最近 200 条事件，最多保留本次查看的 1000 条。更多记录可通过 MCP
         get_logs 查询，默认保留 7 天。调用参数、完整 URL 和错误信息按原文保留。
       </Paragraph>
+    </div>
+  );
+}
+
+export function InstanceLogDrawer({
+  instance,
+  onClose,
+}: {
+  instance?: { instance_id: string; task_description?: string };
+  onClose: () => void;
+}) {
+  return (
+    <Drawer
+      title={
+        <Space>
+          <FileTextOutlined />
+          实例调用日志{instance && <Text type="secondary">{compactId(instance.instance_id)}</Text>}
+        </Space>
+      }
+      open={!!instance}
+      onClose={onClose}
+      size={920}
+      destroyOnHidden
+    >
+      {instance && <InstanceLogsPanel key={instance.instance_id} instance={instance} />}
     </Drawer>
   );
 }

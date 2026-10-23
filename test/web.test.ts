@@ -442,8 +442,71 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     });
     assert.equal(result.status, 'succeeded', JSON.stringify(result));
     const id = result.data.instance_id;
+    const detailUrl = `${base}/instances/${id}?access_token=`;
+    const accessToken =
+      connection.mcp_config.mcpServers.cloudbrowser.headers.Authorization.slice(7);
+    assert.equal(result.data.details_url, detailUrl);
+    assert.equal((await fetch(`${base}/api/instances/${id}`)).status, 401);
+    assert.equal((await fetch(detailUrl + '&format=json')).status, 401);
+    assert.equal((await fetch(detailUrl + 'wrong&format=json')).status, 401);
+    const tokenJson = await fetch(detailUrl + encodeURIComponent(accessToken) + '&format=json');
+    assert.equal(tokenJson.status, 200);
+    assert.equal(tokenJson.headers.get('referrer-policy'), 'no-referrer');
+    assert.equal(tokenJson.headers.get('set-cookie'), null);
+    const detailData = await tokenJson.json();
+    assert.equal(detailData.instance.instance_id, id);
+    assert.equal(detailData.current.viewport.width, 390);
+    assert.equal(detailData.details_url, detailUrl);
+    assert.ok(detailData.logs.entries.length);
+    assert.ok(
+      !JSON.stringify(detailData).includes(accessToken),
+      'Default returned links must not fill in the token',
+    );
+    const markdown = await fetch(detailUrl + encodeURIComponent(accessToken) + '&format=markdown');
+    assert.equal(markdown.status, 200);
+    assert.ok((await markdown.text()).includes('## 调用日志'));
+    const ssr = await (await fetch(detailUrl + encodeURIComponent(accessToken))).text();
+    assert.ok(ssr.includes('实例详情'));
+    assert.ok(ssr.includes(id));
+    assert.ok(ssr.includes('&lt;任务目标&gt;'));
+    assert.equal(
+      (await fetch(detailUrl + 'wrong&format=json', { headers })).status,
+      200,
+      'A logged-in session takes precedence over an invalid token',
+    );
+    assert.equal(
+      (await fetch(`${base}/api/settings?access_token=${accessToken}`)).status,
+      401,
+      'Query tokens are not general admin API authentication',
+    );
+    assert.equal(
+      (await fetch(`${base}/mcp?access_token=${accessToken}`, { method: 'POST', body: '{}' }))
+        .status,
+      401,
+    );
+    const gated = await (await fetch(detailUrl)).text();
+    assert.ok(gated.includes('return_to'));
+    assert.ok(!gated.includes(taskDescription));
+    for (const returnTo of [`${base}/instances/${id}`, `//evil.example/instances/${id}`]) {
+      const response = await fetch(base + '/login', {
+        method: 'POST',
+        body: new URLSearchParams({ password: 'test-password-123', return_to: returnTo }),
+        redirect: 'manual',
+      });
+      assert.equal(response.headers.get('location'), '/browser/');
+    }
+    const deepLogin = await fetch(base + '/login', {
+      method: 'POST',
+      body: new URLSearchParams({
+        password: 'test-password-123',
+        return_to: `/browser/instances/${id}`,
+      }),
+      redirect: 'manual',
+    });
+    assert.equal(deepLogin.headers.get('location'), `/browser/instances/${id}`);
     assert.equal(result.data.task_description, taskDescription);
     const logUrl = `${base}/api/instances/${id}/logs`;
+    assert.equal((await fetch(`${logUrl}?access_token=${accessToken}`)).status, 200);
     assert.equal((await fetch(logUrl)).status, 401);
     assert.equal((await fetch(logUrl + '?limit=201', { headers })).status, 400);
     assert.equal((await fetch(logUrl + '?component=wrong', { headers })).status, 400);
@@ -466,6 +529,41 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
       { name: 'browser_session', value: cookie.split('=')[1], url: base + '/' },
     ]);
     const viewerPage = await viewerContext.newPage();
+    const tokenContext = await viewer.newContext();
+    const passwordContext = await viewer.newContext();
+    const passwordPage = await passwordContext.newPage();
+    passwordPage.setDefaultTimeout(10000);
+    await passwordPage.goto(detailUrl);
+    await passwordPage.getByLabel('访问密码').fill('incorrect');
+    await passwordPage.getByRole('button', { name: /^登\s*录$/ }).click();
+    await passwordPage.getByText('密码不正确。', { exact: true }).waitFor();
+    assert.equal(
+      await passwordPage.locator('input[name=return_to]').inputValue(),
+      `/browser/instances/${id}`,
+    );
+    await passwordPage.getByLabel('访问密码').fill('test-password-123');
+    await passwordPage.getByRole('button', { name: /^登\s*录$/ }).click();
+    await passwordPage.getByRole('heading', { name: '实例详情', exact: true }).waitFor();
+    assert.equal(new URL(passwordPage.url()).pathname, `/browser/instances/${id}`);
+    await passwordPage.getByRole('button', { name: /退\s*出/ }).click();
+    await passwordPage.getByLabel('访问密码').waitFor();
+    await passwordContext.close();
+    const detailPage = await tokenContext.newPage();
+    detailPage.setDefaultTimeout(10000);
+    await detailPage.goto(detailUrl + encodeURIComponent(accessToken));
+    await detailPage.getByRole('heading', { name: '实例详情', exact: true }).waitFor();
+    await detailPage.waitForFunction(() => {
+      const image = document.querySelector('.instance-detail-live-image') as HTMLImageElement;
+      return image?.naturalWidth > 0;
+    });
+    assert.ok(
+      (await detailPage.locator('.detail-user-agent').innerText()).includes(
+        result.data.actual.user_agent,
+      ),
+    );
+    await tokenContext.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await detailPage.getByRole('button', { name: '复制详情链接' }).click();
+    assert.equal(await detailPage.evaluate(() => navigator.clipboard.readText()), detailUrl);
     viewerPage.setDefaultTimeout(10000);
     await viewerPage.goto(base + '/#instances');
     await viewerPage.getByRole('button', { name: /^观看实例/ }).click();
@@ -665,6 +763,24 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     assert.equal(history[0].environment.egress.ip, '8.8.4.4');
     assert.equal(history[0].environment.egress.source, 'instance_check');
     assert.equal(history[0].environment.country, null);
+    const closedDetails = await (await fetch(`${base}/api/instances/${id}`, { headers })).json();
+    assert.equal(closedDetails.current, null);
+    assert.equal(closedDetails.instance.status, 'closed');
+    assert.equal(closedDetails.instance.properties.viewport.width, 390);
+    const tokenVideo = await fetch(
+      `${base}/api/recordings/${history[0].id}/video?access_token=${accessToken}`,
+      { headers: { Range: 'bytes=0-3' } },
+    );
+    assert.equal(tokenVideo.status, 206);
+    assert.equal(Buffer.from(await tokenVideo.arrayBuffer()).toString('hex'), '1a45dfa3');
+    await detailPage.getByLabel('实例录屏播放器').waitFor();
+    await detailPage.waitForFunction(() => {
+      const video = document.querySelector('.instance-detail-video') as HTMLVideoElement;
+      return video?.videoWidth > 0;
+    });
+    await detailPage.setViewportSize({ width: 390, height: 844 });
+    await detailPage.waitForFunction(() => document.documentElement.scrollWidth <= innerWidth + 1);
+    await detailPage.setViewportSize({ width: 1280, height: 900 });
     assert.ok(history[0].environment.os);
     const playback = `${base}/api/recordings/${history[0].id}/video`;
     assert.equal((await fetch(playback)).status, 401);
@@ -710,6 +826,10 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
 
     await viewerPage.getByRole('menuitem', { name: '历史录屏' }).click();
     await viewerPage.getByLabel('搜索录像', { exact: true }).fill('移动端页面');
+    assert.equal(
+      await viewerPage.locator('.recording-task-cell a').getAttribute('href'),
+      `/browser/instances/${id}?access_token=`,
+    );
     await viewerPage.locator('.history-egress').getByText('8.8.4.4', { exact: true }).waitFor();
     await viewerPage
       .getByRole('button', { name: `查看完整 UA ${history[0].id}`, exact: true })
@@ -769,6 +889,12 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
       await fetch(logUrl + '?component=operation', { headers: auth })
     ).json();
     const restoredSettings = await (await fetch(base + '/api/settings', { headers: auth })).json();
+    const restoredDetails = await (
+      await fetch(detailUrl + encodeURIComponent(accessToken) + '&format=json')
+    ).json();
+    assert.equal(restoredDetails.instance.status, 'closed');
+    assert.equal(restoredDetails.instance.properties.viewport.width, 390);
+    assert.equal(restoredDetails.details_url, detailUrl);
     assert.equal(restoredSettings.storage.max_data_bytes, 201 * 1024 ** 3);
     assert.equal(restoredSettings.storage.screenshot_retention_days, 9);
     assert.equal(

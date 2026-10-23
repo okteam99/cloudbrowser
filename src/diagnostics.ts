@@ -14,6 +14,7 @@ import { freemem, totalmem, loadavg } from 'node:os';
 import type { Config } from './config.js';
 import { ToolError } from './errors.js';
 import type { BrowserEnvironment } from './browser-environment.js';
+import type { InstanceProperties, InstancePage } from './instance-details.js';
 
 export type Level = 'info' | 'warn' | 'error';
 export type Component = 'service' | 'browser' | 'page' | 'operation' | 'recorder' | 'tunnel';
@@ -34,6 +35,8 @@ export type InstanceRecord = {
   instance_id: string;
   task_description?: string;
   environment?: BrowserEnvironment;
+  properties?: InstanceProperties;
+  pages?: InstancePage[];
   owner: string;
   created_at: string;
   updated_at: string;
@@ -234,6 +237,10 @@ export class Diagnostics {
       throw new ToolError('INSTANCE_NOT_FOUND', 'Unknown or expired instance history.');
     const { owner: _owner, ...safe } = record;
     return structuredClone(safe);
+  }
+  adminGet(id: string) {
+    const record = this.records.get(id);
+    return record ? this.get(record.owner, id) : undefined;
   }
   async adminInstanceLogs(id: string, options: Parameters<Diagnostics['query']>[1]) {
     const record = this.records.get(id);

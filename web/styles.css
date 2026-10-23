@@ -1508,6 +1508,92 @@ input {
 .storage-settings-actions {
   margin-top: 20px;
 }
+.instance-detail-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  gap: 20px;
+}
+.instance-detail-page .ant-card,
+.instance-detail-page .ant-col,
+.instance-detail-page .ant-table-wrapper {
+  min-width: 0;
+}
+.instance-detail-properties .ant-descriptions-item-content {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.instance-detail-id,
+.detail-user-agent,
+.detail-page-url {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.instance-detail-task {
+  white-space: pre-wrap;
+}
+.instance-detail-properties .ant-typography {
+  margin-bottom: 0;
+}
+.instance-detail-media-stage {
+  position: relative;
+  height: 480px;
+  background: #101a2b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 10px;
+}
+.instance-detail-live-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.detail-media-message {
+  position: absolute;
+  color: #a6b8d4;
+  background: #101a2bcc;
+  padding: 12px;
+  z-index: 1;
+}
+.instance-detail-video {
+  width: 100%;
+  max-height: 480px;
+  display: block;
+  background: #101a2b;
+  border-radius: 10px;
+}
+.instance-document {
+  padding: 32px;
+  max-width: 1200px;
+  margin: auto;
+}
+.instance-document pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .instance-detail-media-stage {
+    height: 340px;
+  }
+  .instance-detail-page .ant-card-head {
+    flex-wrap: wrap;
+  }
+  .instance-detail-page .ant-card-head-wrapper {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .instance-detail-page .ant-card-extra {
+    margin: 8px 0;
+    margin-inline-start: 0;
+    width: 100%;
+  }
+  .instance-detail-page .ant-card-extra > .ant-space {
+    width: 100%;
+  }
+}
 .live-instance-detail {
   display: grid;
   grid-template-columns: 60px minmax(0, 1fr);

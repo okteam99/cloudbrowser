@@ -84,7 +84,7 @@ export const definitions: Record<
   },
   list_recordings: {
     description:
-      'List retained recordings for this principal, optionally filtered by instance, including task description and captured environment (exit IP/source/time, configured country, OS and full UA) when recorded. Playback URLs require web login or the MCP Bearer token.',
+      'List retained recordings for this principal, optionally filtered by instance, including task description, details_url and captured environment (exit IP/source/time, configured country, OS and full UA) when recorded. details_url has an empty access_token= hint; log in or fill an existing MCP token to view. Playback URLs require authentication.',
     schema: z.object({ instance_id: z.string().optional() }),
     readOnly: true,
   },
@@ -155,7 +155,7 @@ export const definitions: Record<
   },
   create_instance: {
     description:
-      'Create an isolated Chromium instance with optional task_description (1–1000 characters, shown in console/history), UA, viewport and optional authenticated HTTP/SOCKS5 proxy. Use proxy_id from list_proxies, inline proxy, or legacy proxy_ref (mutually exclusive). No direct fallback. No proxy means explicit direct mode.',
+      'Create an isolated Chromium instance with optional task_description (1–1000 characters, shown in console/history), UA, viewport and optional authenticated HTTP/SOCKS5 proxy. Returns details_url for live view, recording, status, attributes and logs, with an empty access_token= hint (never auto-filled). Log in, use a Bearer header, or fill the existing MCP token; append format=json or format=markdown for AI-readable content. Use proxy_id from list_proxies, inline proxy, or legacy proxy_ref (mutually exclusive). No direct fallback. No proxy means explicit direct mode.',
     schema: createSchema,
   },
   list_instances: {

@@ -11,6 +11,9 @@ export type Bootstrap = {
   };
   error: string;
   csrf: string;
+  instance_id?: string;
+  return_to?: string;
+  access_token?: string;
 };
 export type Connection = {
   base_url: string;
@@ -25,6 +28,7 @@ export type Connection = {
 };
 export type BrowserInstance = {
   instance_id: string;
+  details_url?: string;
   task_description?: string;
   status: string;
   owner: string;
@@ -35,6 +39,11 @@ export type BrowserInstance = {
   country_source?: 'proxy_config' | 'unknown';
   locale: string;
   timezone: string;
+  mobile?: { enabled: boolean; touch: boolean; device_scale_factor: number };
+  idle_timeout_seconds?: number;
+  max_lifetime_seconds?: number;
+  busy?: boolean;
+  active_operation?: { tool: string; started_at: string } | null;
   active_page_id?: string;
   proxy: { server: string; authenticated: boolean; proxy_id?: string } | null;
   egress?: {
@@ -66,6 +75,36 @@ export type Recording = {
   height: number;
   bytes: number;
   error?: string;
+  details_url?: string;
+};
+export type InstanceDetails = {
+  details_url?: string;
+  instance: {
+    instance_id: string;
+    task_description?: string;
+    status: string;
+    created_at?: string;
+    updated_at?: string;
+    ended_at?: string;
+    close_reason?: string;
+    environment?: Recording['environment'];
+    properties?: Pick<
+      BrowserInstance,
+      | 'viewport'
+      | 'locale'
+      | 'timezone'
+      | 'mobile'
+      | 'proxy'
+      | 'idle_timeout_seconds'
+      | 'max_lifetime_seconds'
+    >;
+    exit_code?: number | null;
+    exit_signal?: string | null;
+  };
+  current: BrowserInstance | null;
+  pages: { page_id: string; url: string; title: string; state: string; active: boolean }[];
+  recordings: Recording[];
+  logs_available: boolean;
 };
 export type InstanceLogEvent = {
   seq: number;
@@ -126,18 +165,34 @@ export async function mutate<T>(
     headers: { 'content-type': 'application/json', 'x-csrf-token': bootstrap.csrf },
     body: data === undefined ? undefined : JSON.stringify(data),
   });
-  if (response.status === 401) window.location.assign(bootstrap.base + '/');
+  if (response.status === 401) window.location.assign(loginPath());
   if (!response.ok) throw Error(`保存失败（${response.status}），请检查填写内容或重新登录`);
   return response.json() as Promise<T>;
 }
 export const bootstrap: Bootstrap = JSON.parse(document.getElementById('bootstrap')!.textContent!);
+function loginPath() {
+  return bootstrap.instance_id
+    ? `${bootstrap.base}/instances/${bootstrap.instance_id}`
+    : bootstrap.base + '/';
+}
+export class ApiError extends Error {
+  constructor(public status: number) {
+    super(`暂时无法获取数据（${status}），请稍后刷新`);
+  }
+}
 export async function api<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(bootstrap.base + path, { cache: 'no-store', signal });
+  const response = await fetch(bootstrap.base + path, {
+    cache: 'no-store',
+    signal,
+    headers: bootstrap.access_token
+      ? { Authorization: `Bearer ${bootstrap.access_token}` }
+      : undefined,
+  });
   if (response.status === 401) {
-    window.location.assign(bootstrap.base + '/');
+    window.location.assign(loginPath());
     throw Error('登录已过期，请重新登录');
   }
-  if (!response.ok) throw Error(`暂时无法获取数据（${response.status}），请稍后刷新`);
+  if (!response.ok) throw new ApiError(response.status);
   return response.json() as Promise<T>;
 }
 export async function copyText(value: string) {
@@ -156,6 +211,14 @@ export async function copyText(value: string) {
   }
 }
 export const compactId = (id: string) => id.replace(/^(ins_|rec_)/, '').slice(0, 8);
+export const instancePath = (id: string) => `${bootstrap.base}/instances/${id}?access_token=`;
+export function privateMediaUrl(path: string) {
+  if (!bootstrap.access_token) return path;
+  const url = new URL(path, window.location.origin);
+  if (url.origin !== window.location.origin) throw Error('Invalid media origin');
+  url.searchParams.set('access_token', bootstrap.access_token);
+  return url.pathname + url.search;
+}
 export const displayTime = (value: string) =>
   new Intl.DateTimeFormat('zh-CN', {
     month: '2-digit',

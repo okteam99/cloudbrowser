@@ -160,6 +160,35 @@ Agent 必须支持远程 Streamable HTTP MCP 及自定义 Authorization 请求�
 
 `verify_environment` 默认访问第三方 `https://api.ipify.org?format=json`，可传自己的 `check_url`。地区数据库未内置。
 
+## 实例详情与问题回溯
+
+`create_instance` 返回 `details_url`，`get_instance`、`list_instances`、`inspect_instance` 和 `list_recordings` 也会提供对应地址。例如：
+
+```text
+https://your-domain.example/instances/ins_12345678-1234-4234-8234-123456789abc?access_token=
+```
+
+默认链接保留空的 `access_token=` 提示，**不自动填入真实 Token**。浏览器打开后使用现有登录态；未登录时展示密码登录页，登录成功后回到该实例。实时列表和历史列表的实例名称都可点击进入详情，页面内也可复制同一链接。
+
+详情页汇总任务目标、状态与关闭原因、实时直播、录屏回放、出口 IP / 国家 / OS / 完整 UA、视口、代理地址、语言与时区、标签页及功能调用日志。实例关闭或服务重启后，仍可用同一链接回溯保留期内的数据；各类历史信息过期后会单独提示，全部记录已清理时显示不可用。新实例会保存属性与标签页快照；旧记录没有保存的字段显示“未记录”。
+
+### AI 使用 access_token 读取
+
+AI 可把 MCP 认证头 `Authorization: Bearer <TOKEN>` 中的 Token 填入查询参数。已有登录态优先；没有登录态时，使用该 Token 鉴权，错误或失效的 Token 返回 401。默认返回的链接仍保持空值，不会自动变成带真实 Token 的链接。
+
+```text
+https://your-domain.example/instances/ins_12345678-1234-4234-8234-123456789abc?access_token=<TOKEN>&format=json
+https://your-domain.example/instances/ins_12345678-1234-4234-8234-123456789abc?access_token=<TOKEN>&format=markdown
+```
+
+| 方式 | 返回内容 |
+| --- | --- |
+| 默认 / `format=html` | 可交互的详情页；已鉴权的初始 HTML 也包含可直接阅读的状态、属性、媒体地址与最近日志 |
+| `format=json` 或 `Accept: application/json` | 结构化详情、标签页、录屏与直播地址、最近200条原文日志 |
+| `format=markdown` 或 `Accept: text/markdown` | 同一份内容的 Markdown 文本 |
+
+也可保留空查询参数并通过 `Authorization: Bearer <TOKEN>` 请求头读取。JSON 和 Markdown 未鉴权时返回 401。查询参数 Token 只在实例详情、相关只读实例接口和录屏媒体接口生效；MCP、代理配置和系统设置等接口仍按原有方式鉴权。返回的 `links` 保留空 Token 提示，AI 读取媒体或日志时可填入相同 Token。页面不建立长期登录 Cookie，采用 `no-store` 与 `no-referrer`。
+
 ## 直播和录像
 
 默认参数：
@@ -401,10 +430,10 @@ bash scripts/publish-docker.sh
 ## 源码构建及 stdio 接入
 
 ```sh
-docker build -t cloudbrowser:0.11.0 .
+docker build -t cloudbrowser:0.12.0 .
 ```
 
-将一行部署命令最后的镜像名换成 `cloudbrowser:0.11.0` 即可本地使用。
+将一行部署命令最后的镜像名换成 `cloudbrowser:0.12.0` 即可本地使用。
 
 兼容配置见 [本地 stdio](examples/mcp.local.json)、[SSH stdio](examples/mcp.ssh.json)。仍使用 `docker exec -i`，不得使用 `-t`。MCP_PRINCIPAL 是可信 SSH/Docker 接入中的命名空间，不是独立认证。
 
