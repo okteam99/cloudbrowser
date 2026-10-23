@@ -1491,6 +1491,23 @@ input {
   line-height: 1.7;
   display: block;
 }
+.system-settings {
+  display: grid;
+  gap: 20px;
+}
+.system-settings .ant-progress {
+  margin: 20px 0;
+}
+.storage-settings-form {
+  max-width: 680px;
+}
+.storage-settings-form .ant-input-number-group-wrapper {
+  width: 240px;
+  max-width: 100%;
+}
+.storage-settings-actions {
+  margin-top: 20px;
+}
 .live-instance-detail {
   display: grid;
   grid-template-columns: 60px minmax(0, 1fr);

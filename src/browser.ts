@@ -35,6 +35,7 @@ import { PageData } from './page-data.js';
 import { readStorageState, storageLimit, deadline } from './browser-state.js';
 import sharp from 'sharp';
 import { operatingSystem, type BrowserEnvironment } from './browser-environment.js';
+import { SystemSettings } from './system-settings.js';
 
 type PageEntry = {
   page: Page;
@@ -95,10 +96,12 @@ export class BrowserManager {
   logs: Diagnostics;
   proxies: ProxyStore;
   proxyHealth: ProxyHealthMonitor;
+  settings: SystemSettings;
   private curlActive = 0;
   private creating = 0;
   private closing = 0;
   constructor(public cfg: Config) {
+    this.settings = new SystemSettings(cfg);
     this.artifacts = new Artifacts(cfg);
     this.policy = new NetworkPolicy(cfg);
     this.logs = new Diagnostics(cfg);
@@ -116,6 +119,7 @@ export class BrowserManager {
   }
   async init() {
     await mkdir(this.cfg.dataDir, { recursive: true, mode: 0o700 });
+    await this.settings.init();
     await this.logs.init();
     await this.proxies.init();
     for (const p of this.proxies.list())
@@ -1157,7 +1161,7 @@ export class BrowserManager {
     if (name === 'health')
       return {
         status: 'ok',
-        version: '0.10.1',
+        version: '0.11.0',
         base_url: this.cfg.baseUrl,
         public_url_mode: this.cfg.quickTunnel
           ? 'quick_tunnel'
@@ -1168,6 +1172,7 @@ export class BrowserManager {
         starting_instances: this.creating,
         closing_instances: this.closing,
         max_instances: this.cfg.maxInstances,
+        storage: this.settings.storage(),
         resources: await resources(this.cfg.dataDir),
         diagnostic_write_errors: this.logs.writeErrors,
         diagnostic_last_write_error: this.logs.lastWriteError ?? null,
@@ -1660,14 +1665,6 @@ export class BrowserManager {
       const bytes = a.target
         ? await this.target(p, a.target).screenshot({ type: 'png', timeout: this.cfg.timeout })
         : await p.page.screenshot(options);
-      const artifact = await this.artifacts.save(
-        i.owner,
-        i.id,
-        'screenshot.png',
-        'image/png',
-        bytes,
-        'screenshot',
-      );
       let image = await sharp(bytes)
         .resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
         .jpeg({ quality: 65 })
@@ -1677,14 +1674,15 @@ export class BrowserManager {
           .resize({ width: 800, height: 800, fit: 'inside', withoutEnlargement: true })
           .jpeg({ quality: 40 })
           .toBuffer();
-      const preview = await this.artifacts.save(
-        i.owner,
-        i.id,
-        'screenshot-preview.jpg',
-        'image/jpeg',
-        image,
-        'screenshot_preview',
-      );
+      const [artifact, preview] = await this.artifacts.saveBatch(i.owner, i.id, [
+        { name: 'screenshot.png', mime: 'image/png', bytes, kind: 'screenshot' },
+        {
+          name: 'screenshot-preview.jpg',
+          mime: 'image/jpeg',
+          bytes: image,
+          kind: 'screenshot_preview',
+        },
+      ]);
       const dimensions = await sharp(image).metadata();
       return {
         ...artifact,

@@ -57,6 +57,7 @@ import {
   PlayCircleOutlined,
   ReloadOutlined,
   SafetyCertificateOutlined,
+  SettingOutlined,
   ThunderboltOutlined,
   VideoCameraOutlined,
 } from '@ant-design/icons';
@@ -77,15 +78,17 @@ import 'antd/dist/reset.css';
 import './styles.css';
 import { ProxiesPage } from './proxies';
 import { InstanceLogDrawer } from './instance-logs';
+import { SettingsPage } from './settings';
 
 const { Title, Text, Paragraph } = Typography;
-type Section = 'overview' | 'instances' | 'history' | 'proxies' | 'connect' | 'docs';
+type Section = 'overview' | 'instances' | 'history' | 'proxies' | 'connect' | 'docs' | 'settings';
 const navItems = [
   { key: 'overview', icon: <DesktopOutlined />, label: '工作台' },
   { key: 'instances', icon: <VideoCameraOutlined />, label: '实时实例' },
   { key: 'history', icon: <HistoryOutlined />, label: '历史录屏' },
   { key: 'proxies', icon: <SafetyCertificateOutlined />, label: '代理管理' },
   { key: 'connect', icon: <ApiOutlined />, label: 'MCP 接入' },
+  { key: 'settings', icon: <SettingOutlined />, label: '系统设置' },
   { key: 'docs', icon: <FileTextOutlined />, label: '使用文档' },
 ];
 const sectionTitles: Record<Section, { title: string; description: string }> = {
@@ -95,6 +98,7 @@ const sectionTitles: Record<Section, { title: string; description: string }> = {
   proxies: { title: '代理管理', description: '配置国家和代理线路，由 Agent 按代理 ID 选择使用。' },
   connect: { title: 'MCP 接入', description: '复制接入说明，把远程浏览器交给 Agent。' },
   docs: { title: '使用文档', description: '从首次连接到日常使用，你需要的信息都在这里。' },
+  settings: { title: '系统设置', description: '查看存储用量，调整配额和截图保留期限。' },
 };
 function Brand({ light = false }: { light?: boolean }) {
   return (
@@ -322,7 +326,7 @@ function Dashboard() {
                 <span className="status-dot" />
                 远程浏览器服务
               </div>
-              <Text>cloudbrowser · v0.10.1</Text>
+              <Text>cloudbrowser · v0.11.0</Text>
             </div>
           </Layout.Sider>
         )}
@@ -617,6 +621,7 @@ function Dashboard() {
               />
             )}
             {section === 'proxies' && <ProxiesPage />}
+            {section === 'settings' && <SettingsPage />}
             {section === 'connect' && (
               <ConnectionPage
                 connection={service.connection}

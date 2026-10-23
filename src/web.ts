@@ -140,7 +140,7 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         return;
       }
       if (path === '/healthz') {
-        json(res, { status: 'ok', version: '0.10.1' });
+        json(res, { status: 'ok', version: '0.11.0' });
         return;
       }
       if (path === '/mcp') {
@@ -262,6 +262,33 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
       }
       if (!authorized) {
         json(res, { error: 'Authentication required' }, 401);
+        return;
+      }
+      if (path === '/api/settings') {
+        if (req.method === 'GET') {
+          json(res, {
+            storage: manager.settings.storage(),
+            usage: await manager.artifacts.usage(),
+          });
+          return;
+        }
+        if (req.method !== 'PUT') {
+          json(res, { error: 'Method not allowed' }, 405);
+          return;
+        }
+        if (!bearer && (!session || req.headers['x-csrf-token'] !== session)) {
+          json(res, { error: 'Invalid session' }, 403);
+          return;
+        }
+        try {
+          const input = JSON.parse(await body(req, 4096));
+          const storage = await manager.settings.updateStorage(input);
+          json(res, { storage, usage: await manager.artifacts.usage() });
+        } catch (e) {
+          if (e instanceof ZodError || e instanceof SyntaxError)
+            json(res, { error: 'Invalid storage settings' }, 400);
+          else throw e;
+        }
         return;
       }
       if (path === '/api/proxy-health' && req.method === 'GET') {

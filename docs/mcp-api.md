@@ -294,6 +294,8 @@ inspect_instance和get_logs不占用浏览器执行锁；get_diagnostics也可�
 - `GET /api/instances/{instance_id}/live`：MJPEG 低帧率直播。
 - `GET /api/instances/{instance_id}/frame`：当前采样 JPEG，无画面时204；实例结束404。网页最多约2 FPS逐帧刷新。
 - `GET /api/recordings`：历史录像。
+- `GET /api/settings`：已登录管理员读取当前 storage 和 usage（产物用量、分类和磁盘可用空间）。
+- `PUT /api/settings`：保存 `{ "max_data_bytes": 214748364800, "screenshot_retention_days": 7 }`；需要网页登录及 CSRF 请求头或现有 Bearer。配额最少1 MiB，截图保留1–365天，配置持久化且即时生效。MCP `health.storage` 返回当前设置。
 - `GET /api/recordings/{recording_id}/video`：WebM 播放/下载，支持 Range；录像未完成返回 409。
 - `GET /docs/README.md`、`/docs/mcp-api.md`、`/docs/mcp-tools.json`、`/docs/agent-workflow.md`：完整文档。
 

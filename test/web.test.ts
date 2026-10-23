@@ -123,6 +123,8 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     assert.equal((await fetch(base + '/api/connection')).status, 401);
     assert.equal((await fetch(base + '/api/proxies')).status, 401);
     assert.equal((await fetch(base + '/api/proxy-health')).status, 401);
+    assert.equal((await fetch(base + '/api/settings')).status, 401);
+    assert.equal((await fetch(base + '/api/settings', { method: 'PUT', body: '{}' })).status, 401);
     assert.equal((await fetch(base + '/mcp', { method: 'POST', body: '{}' })).status, 401);
     const publicGuide = await fetch(base + '/docs/agent-guide.md', {
       headers: { Origin: 'https://agent.example' },
@@ -166,6 +168,13 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     assert.equal(login.status, 303);
     const cookie = login.headers.get('set-cookie')!.split(';')[0];
     const headers = { Cookie: cookie };
+    const defaults = await (await fetch(base + '/api/settings', { headers })).json();
+    assert.equal(defaults.storage.max_data_bytes, 200 * 1024 ** 3);
+    assert.equal(defaults.storage.screenshot_retention_days, 7);
+    assert.equal(
+      (await fetch(base + '/api/settings', { method: 'PUT', headers, body: '{}' })).status,
+      403,
+    );
     const aliasRequest = (
       path: string,
       method = 'GET',
@@ -248,6 +257,23 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
       await page.getByLabel('访问密码').fill('test-password-123');
       await page.getByRole('button', { name: /^登\s*录$/, exact: true }).click();
       await page.getByRole('button', { name: '复制 Agent 接入信息' }).waitFor({ timeout: 5000 });
+      await page.getByRole('menuitem', { name: '系统设置' }).click();
+      await page.getByLabel('产物存储配额（GB）', { exact: true }).waitFor();
+      assert.equal(
+        await page.getByLabel('产物存储配额（GB）', { exact: true }).inputValue(),
+        '200',
+      );
+      assert.equal(await page.getByLabel('截图保留天数', { exact: true }).inputValue(), '7');
+      await page.getByLabel('产物存储配额（GB）', { exact: true }).fill('201');
+      await page.getByLabel('截图保留天数', { exact: true }).fill('9');
+      await page.getByRole('button', { name: '保存设置' }).click();
+      await page.getByText('存储设置已保存并生效', { exact: true }).waitFor();
+      await page.reload();
+      await page.getByLabel('产物存储配额（GB）', { exact: true }).waitFor();
+      assert.equal(
+        await page.getByLabel('产物存储配额（GB）', { exact: true }).inputValue(),
+        '201',
+      );
       await page.getByRole('menuitem', { name: 'MCP 接入' }).click();
       await page.getByLabel('MCP 地址', { exact: true }).waitFor();
       assert.equal(await page.getByLabel('MCP 地址', { exact: true }).inputValue(), base + '/mcp');
@@ -730,6 +756,19 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     const restoredLogs = await (
       await fetch(logUrl + '?component=operation', { headers: auth })
     ).json();
+    const restoredSettings = await (await fetch(base + '/api/settings', { headers: auth })).json();
+    assert.equal(restoredSettings.storage.max_data_bytes, 201 * 1024 ** 3);
+    assert.equal(restoredSettings.storage.screenshot_retention_days, 9);
+    assert.equal(
+      (
+        await fetch(base + '/api/settings', {
+          method: 'PUT',
+          headers: auth,
+          body: JSON.stringify({ max_data_bytes: -1, screenshot_retention_days: 7 }),
+        })
+      ).status,
+      400,
+    );
     assert.equal(restoredLogs.instance.task_description, taskDescription);
     assert.ok(restoredLogs.entries.some((e: any) => e.fields?.tool === 'close_instance'));
     const persisted = await fetch(base + '/api/recordings', { headers: auth });

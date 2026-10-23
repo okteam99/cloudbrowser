@@ -99,7 +99,7 @@ MCP（Streamable HTTP）：https://browser.example.com/mcp
 
 公开文档仅提供通用说明；真实 Token 仍通过登录后的复制操作获取。复制内容包含服务访问凭据，请只交给可信使用方。
 
-控制台使用 React + Ant Design，包含工作台、实时实例、历史录屏、代理管理、MCP 接入和文档中心，并适配手机屏幕。所有前端资源随镜像打包，不依赖外部 CDN。
+控制台使用 React + Ant Design，包含工作台、实时实例、历史录屏、代理管理、MCP 接入、系统设置和文档中心，并适配手机屏幕。所有前端资源随镜像打包，不依赖外部 CDN。
 
 不需要 SSH 配置或 Chrome 插件。原 stdio / SSH 接入方式仍保留。
 
@@ -184,6 +184,19 @@ Agent 必须支持远程 Streamable HTTP MCP 及自定义 Authorization 请求�
 
 录像会包含浏览器中可见的输入与业务内容。通过 `RECORD_VIDEO=false` 可关闭历史录像，实时预览仍可用。产物和录像保存在 `/data`，需挂载数据卷。
 
+## 系统设置与存储
+
+在控制台左侧打开“系统设置”，可查看产物用量、配额和服务器磁盘可用空间，并修改以下设置：
+
+| 设置 | 默认值 | 范围 |
+| --- | --- | --- |
+| 产物存储配额 | 200 GB（200 × 1024³ 字节） | 截图、下载文件、上传文件和登录态，不含录屏 |
+| 截图保留天数 | 7 天 | 1–365 天，同时适用于 PNG 原图和 JPEG 预览 |
+
+保存后即时生效，无需重启浏览器；设置保存到 `/data/system-settings.json`，容器更新或重启后保留，优先于环境变量默认值。尚未保存后台设置时，使用 `MAX_DATA_BYTES` 和 `SCREENSHOT_RETENTION_DAYS` 的部署值。
+
+自动清理先删除过期产物，再在配额不足时按时间清理最旧产物，为新文件预留空间；二进制和元信息成对清理，截图原图和预览共同预留空间。截图保留天数是最长保留期限，配额不足时可能提前清理；缩短期限或降低配额会影响已有产物。下载和登录态等其他产物仍遵循 `ARTIFACT_RETENTION_HOURS`；录屏的大小与保留规则独立。
+
 ## 公开直播与录像分享
 
 Agent 可通过 MCP 创建无需登录的只读观看链接；链接使用 `BASE_URL`，支持部署路径前缀。观看者只能看到指定实例的活动页面或指定录像，不能操作浏览器或访问控制台。
@@ -236,10 +249,11 @@ Agent 可通过 MCP 创建无需登录的只读观看链接；链接使用 `BASE
 | `MAX_RECORDING_BYTES` | 134217728 | 单段录像大小上限 |
 | `MAX_RECORDINGS_BYTES` | 1073741824 | 历史录像总配额 |
 | `MAX_DOWNLOAD_BYTES` | 52428800 | 下载及单产物大小限制 |
-| `MAX_DATA_BYTES` | 1073741824 | 截图/下载等产物配额，不含录像 |
+| `MAX_DATA_BYTES` | 214748364800 | 产物默认配额，200 GB，不含录像；后台保存后以后台值为准 |
+| `SCREENSHOT_RETENTION_DAYS` | 7 | 截图原图及预览的默认保留天数，1–365；后台保存后以后台值为准 |
 | `MAX_LOG_BYTES` | 16777216 | 诊断事件轮转总大小，不含最多1000份实例快照 |
 | `LOG_RETENTION_HOURS` | 168 | 诊断事件和结束实例状态的最长保留时间 |
-| `ARTIFACT_RETENTION_HOURS` | 168 | 产物及历史录像保留时间 |
+| `ARTIFACT_RETENTION_HOURS` | 168 | 非截图产物及历史录像的保留时间 |
 | `PROXY_CONFIG` | /config/proxies.json | 首次启动时导入的代理文件 |
 | `PROXY_CHECK_INTERVAL_SECONDS` | 300 | 自动检测周期，秒；30–86400 |
 | `PROXY_CHECK_URL` | https://api.ipify.org?format=json | 检测目标，遵循目标访问策略 |
@@ -387,10 +401,10 @@ bash scripts/publish-docker.sh
 ## 源码构建及 stdio 接入
 
 ```sh
-docker build -t cloudbrowser:0.10.1 .
+docker build -t cloudbrowser:0.11.0 .
 ```
 
-将一行部署命令最后的镜像名换成 `cloudbrowser:0.10.1` 即可本地使用。
+将一行部署命令最后的镜像名换成 `cloudbrowser:0.11.0` 即可本地使用。
 
 兼容配置见 [本地 stdio](examples/mcp.local.json)、[SSH stdio](examples/mcp.ssh.json)。仍使用 `docker exec -i`，不得使用 `-t`。MCP_PRINCIPAL 是可信 SSH/Docker 接入中的命名空间，不是独立认证。
 

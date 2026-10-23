@@ -107,7 +107,8 @@ export function config() {
     timeout: integer('ACTION_TIMEOUT_MS', 15000, 1000, 60000),
     downloadLimit: integer('MAX_DOWNLOAD_BYTES', 52428800, 1024, 1073741824),
     retentionHours: integer('ARTIFACT_RETENTION_HOURS', 168, 1, 8760),
-    dataLimit: integer('MAX_DATA_BYTES', 1073741824, 1048576, Number.MAX_SAFE_INTEGER),
+    screenshotRetentionDays: integer('SCREENSHOT_RETENTION_DAYS', 7, 1, 365),
+    dataLimit: integer('MAX_DATA_BYTES', 214748364800, 1048576, Number.MAX_SAFE_INTEGER),
     allowPrivate: process.env.ALLOW_PRIVATE_NETWORKS === 'true',
     allowedHosts: (process.env.ALLOWED_HOSTS ?? '')
       .split(',')
