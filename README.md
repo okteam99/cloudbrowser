@@ -21,7 +21,7 @@ docker run -d --init \
   --shm-size=1g \
   -e WEB_PASSWORD='替换为你的强密码' \
   -v browser-mcp-data:/data \
-  bdpgogoup/cloudbrowser:20261023144551
+  bdpgogoup/cloudbrowser:20261024194926
 ```
 
 查看自动生成的 HTTPS 地址：
@@ -48,7 +48,7 @@ docker run -d --init \
   -e WEB_PASSWORD='替换为你的强密码' \
   -e CF_TUNNEL_TOKEN='替换为隧道的连接器Token' \
   -v browser-mcp-data:/data \
-  bdpgogoup/cloudbrowser:20261023144551
+  bdpgogoup/cloudbrowser:20261024194926
 ```
 
 服务自动读取隧道配置，按规则顺序选择第一个指向本容器端口的有效域名，无需再填 `BASE_URL`。可通过 `-e BASE_URL=https://browser.example.com` 优先指定主地址；只有通配符或路径规则、无法识别具体域名时也需显式指定。只支持 Cloudflare 远程管理的命名隧道，不会代替用户购买域名或创建 DNS。
@@ -76,7 +76,7 @@ docker run -d --init \
   -e BASE_URL=http://localhost:8080 \
   -e WEB_PASSWORD='替换为你的强密码' \
   -v browser-mcp-data:/data \
-  bdpgogoup/cloudbrowser:20261023144551
+  bdpgogoup/cloudbrowser:20261024194926
 ```
 
 部署到远程服务器时，将 `BASE_URL` 改为实际可访问地址；部署方负责 DNS、反向代理、HTTPS 或端口映射接通容器8080。`BASE_URL` 可带路径前缀。
