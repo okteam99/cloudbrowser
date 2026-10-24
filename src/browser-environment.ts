@@ -1,6 +1,10 @@
+import type { userAgentMetadata } from './user-agent.js';
+
 export type BrowserEnvironment = {
   captured_at: string;
   user_agent: string | null;
+  browser_version?: string;
+  user_agent_metadata?: ReturnType<typeof userAgentMetadata> | null;
   os: string | null;
   country: string | null;
   country_source: 'proxy_config' | 'unknown';

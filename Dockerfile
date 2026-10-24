@@ -2,6 +2,8 @@ FROM cloudflare/cloudflared:2026.10.1@sha256:a15a3b50b8dabd57ac2090e9484c0247dba
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json tsconfig.json tsconfig.web.json ./
+COPY scripts/patch-playwright.mjs ./scripts/patch-playwright.mjs
+COPY src/user-agent.js ./src/user-agent.js
 RUN npm ci
 COPY src ./src
 COPY web ./web

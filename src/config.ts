@@ -39,7 +39,14 @@ export const createSchema = z
       .max(100)
       .optional()
       .describe('Owner-authorized login state artifact from save_storage_state.'),
-    user_agent: z.string().min(1).max(1024).optional(),
+    user_agent: z
+      .string()
+      .min(1)
+      .max(1024)
+      .describe(
+        'Custom UA. Chromium UA Client Hints are derived automatically from this UA, including versions; this does not change the installed browser engine. Omit for native UA and hints.',
+      )
+      .optional(),
     viewport: z
       .object({
         width: z.number().int().min(240).max(3840),

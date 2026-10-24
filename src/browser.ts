@@ -35,6 +35,7 @@ import { PageData } from './page-data.js';
 import { readStorageState, storageLimit, deadline } from './browser-state.js';
 import sharp from 'sharp';
 import { operatingSystem, type BrowserEnvironment } from './browser-environment.js';
+import { userAgentMetadata } from './user-agent.js';
 import { SystemSettings } from './system-settings.js';
 import {
   instanceDetailsUrl,
@@ -377,6 +378,8 @@ export class BrowserManager {
       viewport: i.options.viewport,
       storage_state_id: i.options.storage_state_id,
       user_agent: i.userAgent ?? i.options.user_agent ?? 'browser default',
+      browser_version: i.browser.version(),
+      user_agent_metadata: userAgentMetadata({ userAgent: i.options.user_agent }) ?? null,
       country: i.proxyCountry ?? null,
       country_source: i.proxyCountry ? ('proxy_config' as const) : ('unknown' as const),
       egress,
@@ -394,7 +397,7 @@ export class BrowserManager {
       max_lifetime_seconds: i.options.max_lifetime_seconds,
       pages: Array.from(i.pages, ([page_id, p]) => ({ page_id, url: p.page.url() })),
       warnings: [
-        'UA/viewport simulation is not a real mobile device. Client Hints may differ; verify on the target.',
+        'Custom Chromium UA Client Hints follow the supplied UA. browser_version is the actual engine; changing UA does not install that engine or create a real mobile device. Verify on the target.',
         'Host policy is defense in depth; use trusted upstream proxies and a network firewall for strict egress isolation.',
       ],
     };
@@ -406,6 +409,8 @@ export class BrowserManager {
     const environment: BrowserEnvironment = {
       captured_at: new Date().toISOString(),
       user_agent: userAgent,
+      browser_version: current.browser_version,
+      user_agent_metadata: current.user_agent_metadata,
       os: operatingSystem(userAgent),
       country: i.proxyCountry ?? null,
       country_source: i.proxyCountry ? 'proxy_config' : 'unknown',
@@ -722,7 +727,7 @@ export class BrowserManager {
   private async environment(p: Page) {
     return {
       viewport: p.viewportSize(),
-      ...(await p.evaluate(() => ({
+      ...(await p.evaluate(async () => ({
         user_agent: navigator.userAgent,
         layout_viewport: { width: innerWidth, height: innerHeight },
         screen: { width: screen.width, height: screen.height },
@@ -730,7 +735,19 @@ export class BrowserManager {
         touch_points: navigator.maxTouchPoints,
         language: navigator.language,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        client_hints: (navigator as any).userAgentData?.toJSON() ?? null,
+        client_hints: (navigator as any).userAgentData
+          ? await (navigator as any).userAgentData
+              .getHighEntropyValues([
+                'fullVersionList',
+                'platformVersion',
+                'architecture',
+                'bitness',
+                'model',
+                'wow64',
+                'formFactors',
+              ])
+              .catch(() => (navigator as any).userAgentData.toJSON())
+          : null,
       }))),
     };
   }
@@ -1215,7 +1232,7 @@ export class BrowserManager {
     if (name === 'health')
       return {
         status: 'ok',
-        version: '0.13.0',
+        version: '0.13.1',
         base_url: this.cfg.baseUrl,
         public_url_mode: this.cfg.quickTunnel
           ? 'quick_tunnel'

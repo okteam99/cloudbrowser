@@ -155,7 +155,7 @@ export const definitions: Record<
   },
   create_instance: {
     description:
-      'Create an isolated Chromium instance with optional task_description (1–1000 characters, shown in console/history), UA, viewport and optional authenticated HTTP/SOCKS5 proxy. Returns details_url for live view, recording, status, attributes and logs, with an empty access_token= hint (never auto-filled). Log in, use a Bearer header, or fill the existing MCP token; append format=json or format=markdown for AI-readable content. Use proxy_id from list_proxies, inline proxy, or legacy proxy_ref (mutually exclusive). No direct fallback. No proxy means explicit direct mode.',
+      'Create an isolated Chromium instance with optional task_description (1–1000 characters, shown in console/history), UA, viewport and optional authenticated HTTP/SOCKS5 proxy. Custom Chromium UA automatically determines Client Hints; browser_version reports the unchanged actual engine and user_agent_metadata reports the derived identity. Returns details_url for live view, recording, status, attributes and logs, with an empty access_token= hint (never auto-filled). Log in, use a Bearer header, or fill the existing MCP token; append format=json or format=markdown for AI-readable content. Use proxy_id from list_proxies, inline proxy, or legacy proxy_ref (mutually exclusive). No direct fallback. No proxy means explicit direct mode.',
     schema: createSchema,
   },
   list_instances: {
@@ -174,7 +174,7 @@ export const definitions: Record<
   },
   verify_environment: {
     description:
-      'Open temporary page through instance proxy to read actual IP response and device attributes. Default endpoint: api.ipify.org. Country requires independent verification.',
+      'Open temporary page through instance proxy to read actual IP response and device attributes, including page-visible low/high entropy Client Hints when allowed. Default endpoint: api.ipify.org. Country requires independent verification. Declared hints do not identify the actual engine: see get_instance.browser_version.',
     schema: z.object({ ...instance, check_url: z.string().url().optional() }),
     readOnly: true,
   },

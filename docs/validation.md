@@ -36,3 +36,13 @@
 - GitHub Actions 验证 Linux runner 的自动测试、Docker 构建及容器启动，具体结果以 Actions 为准。
 - 未进行生产网站完整业务回归、真实 Webshare 国家库存验证、10 个重页面的长期压力测试或严格网络无旁路证明。
 - 非正常终止可留下 interrupted 录像，不保证完整可播；采样受拥塞影响可能丢帧。
+
+## UA Client Hints 兼容层
+
+Playwright 1.64.1 的内置 UA metadata 解析没有填写品牌和版本；Chromium 会回填内核版本。`src/user-agent.js` 是唯一的 UA 解析来源，`scripts/patch-playwright.mjs` 在 npm 安装及服务端构建时将解析函数嵌入 Playwright 的原生页面/iframe/worker 初始化位置，不使用 navigator 属性重写。
+
+弹窗首个请求的提示可能早于目标初始化生成，因此兼容层也在 Chromium Fetch 请求继续时纠正已经存在的 UA-CH 头。仅替换 UA-CH，不修改其他头；高熵提示不主动添加；修正结果不保存为重定向头覆盖，避免把认证、Cookie 或提示授权沿用到另一来源。
+
+兼容层严格锁定 Playwright 1.64.1，并检查原函数 SHA 和请求处理锚点。升级 Playwright 时必须审查兼容层；不匹配会使安装/构建失败。不要使用 `npm ci --ignore-scripts` 后直接运行旧构建。Docker 构建也执行兼容层，保留现有内核及网络策略。
+
+`test/user-agent.test.ts` 使用真实 Chromium 和本地 HTTP 接收端校验：首个请求、Accept-CH 完整版本、页面早期 JS、普通新 Tab、弹窗、同源/跨站 iframe、Worker、刷新、跨站跳转不携带原站认证/Cookie、多实例隔离、原生 UA、未知 UA、环境核验及历史保存。Worker 脚本请求可以不带 UA-CH；测试不为此强行添加头。

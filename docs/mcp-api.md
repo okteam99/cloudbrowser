@@ -1,4 +1,4 @@
-# 共用工具参考 V0.13（MCP & API）
+# 共用工具参考 V0.13.1（MCP & API）
 
 推荐使用 `BASE_URL/mcp` 的 Streamable HTTP，携带 `Authorization: Bearer <登录网页自动生成的 Token>`。网页登录后可复制完整配置。兼容 MCP stdio，通过 SSH 或 docker exec 接入。HTTP 调用共享 web principal，stdio 仍按 MCP_PRINCIPAL 隔离。
 
@@ -46,6 +46,18 @@
   "max_lifetime_seconds": 3600
 }
 ```
+
+## UA 与 Client Hints
+
+`create_instance.user_agent` 自动生成 Chromium UA Client Hints，不需要另传参数。HTTP API 和 MCP 行为一致；新建标签页、弹窗及 iframe 使用同一实例的声明，Worker 的 JS 提示也随 UA 设置。
+
+例如上述 Android UA 会生成 `Chromium` / `Google Chrome` 主版本 `130`、完整版本 `130.0.0.0`、`platform=Android`、`platformVersion=14`、`model=Pixel 8` 和 `mobile=true`。UA 中没有包含的 CPU 架构、位数等信息保持空值，不从宿主机补入。Windows NT 10.0 无法区分 Windows 10/11，对应平台版本也留空；简化 Android UA 的 `K` 不作为真实机型。
+
+- `create_instance`、`get_instance`、`list_instances` 返回 `browser_version`（实际内核版本）和 `user_agent_metadata`（从自定义 UA 生成的声明，未生成时为 null）。这些字段也保存到历史 `environment`。
+- `verify_environment.actual.client_hints` 返回验证页可读取的低熵及高熵提示，包括 `brands`、`fullVersionList`、`platform`、`platformVersion`、`mobile`、`model`、`architecture`、`bitness` 和 `wow64`。浏览器策略可能限制返回字段；非安全页面可能没有 Client Hints。
+- 请求头仍遵守 Client Hints 的发送条件。基础提示在受支持的安全上下文提供；完整版本等高熵请求头由目标站点通过 `Accept-CH` 请求，不会为了模拟而向所有请求强行添加。
+- 省略 UA 时保留浏览器原生行为。Safari、Firefox、iOS 或不能识别为 Chromium 的自定义 UA 不生成 Chromium 提示。
+- UA 和 Client Hints 都是浏览器对外声明；真实内核保持容器自带版本，不等于对应版本的兼容性测试，也不等于真机。页面布局和触摸配置仍通过 `viewport` / `mobile` 指定。
 
 ## 公开观看链接
 

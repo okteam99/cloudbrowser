@@ -158,7 +158,9 @@ Agent 必须支持远程 Streamable HTTP MCP 及自定义 Authorization 请求�
 - 支持 `http://`、`https://` 上游与 `socks5://`，凭据通过独立字段传入。
 - 省略 proxy 是明确的直连模式；指定代理失败不会回退直连。
 - 环境参数创建后固定，切换环境需新建实例。
-- UA 示例仅展示配置，不代表当前真实浏览器版本。Client Hints、页面布局和真机可能不同。
+- 传入 Chromium UA 后，自动按 UA 生成 Client Hints 的品牌、主/完整版本、平台、机型和移动标记；无需额外参数。例如 Chrome/130.0.0.0 对应版本提示 130 / 130.0.0.0。
+- `browser_version` 返回实际运行的 Chromium 内核版本，`user_agent_metadata` 返回自动生成的声明；UA 配置不会安装或切换内核。`verify_environment.actual.client_hints` 可核对目标页面实际读到的提示。
+- 未指定 UA 时保留原生 UA 和 Client Hints。无法从 UA 判断的机型、系统版本或 CPU 信息留空；Safari、Firefox、iOS 和无法识别的自定义 UA 不附带 Chromium 版本提示。移动布局与触摸仍由 viewport/mobile 控制。
 - viewport 是 CSS 像素的设备视口；移动页面没有 viewport meta 时，layout_viewport 可能约为 980px。
 - 返回 instance_id、初始 page_id 和实际设备属性。用 `verify_environment` 验证出口，不把配置的国家标签当作真实地区。
 
@@ -434,10 +436,10 @@ bash scripts/publish-docker.sh
 ## 源码构建及 stdio 接入
 
 ```sh
-docker build -t cloudbrowser:0.13.0 .
+docker build -t cloudbrowser:0.13.1 .
 ```
 
-将一行部署命令最后的镜像名换成 `cloudbrowser:0.13.0` 即可本地使用。
+将一行部署命令最后的镜像名换成 `cloudbrowser:0.13.1` 即可本地使用。
 
 兼容配置见 [本地 stdio](examples/mcp.local.json)、[SSH stdio](examples/mcp.ssh.json)。仍使用 `docker exec -i`，不得使用 `-t`。MCP_PRINCIPAL 是可信 SSH/Docker 接入中的命名空间，不是独立认证。
 

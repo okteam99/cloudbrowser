@@ -1,12 +1,13 @@
 {
   "name": "cloudbrowser",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "private": true,
   "type": "module",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
+    "postinstall": "node scripts/patch-playwright.mjs",
     "build": "npm run build:server && npm run build:web",
     "start": "node dist/cli.js",
     "test": "npm run build && tsx --test test/*.test.ts",
@@ -17,7 +18,7 @@
     "format:check": "prettier --check src web test scripts",
     "release": "bash scripts/publish-docker.sh",
     "smoke:http": "tsx scripts/smoke-http.ts",
-    "build:server": "tsc",
+    "build:server": "node scripts/patch-playwright.mjs && tsc",
     "build:web": "tsc -p tsconfig.web.json && node scripts/build-web.mjs"
   },
   "dependencies": {
