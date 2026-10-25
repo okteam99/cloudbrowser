@@ -430,6 +430,10 @@ Agent 调用 `list_proxies` 查询列表，可传 `country: "US"`、`protocol: "
 
 以上是 `get_logs` 的 arguments。也可不传实例查询最近事件，或用 `operation_id`、`component`、`since`、`after_seq` 筛选。`since` 使用带时区的 ISO8601 时间；返回 `next_after_seq`，下次传为 `after_seq` 可增量读取，`has_more=true` 时继续翻页。
 
+遇到 MCP 502 或连接重置，先用只读 `health` 检查当前可达性，再查 `get_logs({"component":"tunnel","level":"error"})`。隧道回源失败会记录 `tunnel_origin_error`，包含原始发生时间、连接编号、路由编号、回源地址及固定错误类别（connection_reset / connection_refused / timeout / eof / tls）。不会把隧道 Token、认证头或完整远程配置写入日志。
+
+服务端 HTTP 空闲连接保留 120 秒，长于 Cloudflare Tunnel 默认的 90 秒连接池时间，以减少连接复用与服务端关连接碰撞导致的 reset；自定义反向代理的回源空闲时间应短于 120 秒。出现传输错误不代表业务操作一定未执行，服务不会自动重放操作。保留 operation_id、instance_id、响应状态、CF-Ray 和发生时间后再核对日志。
+
 能够区分的证据包括：
 
 - 正常关闭、空闲超时 `idle_timeout`、最大存活期 `max_lifetime`、服务关闭 `service_shutdown`。
@@ -469,10 +473,10 @@ bash scripts/publish-docker.sh
 ## 源码构建及 stdio 接入
 
 ```sh
-docker build -t cloudbrowser:0.15.2 .
+docker build -t cloudbrowser:0.15.3 .
 ```
 
-将一行部署命令最后的镜像名换成 `cloudbrowser:0.15.2` 即可本地使用。
+将一行部署命令最后的镜像名换成 `cloudbrowser:0.15.3` 即可本地使用。
 
 兼容配置见 [本地 stdio](examples/mcp.local.json)、[SSH stdio](examples/mcp.ssh.json)。仍使用 `docker exec -i`，不得使用 `-t`。MCP_PRINCIPAL 是可信 SSH/Docker 接入中的命名空间，不是独立认证。
 

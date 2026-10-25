@@ -170,7 +170,7 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         return;
       }
       if (path === '/healthz') {
-        json(res, { status: 'ok', version: '0.15.2' });
+        json(res, { status: 'ok', version: '0.15.3' });
         return;
       }
       const toolRoute = /^\/api\/tools\/([^/]+)$/.exec(path);
@@ -667,7 +667,10 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
     }
   });
   server.requestTimeout = 180000;
-  server.headersTimeout = 15000;
+  // cloudflared retains idle origin sockets for 90s by default. Let the proxy
+  // retire them before Node does, avoiding reset races on non-retriable MCP POSTs.
+  server.keepAliveTimeout = 120000;
+  server.headersTimeout = 125000;
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
     server.listen(cfg.webPort, '0.0.0.0', resolve);

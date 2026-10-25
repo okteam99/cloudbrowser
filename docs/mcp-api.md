@@ -354,6 +354,8 @@ inspect_instance和get_logs不占用浏览器执行锁；get_diagnostics也可�
 
 其他诊断事件记录事件码、错误类型、HTTP状态、脱敏URL等元信息，不记录原始console文本和响应正文。浏览器原生stderr和编码器stderr仅提取固定故障类别，不返回原始输出。日志查询和状态探测不会挤占最近500个业务操作结果的缓存；这两个只读工具失败后可重新查询。
 
+`component:tunnel` 包含连接建立及回源错误：`tunnel_origin_error` 的 `fields` 提供 `source_time`、`connection_index`、`ingress_rule`、`origin` 和 `reason`（connection_reset / connection_refused / timeout / eof / tls / other）。事件在就绪之后仍持续记录并持久化，不包含连接器 Token 或原始远程配置。MCP 出现 502 时先检查 `health`，再按发生时间查隧道与操作日志；不据传输错误直接重放未知操作。HTTP 服务端空闲连接保留 120 秒，Cloudflare Tunnel 默认连接池为 90 秒；自定义代理应先于服务端回收空闲连接。
+
 进程重启后，先前仍活跃且没有关闭记录的实例标记manager_interrupted；这表示管理进程中断，不能据此确认浏览器或宿主机的具体故障。此前未采集的事件无法追溯。整个服务不可用时需由部署方检查docker logs和docker inspect的状态摘要。
 
 ## 错误与并发

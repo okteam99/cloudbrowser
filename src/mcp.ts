@@ -6,7 +6,7 @@ import { definitions } from './tools.js';
 import { invokeTool, type Dispatch } from './tool-api.js';
 export type { Dispatch } from './tool-api.js';
 export function createMcpServer(owner: string, call: Dispatch) {
-  const server = new McpServer({ name: 'cloudbrowser', version: '0.15.2' });
+  const server = new McpServer({ name: 'cloudbrowser', version: '0.15.3' });
   for (const [name, d] of Object.entries(definitions)) {
     // SDK discovery requires an object at the root. Keep full cross-field validation in the handler.
     let inputSchema = d.schema;

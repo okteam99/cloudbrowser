@@ -113,7 +113,7 @@ export async function toolOpenApi(baseUrl: string) {
     openapi: '3.1.1',
     info: {
       title: 'cloudbrowser Tool API',
-      version: '0.15.2',
+      version: '0.15.3',
       description:
         'The HTTP and MCP adapters share browser tools, validation, instance state and operation logs.',
     },

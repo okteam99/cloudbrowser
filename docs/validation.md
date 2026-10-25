@@ -77,3 +77,9 @@ Playwright 1.64.1 的内置 UA metadata 解析没有填写品牌和版本；Chro
 `test/webrtc.test.ts` 使用本地 STUN Binding 服务作为独立网络观察端：先确认旧开关确实发送 UDP 并获得测试映射地址，再验证真实 BrowserManager 经鉴权 SOCKS5 加载页面时，页面/iframe/弹窗/刷新均不产生直连 STUN 数据包或 host/srflx 候选。HTTP 请求仍经过上游代理。此测试比只检查页面返回字符串更直接；任何只隐藏 JS 候选但仍发出 UDP 的改动都会失败。
 
 依据：[Chromium 开关区分的变更](https://chromium.googlesource.com/chromium/src/+/3d6bf17ccb45f22a9f86ce2dfc12559ea39dac74)、[Chrome 命令行到 preference 的映射](https://chromium.googlesource.com/chromium/src/+/refs/heads/main/chrome/browser/prefs/chrome_command_line_pref_store.cc)。
+
+## MCP 回源连接复用（0.15.3）
+
+`test/keepalive.test.ts` 通过真实 daemon 的 MCP HTTP POST 执行只读 health。代理侧暂停处理 I/O 跨过原来的 5 秒空闲连接边界，再复用连接：旧设置产生 ECONNRESET；服务端保留 120 秒后，同一连接可完成下一次 POST。只改服务端连接生命周期，不重放浏览器动作。
+
+隧道日志测试验证分片输出、stdout/stderr 隔离、重复摘要去重、敏感字段不保留、回源错误分类，以及 tunnel 就绪之后的错误仍可持久化并由 get_logs 查询。连接重置说明传输失败，本身不证明业务操作是否执行。

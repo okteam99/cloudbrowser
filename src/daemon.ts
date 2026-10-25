@@ -264,7 +264,9 @@ export async function daemon() {
         code: 'tunnel_starting',
         fields: { mode: cfg.quickTunnel ? 'quick' : 'named' },
       });
-      tunnel = await startCloudflareTunnel(cfg, controller.signal);
+      tunnel = await startCloudflareTunnel(cfg, controller.signal, (event) =>
+        manager.logs.log({ component: 'tunnel', ...event }),
+      );
       manager.logs.log({ component: 'tunnel', level: 'info', code: 'tunnel_ready' });
       cfg.baseUrl = tunnel.url;
       void tunnel.exited.then(() => {

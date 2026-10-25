@@ -50,6 +50,14 @@
 5. 若原操作结果不明，保留未知状态，不盲目重试提交。需要恢复时，先确认任务可中止，关闭旧实例再创建新实例；诊断工具本身不会自动取消或重试业务操作。
 6. 记录instance_id、operation_id、日志seq与时间，说明已证实事实、候选原因和缺失证据。服务完全不可达时让部署方保留docker日志和状态摘要；升级前未记录的事件无法补回。
 
+## MCP 传输故障
+
+遇到 502 / 503 / 504 或连接重置，保留客户端发生时间、HTTP 状态、CF-Ray、instance_id、已收到的 operation_id 和响应正文。`request_not_sent=false` 或没有返回结果均不能证明操作未执行。可以有限重试只读 `health` / `get_logs` / `get_operation` 来判断服务是否恢复；不要自动重放点击、提交或原业务脚本，也不要丢弃已完成的检查结果。
+
+通过 `get_logs({"component":"tunnel","level":"error","since":"带时区的发生时间"})` 排查入口回源连接错误，再按实例/操作 ID 查执行记录。已因 idle_timeout 关闭的实例需在确认恢复范围后重新创建，不能把关闭状态误报为网站故障。恢复巡检由调用方按原任务授权决定。
+
+Cloudflare 的 403/1010 与 502 回源错误是不同问题。自动监控请使用明确的应用 User-Agent（如 `CloudbrowserMonitor/1.0`），避免将安全策略拦截误判为容器崩溃；只有站点管理员可以调整 Cloudflare 规则。
+
 ## 使用平台代理
 
 需要指定国家或代理时，先调用 `list_proxies`（可按 country / protocol / status 筛选；优先 status="healthy"），再把返回的 `proxy_id` 传给 `create_instance`。如需先测出口或直接验证接口，调用 `proxy_curl`，无需启动浏览器。国家是人工标记，必须通过可信 IP 服务验证实际出口。不要把代理凭据写进 Prompt、日志或报告。修改配置不会改变已经创建的实例。

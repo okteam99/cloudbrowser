@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Config } from './config.js';
+import { tunnelDiagnosticReader, type TunnelDiagnostic } from './tunnel-diagnostics.js';
 
 export function validateTunnelConfig(cfg: Config) {
   if (!cfg.quickTunnel && !cfg.cfTunnelToken) return;
@@ -63,7 +64,11 @@ export function inferTunnelUrl(config: unknown, port: number) {
   return [...hosts][0];
 }
 
-export async function startCloudflareTunnel(cfg: Config, signal?: AbortSignal) {
+export async function startCloudflareTunnel(
+  cfg: Config,
+  signal?: AbortSignal,
+  onDiagnostic?: (event: TunnelDiagnostic) => void,
+) {
   validateTunnelConfig(cfg);
   const dir = await mkdtemp(join(tmpdir(), 'browser-mcp-tunnel-'));
   const file = join(dir, 'config.yml');
@@ -90,6 +95,7 @@ export async function startCloudflareTunnel(cfg: Config, signal?: AbortSignal) {
     { stdio: ['ignore', 'pipe', 'pipe'], env },
   );
   let stopped = false;
+  const report = tunnelDiagnosticReader(onDiagnostic);
   const exited = new Promise<void>((resolve) =>
     child.once('close', () => {
       stopped = true;
@@ -181,7 +187,8 @@ export async function startCloudflareTunnel(cfg: Config, signal?: AbortSignal) {
         cfg.tunnelStartupTimeout,
       );
       const interval = setInterval(() => void poll(), 200);
-      const read = (chunk: Buffer) => {
+      const read = (chunk: Buffer, stream: 'stdout' | 'stderr') => {
+        report(chunk, stream);
         text = (text + chunk.toString()).slice(-16384);
         const match = /Starting metrics server on (127\.0\.0\.1:\d+)\/metrics/.exec(text);
         if (match && Number(match[1].split(':')[1]) > 0) {
@@ -191,8 +198,8 @@ export async function startCloudflareTunnel(cfg: Config, signal?: AbortSignal) {
       };
       child.once('error', error);
       child.once('close', end);
-      child.stdout.on('data', read);
-      child.stderr.on('data', read);
+      child.stdout.on('data', (chunk: Buffer) => read(chunk, 'stdout'));
+      child.stderr.on('data', (chunk: Buffer) => read(chunk, 'stderr'));
       signal?.addEventListener('abort', abort, { once: true });
       if (signal?.aborted) abort();
     });
