@@ -177,7 +177,7 @@ Agent 必须支持远程 Streamable HTTP MCP 及自定义 Authorization 请求�
 }
 ```
 
-配置档明确保存完整浏览器版本、Client Hints、navigator.platform、屏幕/视口、缩放、语言列表、Intl 区域、时区、触控及逻辑核心数，避免从冻结的 Mac UA 猜测真实架构和系统版本。示例是可修改的测试声明，不是实际 Mac/手机，也不会安装对应版本的内核。
+配置档明确保存完整浏览器版本、Client Hints、navigator.platform、屏幕/视口、缩放、语言列表、Intl 区域、时区、触控及逻辑核心数，避免从冻结的 Mac UA 猜测真实架构和系统版本。示例是可修改的测试声明，不是实际 Mac/手机，也不会安装对应版本的内核。Worker 的 platform 在原生覆盖未生效时通过启动脚本补齐；字段一致不代表原型或底层实现与真机相同。
 
 打开测试页面后调用 `verify_device_profile`，传 `instance_id`、`page_id`：逐字段比较目标值与页面/Worker 实测值，实际执行 Canvas/WebGL 绘制、音频处理、Worker 与隔离页面中的本地 PDF 渲染，另外报告蓝牙、系统语音及分享接口可用性。报告区分一致、差异、无法读取、执行通过和仅报告可用性。不会伪造 webdriver、设备内存、蓝牙硬件、语音库或 GPU 能力。
 

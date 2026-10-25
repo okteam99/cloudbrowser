@@ -362,6 +362,7 @@ export async function verifyDeviceProfile(
     },
     notes: [
       'Field matches measure declared values, not physical hardware or human behavior. browser_version is the actual engine.',
+      'Worker navigator.platform uses a bootstrap getter when Chromium does not apply its native platform override. Matching property values does not guarantee identical prototypes or implementation behavior.',
       'The inspected tab is not navigated. PDF is rendered in an isolated temporary page from generated local data with external network requests blocked. No permission prompts, audio output, Bluetooth connection or share dialog are triggered. Availability/reported checks do not prove the underlying function works.',
       'Client Hints may be unavailable outside secure contexts. CSP can block Worker probes; mobile page layout can change innerWidth/innerHeight.',
       ...(!profile

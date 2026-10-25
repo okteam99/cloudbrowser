@@ -39,7 +39,7 @@
 
 ## UA Client Hints 兼容层
 
-Playwright 1.64.1 的内置 UA metadata 解析没有填写品牌和版本；Chromium 会回填内核版本。`src/user-agent.js` 是唯一的 UA 解析来源，`scripts/patch-playwright.mjs` 在 npm 安装及服务端构建时将解析函数嵌入 Playwright 的原生页面/iframe/worker 初始化位置，不使用 navigator 属性重写。
+Playwright 1.64.1 的内置 UA metadata 解析没有填写品牌和版本；Chromium 会回填内核版本。`src/user-agent.js` 是唯一的 UA 解析来源，`scripts/patch-playwright.mjs` 在 npm 安装及服务端构建时将解析函数嵌入 Playwright 的原生页面/iframe/worker 初始化位置，UA / Client Hints 通过原生覆盖设置；Worker 平台属性的兼容处理见下文。
 
 弹窗首个请求的提示可能早于目标初始化生成，因此兼容层也在 Chromium Fetch 请求继续时纠正已经存在的 UA-CH 头。仅替换 UA-CH，不修改其他头；高熵提示不主动添加；修正结果不保存为重定向头覆盖，避免把认证、Cookie 或提示授权沿用到另一来源。
 
@@ -51,7 +51,7 @@ Playwright 1.64.1 的内置 UA metadata 解析没有填写品牌和版本；Chro
 ## 完整设备档案与新无头模式（0.14）
 
 - 实例使用 channel=chromium 的完整 Chromium 新版无头模式。配置档通过本地 Playwright 协议中的专用字段传递，不编码进 UA 或 HTTP 头。
-- 平台、UA metadata、语言和 CPU 通过 Chromium 原生模拟接口设置；屏幕、视口、缩放和触摸由 context 配置。页面、弹窗、OOPIF、Worker 及首个请求均有真实浏览器回归。
+- 页面平台、UA metadata、语言和 CPU 通过 Chromium 原生模拟接口设置；Linux Chromium 对 Worker 平台字段的遗漏通过 Worker 执行前的 getter 补齐（不隐藏该脚本模拟性质）；屏幕、视口、缩放和触摸由 context 配置。页面、弹窗、OOPIF、Worker 及首个请求均有真实浏览器回归。
 - 兼容层保存原始 dependency bundle 后幂等应用补丁；从旧版开发环境升级时先 npm ci。升级 Playwright 仍需审查版本、源码校验和锚点。
 - verify_device_profile 对字段和能力分开计数，记录不支持、CSP限制和超时；webdriver、内存、PDF、蓝牙、语音等期望值不通过假对象覆盖。
 - 核验历史通过原有受认证详情接口显示；旧记录无配置档时显示未配置，不能标成新版运行模式。

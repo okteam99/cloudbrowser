@@ -106,7 +106,7 @@
 
 `client_hints.brands` 和 `full_version_list` 可选，但必须同时提供，格式与浏览器 `brands` / `fullVersionList` 相同；省略时按 UA 品牌和明确的 full_version 生成。UA 与 Client Hints 必须保持 Chromium 主版本、平台和移动标记一致。viewport 必须放得进 screen。语言列表最多8项且不得重复；locale 用于 Intl 格式，languages 用于 navigator.language/languages 和 Accept-Language，两者可以不同。
 
-`expectations` 是要比较的真实能力，不会覆盖浏览器返回值。支持 device_memory、webdriver、pdf_viewer、bluetooth、web_share、audio_sample_rate、speech_voices_min、webgl。未配置的期望不参与差异判定。设备档案只模拟声明；实际操作系统、浏览器内核、硬件和网络不因此改变。
+`expectations` 是要比较的真实能力，不会覆盖浏览器返回值。支持 device_memory、webdriver、pdf_viewer、bluetooth、web_share、audio_sample_rate、speech_voices_min、webgl。未配置的期望不参与差异判定。设备档案只模拟声明；实际操作系统、浏览器内核、硬件和网络不因此改变。Chromium 在 Linux 上未将平台覆盖应用到 WorkerNavigator，服务在 Worker 脚本执行前补齐 platform getter；这属于可观测的脚本模拟，不保证原型或函数行为与真机一致。
 
 ## 设备字段与能力核验
 

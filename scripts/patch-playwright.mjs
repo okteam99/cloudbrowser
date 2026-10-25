@@ -6,7 +6,7 @@ import { userAgentMetadata, clientHintHeaders } from '../src/user-agent.js';
 
 // Playwright 1.64.1 does not expose userAgentMetadata as a public context option.
 // Its built-in hook already runs before navigation for every page and OOPIF,
-// and for workers. Replace only its incomplete UA parser, not CDP lifecycle code.
+// and for workers. Configure the selected identity before target scripts start.
 // Fail closed on a dependency change instead of silently losing this behavior.
 const require = createRequire(import.meta.url);
 const root = dirname(require.resolve('playwright-core/package.json'));
@@ -102,10 +102,13 @@ replaceOnce(
   'if (options.hasTouch)\n            promises2.push(this._client.send("Emulation.setTouchEmulationEnabled", { enabled: true }));',
   'if (options.cloudbrowserDeviceProfile?.hardwareConcurrency)\n            promises2.push(this._client.send("Emulation.setHardwareConcurrencyOverride", { hardwareConcurrency: options.cloudbrowserDeviceProfile.hardwareConcurrency }));\n          if (options.hasTouch)\n            promises2.push(this._client.send("Emulation.setTouchEmulationEnabled", { enabled: true }));',
 );
-// Dedicated workers inherit UA settings, but CPU override is target-scoped.
+// Dedicated workers need target-scoped UA/language/CPU settings. Chromium does
+// not apply the platform override to WorkerNavigator on Linux; fill that one
+// declared property before worker scripts start. This is visible script
+// emulation, not a claim that the Worker is a native macOS runtime.
 replaceOnce(
   'session._sendMayFail("Runtime.runIfWaitingForDebugger");\n        session._sendMayFail("Target.setAutoAttach",',
-  'const options = this._crPage._browserContext._options;\n        const profile = options.cloudbrowserDeviceProfile;\n        const configured = profile ? Promise.all([session.send("Emulation.setUserAgentOverride", { userAgent: options.userAgent, platform: profile.platform, acceptLanguage: profile.languages.join(","), userAgentMetadata: calculateUserAgentMetadata(options) }), ...(profile.hardwareConcurrency ? [session.send("Emulation.setHardwareConcurrencyOverride", { hardwareConcurrency: profile.hardwareConcurrency })] : [])]) : Promise.resolve();\n        configured.catch(() => {}).finally(() => session._sendMayFail("Runtime.runIfWaitingForDebugger"));\n        session._sendMayFail("Target.setAutoAttach",',
+  'const options = this._crPage._browserContext._options;\n        const profile = options.cloudbrowserDeviceProfile;\n        const configured = profile ? Promise.all([session.send("Emulation.setUserAgentOverride", { userAgent: options.userAgent, platform: profile.platform, acceptLanguage: profile.languages.join(","), userAgentMetadata: calculateUserAgentMetadata(options) }), ...(profile.hardwareConcurrency ? [session.send("Emulation.setHardwareConcurrencyOverride", { hardwareConcurrency: profile.hardwareConcurrency })] : [])]) : Promise.resolve();\n        configured.then(async () => { if (profile) { const result = await session.send("Runtime.evaluate", { expression: `if (navigator.platform !== ${JSON.stringify(profile.platform)}) Object.defineProperty(Object.getPrototypeOf(navigator), "platform", { get: () => ${JSON.stringify(profile.platform)}, configurable: true, enumerable: true }); true` }); if (result.exceptionDetails) throw new Error("Worker platform emulation failed"); } }).catch(() => {}).finally(() => session._sendMayFail("Runtime.runIfWaitingForDebugger"));\n        session._sendMayFail("Target.setAutoAttach",',
 );
 await writeFile(file, patched);
 console.log('Playwright UA-CH metadata now follows the configured UA.');
