@@ -69,3 +69,11 @@ Playwright 1.64.1 的内置 UA metadata 解析没有填写品牌和版本；Chro
 - 真实 Chromium 验证明确选择档案加 UA、仅 UA 自动选择、内联档案加 UA：首个请求、早期脚本、弹窗、iframe、Worker、连续调用和刷新均使用覆盖后的 UA 与新提示，其他设备属性保持档案值，历史保存生效快照，后台模板不被改写。
 - 按系统优先选启用的 is_default，未标记时按目录顺序选同系统第一份；验证重复默认项拒绝、停用项排除、旧 JSON 缺省兼容、无匹配时保留 UA 模式且说明结果。
 - 不透明 UA 覆盖档案时不残留旧 Chromium 提示；未指定 UA/档案的原生环境保持原样。
+
+## WebRTC 代理旁路回归（0.15.2）
+
+完整 Chromium 与独立 headless shell 使用不同的 WebRTC 策略开关。0.14 切换完整 Chromium 后，旧的 `--force-webrtc-ip-handling-policy` 未设置 Chrome 的 profile preference，导致 STUN UDP 仍可从宿主机直连。改用 `--webrtc-ip-handling-policy=disable_non_proxied_udp`；保留正常 WebRTC API，不伪造候选 IP。
+
+`test/webrtc.test.ts` 使用本地 STUN Binding 服务作为独立网络观察端：先确认旧开关确实发送 UDP 并获得测试映射地址，再验证真实 BrowserManager 经鉴权 SOCKS5 加载页面时，页面/iframe/弹窗/刷新均不产生直连 STUN 数据包或 host/srflx 候选。HTTP 请求仍经过上游代理。此测试比只检查页面返回字符串更直接；任何只隐藏 JS 候选但仍发出 UDP 的改动都会失败。
+
+依据：[Chromium 开关区分的变更](https://chromium.googlesource.com/chromium/src/+/3d6bf17ccb45f22a9f86ce2dfc12559ea39dac74)、[Chrome 命令行到 preference 的映射](https://chromium.googlesource.com/chromium/src/+/refs/heads/main/chrome/browser/prefs/chrome_command_line_pref_store.cc)。

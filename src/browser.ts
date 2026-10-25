@@ -576,7 +576,9 @@ export class BrowserManager {
         proxy: { server: `http://127.0.0.1:${gateway.port}`, bypass: '<-loopback>' },
         args: [
           '--disable-quic',
-          '--force-webrtc-ip-handling-policy=disable_non_proxied_udp',
+          // Full Chromium reads the Chrome preference switch. The old
+          // --force-webrtc-* switch only configures the separate headless shell.
+          '--webrtc-ip-handling-policy=disable_non_proxied_udp',
           '--disable-background-networking',
           '--disable-features=DnsOverHttps',
         ],
@@ -1322,7 +1324,7 @@ export class BrowserManager {
     if (name === 'health')
       return {
         status: 'ok',
-        version: '0.15.1',
+        version: '0.15.2',
         base_url: this.cfg.baseUrl,
         public_url_mode: this.cfg.quickTunnel
           ? 'quick_tunnel'

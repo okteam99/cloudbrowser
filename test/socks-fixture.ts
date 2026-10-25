@@ -40,6 +40,12 @@ export function socksFixture(onConnect: () => void) {
           if (pending.length < 10) return;
           host = Array.from(pending.subarray(4, 8)).join('.');
           end = 8;
+        } else if (pending[3] === 4) {
+          if (pending.length < 22) return;
+          host = Array.from({ length: 8 }, (_, n) =>
+            pending.readUInt16BE(4 + n * 2).toString(16),
+          ).join(':');
+          end = 20;
         } else if (pending[3] === 3) {
           if (pending.length < 7 + pending[4]) return;
           host = pending.subarray(5, 5 + pending[4]).toString();

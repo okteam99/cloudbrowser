@@ -157,6 +157,7 @@ Agent 必须支持远程 Streamable HTTP MCP 及自定义 Authorization 请求�
 - 每个实例独立浏览器进程和会话；新标签页继承同一代理和设备环境。
 - 支持 `http://`、`https://` 上游与 `socks5://`，凭据通过独立字段传入。
 - 省略 proxy 是明确的直连模式；指定代理失败不会回退直连。
+- WebRTC 使用完整 Chromium 的原生 `disable_non_proxied_udp` 策略，阻止绕过代理的 UDP / STUN 出口。浏览器通过本机 HTTP CONNECT 网关使用上游 HTTP/SOCKS5；无法转发的 WebRTC 连接会受限，检测页可能显示 `n/a`，不会伪造代理 IP 或替换网页的 WebRTC API。普通网页仍使用所选代理。策略在启动时设置，升级后需新建实例。
 - 环境参数创建后固定，切换环境需新建实例。
 - 传入 Chromium UA 后，自动按 UA 生成 Client Hints 的品牌、主/完整版本、平台、机型和移动标记；无需额外参数。例如 Chrome/130.0.0.0 对应版本提示 130 / 130.0.0.0。
 - `browser_version` 返回实际运行的 Chromium 内核版本，`user_agent_metadata` 返回自动生成的声明；UA 配置不会安装或切换内核。`verify_environment.actual.client_hints` 可核对目标页面实际读到的提示。
@@ -468,10 +469,10 @@ bash scripts/publish-docker.sh
 ## 源码构建及 stdio 接入
 
 ```sh
-docker build -t cloudbrowser:0.15.1 .
+docker build -t cloudbrowser:0.15.2 .
 ```
 
-将一行部署命令最后的镜像名换成 `cloudbrowser:0.15.1` 即可本地使用。
+将一行部署命令最后的镜像名换成 `cloudbrowser:0.15.2` 即可本地使用。
 
 兼容配置见 [本地 stdio](examples/mcp.local.json)、[SSH stdio](examples/mcp.ssh.json)。仍使用 `docker exec -i`，不得使用 `-t`。MCP_PRINCIPAL 是可信 SSH/Docker 接入中的命名空间，不是独立认证。
 

@@ -64,6 +64,12 @@
 
 ## 完整设备配置档
 
+### WebRTC 网络出口
+
+实例在完整 Chromium 启动时设置 `--webrtc-ip-handling-policy=disable_non_proxied_udp`，禁止 WebRTC 绕过代理直接发送 UDP / STUN。实际浏览器先连接本机 HTTP CONNECT 网关，再使用所选上游 HTTP/SOCKS5；代理无法承载的 WebRTC 路径不回退为直连 UDP。WebRTC 检测可能得到 `n/a`，这不代表 HTTP 代理失效，也不保证能显示代理出口 IP。服务不伪造候选地址或替换页面 API。运行中实例不会因修改配置获得新启动参数，更新后请新建实例复测。
+
+### 设备档案选择
+
 管理员在 **系统设置 → 设备档案** 编辑 JSON 数组；每项为 `{ "profile_id": "自定义唯一ID", "enabled": true, "is_default": false, "profile": { ...完整设备字段... } }`。ID 为 1–100 位英文字母、数字、下划线或连字符，首位为字母/数字。最多 100 份；重复 ID、UA / Client Hints 冲突、无效语言/时区等会被拒绝，并返回具体字段路径。保存后新实例立即可用，重启后保留；空数组表示没有可选档案，不会重新补入示例。
 
 首次初始化提供 `macos-arm-chrome155`、`android-pixel8-chrome155` 两份可编辑示例。`list_device_profiles` 返回当前配置而非固定枚举，每项包含 `profile_id`、`enabled`、`is_default`、`default_for_platform`（当前系统实际默认项）、`kind=configured`、`revision`、完整 `profile`。默认只返回启用项；传 `enabled_only:false` 可查看停用档案。`platform` 可为 macOS / Windows / Linux / Android / Chrome OS，`query` 按 ID 或名称匹配，不区分大小写。`get_device_profile` 可读取单份启用或停用档案。两个接口均不启动浏览器、不发送外部请求。
