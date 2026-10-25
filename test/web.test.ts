@@ -297,7 +297,7 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
       await page.getByRole('tab', { name: 'API 文档', exact: true }).click();
       await page.getByLabel('API 地址', { exact: true }).waitFor();
       assert.equal(await page.getByLabel('API 地址', { exact: true }).inputValue(), base + '/api');
-      await page.getByText('接口参考 · 42 项能力', { exact: true }).waitFor();
+      await page.getByText('接口参考 · 44 项能力', { exact: true }).waitFor();
       await page.getByRole('button', { name: '复制 API 接入信息' }).click();
       const apiPrompt = await page.evaluate(() => navigator.clipboard.readText());
       assert.ok(apiPrompt.includes(base + '/docs/agent-guide.md'));
@@ -422,7 +422,7 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
         requestInit: { headers: auth },
       }),
     );
-    assert.equal((await client.listTools()).tools.length, 42);
+    assert.equal((await client.listTools()).tools.length, 44);
     const savedList: any = await client.callTool({
       name: 'list_proxies',
       arguments: { protocol: 'socks5', country: 'US' },
@@ -445,7 +445,13 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
       return JSON.parse(r.content[0].text);
     };
     const taskDescription = '验证移动端页面与下载流程 <任务目标>';
+    const profile = (await call('list_device_profiles')).data.find(
+      (p: any) => p.profile_id === 'android-pixel8-chrome155',
+    ).profile;
+    profile.name = '设备配置界面回归';
+    profile.viewport = { width: 390, height: 844 };
     const result = await call('create_instance', {
+      device_profile: profile,
       task_description: taskDescription,
       viewport: { width: 390, height: 844 },
       mobile: { enabled: true, touch: true, device_scale_factor: 2 },
@@ -533,6 +539,8 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     await call('navigate', { ...ids, url: fixtureUrl + '/?token=complete-url#original' });
     await call('screenshot', ids);
     await call('interact', { ...ids, action: 'click', target: { role: 'button', name: 'Change' } });
+    const profileReport = await call('verify_device_profile', ids);
+    assert.equal(profileReport.status, 'succeeded', JSON.stringify(profileReport));
     viewer = await chromium.launch({ headless: true });
     const viewerContext = await viewer.newContext({ viewport: { width: 1280, height: 900 } });
     await viewerContext.addCookies([
@@ -571,6 +579,11 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
         result.data.actual.user_agent,
       ),
     );
+    const profileCard = detailPage.locator('.device-profile-card');
+    await profileCard.getByText('设备配置界面回归', { exact: true }).waitFor();
+    await profileCard.getByRole('tab', { name: '实际能力', exact: true }).click();
+    await profileCard.getByText('Canvas 绘制与读取', { exact: true }).waitFor();
+    await profileCard.getByText('Worker 执行', { exact: true }).waitFor();
     await tokenContext.grantPermissions(['clipboard-read', 'clipboard-write']);
     await detailPage.getByRole('button', { name: '复制详情链接' }).click();
     assert.equal(await detailPage.evaluate(() => navigator.clipboard.readText()), detailUrl);
@@ -777,6 +790,11 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     assert.equal(closedDetails.current, null);
     assert.equal(closedDetails.instance.status, 'closed');
     assert.equal(closedDetails.instance.properties.viewport.width, 390);
+    assert.equal(closedDetails.instance.environment.device_profile.name, '设备配置界面回归');
+    assert.equal(
+      closedDetails.instance.environment.device_verification.profile_name,
+      '设备配置界面回归',
+    );
     const tokenVideo = await fetch(
       `${base}/api/recordings/${history[0].id}/video?access_token=${accessToken}`,
       { headers: { Range: 'bytes=0-3' } },

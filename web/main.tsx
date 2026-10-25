@@ -339,7 +339,7 @@ function Dashboard() {
                 <span className="status-dot" />
                 远程浏览器服务
               </div>
-              <Text>cloudbrowser · v0.13.1</Text>
+              <Text>cloudbrowser · v0.14.0</Text>
             </div>
           </Layout.Sider>
         )}

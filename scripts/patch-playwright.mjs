@@ -14,7 +14,17 @@ const pkg = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
 if (pkg.version !== '1.64.1')
   throw new Error('Review UA-CH compatibility patch for new Playwright version');
 const file = join(root, 'lib/coreBundle.js');
-const source = await readFile(file, 'utf8');
+const pristine = join(root, 'lib/coreBundle.cloudbrowser-original.js');
+let source;
+try {
+  source = await readFile(pristine, 'utf8');
+} catch (error) {
+  if (error.code !== 'ENOENT') throw error;
+  source = await readFile(file, 'utf8');
+  if (source.includes('/* cloudbrowser UA-CH compatibility */'))
+    throw new Error('Run npm ci once to refresh the previous UA compatibility patch');
+  await writeFile(pristine, source, { flag: 'wx' });
+}
 const start = source.indexOf('function calculateUserAgentMetadata(options) {');
 const end = source.indexOf('\nvar kCrashingWebUIHosts', start);
 if (start < 0 || end < 0) throw new Error('Playwright UA-CH hook not found');
@@ -49,28 +59,53 @@ function replaceOnce(before, after) {
 // Normalize only UA-CH at the native Fetch continuation, retaining per-hop
 // browser headers. Do not save normalized headers in _alreadyContinuedParams:
 // that would replay Cookie/Authorization or high-entropy opt-ins on redirects.
-const requestHeaders = (headers, ua) =>
-  `headersObjectToArray(cloudbrowserClientHintHeaders(${headers}, ${ua}))`;
+const requestHeaders = (headers, ua, profile) =>
+  `headersObjectToArray(cloudbrowserClientHintHeaders(${headers}, ${ua}, ${profile}))`;
 const contextUA = '(this._page || this._serviceWorker).browserContext._options.userAgent';
+const contextProfile =
+  '(this._page || this._serviceWorker).browserContext._options.cloudbrowserDeviceProfile';
 replaceOnce(
   'route2 = new RouteImpl(requestPausedSessionInfo.session, requestPausedEvent.requestId);',
-  `route2 = new RouteImpl(requestPausedSessionInfo.session, requestPausedEvent.requestId, ${contextUA}, requestPausedEvent.request.headers);`,
+  `route2 = new RouteImpl(requestPausedSessionInfo.session, requestPausedEvent.requestId, ${contextUA}, requestPausedEvent.request.headers, ${contextProfile});`,
 );
 replaceOnce(
   'RouteImpl = class {\n      constructor(session, interceptionId) {\n        this._fulfilled = false;',
-  'RouteImpl = class {\n      constructor(session, interceptionId, cloudbrowserUA, cloudbrowserHeaders) {\n        this._cloudbrowserUA = cloudbrowserUA;\n        this._cloudbrowserHeaders = cloudbrowserHeaders;\n        this._fulfilled = false;',
+  'RouteImpl = class {\n      constructor(session, interceptionId, cloudbrowserUA, cloudbrowserHeaders, cloudbrowserProfile) {\n        this._cloudbrowserUA = cloudbrowserUA;\n        this._cloudbrowserProfile = cloudbrowserProfile;\n        this._cloudbrowserHeaders = cloudbrowserHeaders;\n        this._fulfilled = false;',
 );
 replaceOnce(
   'await this._session.send("Fetch.continueRequest", this._alreadyContinuedParams);',
-  `await this._session.send("Fetch.continueRequest", { ...this._alreadyContinuedParams, headers: this._cloudbrowserUA ? ${requestHeaders('this._alreadyContinuedParams.headers ? Object.fromEntries(this._alreadyContinuedParams.headers.map(h => [h.name, h.value])) : this._cloudbrowserHeaders', 'this._cloudbrowserUA')} : this._alreadyContinuedParams.headers });`,
+  `await this._session.send("Fetch.continueRequest", { ...this._alreadyContinuedParams, headers: this._cloudbrowserUA ? ${requestHeaders('this._alreadyContinuedParams.headers ? Object.fromEntries(this._alreadyContinuedParams.headers.map(h => [h.name, h.value])) : this._cloudbrowserHeaders', 'this._cloudbrowserUA', 'this._cloudbrowserProfile')} : this._alreadyContinuedParams.headers });`,
 );
 replaceOnce(
   'requestPausedSessionInfo.session._sendMayFail("Fetch.continueRequest", { requestId: requestPausedEvent.requestId, headers: headersOverride });',
-  `requestPausedSessionInfo.session._sendMayFail("Fetch.continueRequest", { requestId: requestPausedEvent.requestId, headers: ${contextUA} ? ${requestHeaders('headersOverride ? Object.fromEntries(headersOverride.map(h => [h.name, h.value])) : requestPausedEvent.request.headers', contextUA)} : headersOverride });`,
+  `requestPausedSessionInfo.session._sendMayFail("Fetch.continueRequest", { requestId: requestPausedEvent.requestId, headers: ${contextUA} ? ${requestHeaders('headersOverride ? Object.fromEntries(headersOverride.map(h => [h.name, h.value])) : requestPausedEvent.request.headers', contextUA, contextProfile)} : headersOverride });`,
 );
 replaceOnce(
   '...alreadyContinuedParams,\n              requestId: event.requestId',
-  `...alreadyContinuedParams,\n              headers: ${contextUA} ? ${requestHeaders('alreadyContinuedParams.headers ? Object.fromEntries(alreadyContinuedParams.headers.map(h => [h.name, h.value])) : event.request.headers', contextUA)} : alreadyContinuedParams.headers,\n              requestId: event.requestId`,
+  `...alreadyContinuedParams,\n              headers: ${contextUA} ? ${requestHeaders('alreadyContinuedParams.headers ? Object.fromEntries(alreadyContinuedParams.headers.map(h => [h.name, h.value])) : event.request.headers', contextUA, contextProfile)} : alreadyContinuedParams.headers,\n              requestId: event.requestId`,
+);
+// Pass a bounded, validated profile through Playwright's local protocol. It is
+// never carried in a URL, User-Agent string, or custom HTTP header.
+replaceOnce(
+  'scheme.BrowserNewContextParams = tObject({',
+  'scheme.BrowserNewContextParams = tObject({\n      cloudbrowserDeviceProfile: tOptional(tAny),',
+);
+// Both page/OOPIF and service-worker UA initialization use these fields.
+const uaFields =
+  'acceptLanguage: options.locale,\n          userAgentMetadata: calculateUserAgentMetadata(options)';
+if (patched.split(uaFields).length !== 3) throw new Error('Playwright UA override sites changed');
+patched = patched.replaceAll(
+  uaFields,
+  'acceptLanguage: options.cloudbrowserDeviceProfile?.languages?.join(",") || options.locale,\n          platform: options.cloudbrowserDeviceProfile?.platform,\n          userAgentMetadata: calculateUserAgentMetadata(options)',
+);
+replaceOnce(
+  'if (options.hasTouch)\n            promises2.push(this._client.send("Emulation.setTouchEmulationEnabled", { enabled: true }));',
+  'if (options.cloudbrowserDeviceProfile?.hardwareConcurrency)\n            promises2.push(this._client.send("Emulation.setHardwareConcurrencyOverride", { hardwareConcurrency: options.cloudbrowserDeviceProfile.hardwareConcurrency }));\n          if (options.hasTouch)\n            promises2.push(this._client.send("Emulation.setTouchEmulationEnabled", { enabled: true }));',
+);
+// Dedicated workers inherit UA settings, but CPU override is target-scoped.
+replaceOnce(
+  'session._sendMayFail("Runtime.runIfWaitingForDebugger");\n        session._sendMayFail("Target.setAutoAttach",',
+  'const options = this._crPage._browserContext._options;\n        const profile = options.cloudbrowserDeviceProfile;\n        const configured = profile ? Promise.all([session.send("Emulation.setUserAgentOverride", { userAgent: options.userAgent, platform: profile.platform, acceptLanguage: profile.languages.join(","), userAgentMetadata: calculateUserAgentMetadata(options) }), ...(profile.hardwareConcurrency ? [session.send("Emulation.setHardwareConcurrencyOverride", { hardwareConcurrency: profile.hardwareConcurrency })] : [])]) : Promise.resolve();\n        configured.catch(() => {}).finally(() => session._sendMayFail("Runtime.runIfWaitingForDebugger"));\n        session._sendMayFail("Target.setAutoAttach",',
 );
 await writeFile(file, patched);
 console.log('Playwright UA-CH metadata now follows the configured UA.');

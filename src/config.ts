@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { z } from 'zod';
+import { deviceProfileSchema, deviceProfileIds } from './device-profile.js';
 
 export const proxySchema = z
   .object({
@@ -33,6 +34,17 @@ export const createSchema = z
       .max(1000)
       .describe('Task objective shown in the console and retained with instance history.')
       .optional(),
+    device_profile_id: z
+      .enum(deviceProfileIds)
+      .optional()
+      .describe(
+        'Example profile from list_device_profiles. Device profile values override legacy UA/viewport/mobile/locale/timezone parameters.',
+      ),
+    device_profile: deviceProfileSchema
+      .optional()
+      .describe(
+        'Complete inline device profile. Mutually exclusive with device_profile_id. Applied declarations and measured capabilities are reported separately.',
+      ),
     storage_state_id: z
       .string()
       .min(1)
@@ -69,6 +81,10 @@ export const createSchema = z
     max_lifetime_seconds: z.number().int().min(60).max(14400).default(3600),
   })
   .strict()
+  .refine(
+    (v) => !(v.device_profile && v.device_profile_id),
+    'Specify device_profile or device_profile_id, not both',
+  )
   .refine(
     (v) => [v.proxy, v.proxy_id, v.proxy_ref].filter((x) => x !== undefined).length <= 1,
     'Specify at most one proxy, proxy_id or proxy_ref',

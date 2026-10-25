@@ -46,3 +46,12 @@ Playwright 1.64.1 的内置 UA metadata 解析没有填写品牌和版本；Chro
 兼容层严格锁定 Playwright 1.64.1，并检查原函数 SHA 和请求处理锚点。升级 Playwright 时必须审查兼容层；不匹配会使安装/构建失败。不要使用 `npm ci --ignore-scripts` 后直接运行旧构建。Docker 构建也执行兼容层，保留现有内核及网络策略。
 
 `test/user-agent.test.ts` 使用真实 Chromium 和本地 HTTP 接收端校验：首个请求、Accept-CH 完整版本、页面早期 JS、普通新 Tab、弹窗、同源/跨站 iframe、Worker、刷新、跨站跳转不携带原站认证/Cookie、多实例隔离、原生 UA、未知 UA、环境核验及历史保存。Worker 脚本请求可以不带 UA-CH；测试不为此强行添加头。
+
+
+## 完整设备档案与新无头模式（0.14）
+
+- 实例使用 channel=chromium 的完整 Chromium 新版无头模式。配置档通过本地 Playwright 协议中的专用字段传递，不编码进 UA 或 HTTP 头。
+- 平台、UA metadata、语言和 CPU 通过 Chromium 原生模拟接口设置；屏幕、视口、缩放和触摸由 context 配置。页面、弹窗、OOPIF、Worker 及首个请求均有真实浏览器回归。
+- 兼容层保存原始 dependency bundle 后幂等应用补丁；从旧版开发环境升级时先 npm ci。升级 Playwright 仍需审查版本、源码校验和锚点。
+- verify_device_profile 对字段和能力分开计数，记录不支持、CSP限制和超时；webdriver、内存、PDF、蓝牙、语音等期望值不通过假对象覆盖。
+- 核验历史通过原有受认证详情接口显示；旧记录无配置档时显示未配置，不能标成新版运行模式。

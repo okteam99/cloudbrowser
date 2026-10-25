@@ -36,6 +36,14 @@ import { readStorageState, storageLimit, deadline } from './browser-state.js';
 import sharp from 'sharp';
 import { operatingSystem, type BrowserEnvironment } from './browser-environment.js';
 import { userAgentMetadata } from './user-agent.js';
+import {
+  resolveDeviceProfile,
+  profileMetadata,
+  protocolProfile,
+  acceptLanguage,
+  listDeviceProfiles,
+} from './device-profile.js';
+import { verifyDeviceProfile, type DeviceVerification } from './device-verification.js';
 import { SystemSettings } from './system-settings.js';
 import {
   instanceDetailsUrl,
@@ -71,6 +79,7 @@ type Instance = {
   userAgent?: string;
   proxyCountry?: string;
   environment?: BrowserEnvironment;
+  deviceVerification?: DeviceVerification;
   egress?: { ip: string; source: 'instance_check'; checked_at: string };
   pages: Map<string, PageEntry>;
   pageData: Map<string, PageData>;
@@ -379,7 +388,12 @@ export class BrowserManager {
       storage_state_id: i.options.storage_state_id,
       user_agent: i.userAgent ?? i.options.user_agent ?? 'browser default',
       browser_version: i.browser.version(),
-      user_agent_metadata: userAgentMetadata({ userAgent: i.options.user_agent }) ?? null,
+      browser_mode: 'chromium_new_headless',
+      device_profile: i.options.device_profile ?? null,
+      device_verification: i.deviceVerification ?? null,
+      user_agent_metadata: i.options.device_profile
+        ? profileMetadata(i.options.device_profile)
+        : (userAgentMetadata({ userAgent: i.options.user_agent }) ?? null),
       country: i.proxyCountry ?? null,
       country_source: i.proxyCountry ? ('proxy_config' as const) : ('unknown' as const),
       egress,
@@ -410,7 +424,10 @@ export class BrowserManager {
       captured_at: new Date().toISOString(),
       user_agent: userAgent,
       browser_version: current.browser_version,
+      browser_mode: current.browser_mode,
       user_agent_metadata: current.user_agent_metadata,
+      device_profile: current.device_profile,
+      device_verification: i.deviceVerification ?? null,
       os: operatingSystem(userAgent),
       country: i.proxyCountry ?? null,
       country_source: i.proxyCountry ? 'proxy_config' : 'unknown',
@@ -468,6 +485,20 @@ export class BrowserManager {
     });
     try {
       const options = createSchema.parse(raw);
+      const profile = resolveDeviceProfile(options);
+      if (profile)
+        Object.assign(options, {
+          device_profile: profile,
+          user_agent: profile.user_agent,
+          viewport: profile.viewport,
+          locale: profile.locale,
+          timezone: profile.timezone,
+          mobile: {
+            enabled: profile.mobile,
+            touch: profile.touch,
+            device_scale_factor: profile.device_scale_factor,
+          },
+        });
       this.logs.update(id, { task_description: options.task_description });
       const proxy = await this.resolveProxy(options);
       const proxyId = options.proxy_id ?? options.proxy_ref;
@@ -488,6 +519,7 @@ export class BrowserManager {
         handleSIGTERM: false,
         handleSIGHUP: false,
         headless: true,
+        channel: 'chromium',
         chromiumSandbox: process.env.CHROMIUM_SANDBOX === 'true',
         timeout: 30000,
         downloadsPath: dir,
@@ -544,18 +576,24 @@ export class BrowserManager {
         }
       });
       browser = await chromium.connect(server.wsEndpoint(), { timeout: 30000 });
-      const context = await browser.newContext({
+      const contextOptions = {
         userAgent: options.user_agent,
         viewport: options.viewport,
+        screen: profile?.screen,
+        cloudbrowserDeviceProfile: profile ? protocolProfile(profile) : undefined,
+        extraHTTPHeaders: profile
+          ? { 'Accept-Language': acceptLanguage(profile.languages) }
+          : undefined,
         isMobile: options.mobile?.enabled ?? false,
         hasTouch: options.mobile?.touch ?? false,
         deviceScaleFactor: options.mobile?.device_scale_factor ?? 1,
         locale: options.locale,
         timezoneId: options.timezone,
         acceptDownloads: true,
-        serviceWorkers: 'block',
+        serviceWorkers: 'block' as const,
         storageState: storage,
-      });
+      };
+      const context = await browser.newContext(contextOptions);
       context.setDefaultTimeout(this.cfg.timeout);
       context.setDefaultNavigationTimeout(this.cfg.timeout);
       // Reject local schemes and redirects before request execution; the gateway also validates each destination.
@@ -1119,6 +1157,7 @@ export class BrowserManager {
     operationId: string,
     instanceId?: string,
   ): Promise<any> {
+    if (name === 'list_device_profiles') return listDeviceProfiles();
     if (
       [
         'get_instance',
@@ -1232,7 +1271,7 @@ export class BrowserManager {
     if (name === 'health')
       return {
         status: 'ok',
-        version: '0.13.1',
+        version: '0.14.0',
         base_url: this.cfg.baseUrl,
         public_url_mode: this.cfg.quickTunnel
           ? 'quick_tunnel'
@@ -1420,6 +1459,31 @@ export class BrowserManager {
     }
   }
   private async action(i: Instance, name: string, a: any): Promise<any> {
+    if (name === 'verify_device_profile') {
+      const p = this.page(i, a.page_id);
+      if (p.requiresReload)
+        throw new ToolError('PAGE_RELOAD_REQUIRED', 'Reload this tab before another verification.');
+      const session = await i.context.newCDPSession(p.page);
+      try {
+        const result = await verifyDeviceProfile(
+          p.page,
+          a.page_id,
+          i.browser,
+          i.options.device_profile,
+        );
+        i.deviceVerification = result;
+        await this.persistEnvironment(i);
+        return { instance_id: i.id, ...result };
+      } catch (error) {
+        if (error instanceof ToolError && error.code === 'TIMEOUT') {
+          p.requiresReload = true;
+          await session.send('Runtime.terminateExecution').catch(() => {});
+        }
+        throw error;
+      } finally {
+        await session.detach().catch(() => {});
+      }
+    }
     if (name === 'save_storage_state') {
       const state = await i.context.storageState({ indexedDB: a.indexed_db ?? false });
       const bytes = Buffer.from(JSON.stringify(state));

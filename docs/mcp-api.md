@@ -1,4 +1,4 @@
-# 共用工具参考 V0.13.1（MCP & API）
+# 共用工具参考 V0.14（MCP & API）
 
 推荐使用 `BASE_URL/mcp` 的 Streamable HTTP，携带 `Authorization: Bearer <登录网页自动生成的 Token>`。网页登录后可复制完整配置。兼容 MCP stdio，通过 SSH 或 docker exec 接入。HTTP 调用共享 web principal，stdio 仍按 MCP_PRINCIPAL 隔离。
 
@@ -25,7 +25,9 @@
 | `health` | `{}` | 服务状态与容量 |
 | `list_proxies` | 可选 country（两位大写国家码）、protocol（socks5/http/https）、enabled_only（默认true）、status（healthy/unhealthy/unknown/checking/disabled） | proxy_id、兼容 proxy_ref、名称、地址、国家、启用状态、status、health（checked_at / next_check_at / latency_ms / observed_ip / http_status / error_code / checking）、鉴权标记；不返回用户名或密码 |
 | `check_proxy` | proxy、proxy_id、proxy_ref 三选一；可选 check_url | 临时浏览器查询出口，始终清理；不验证国家 |
-| `create_instance` | 可选 task_description（1–1000字符）、storage_state_id、UA、viewport、proxy/proxy_id/proxy_ref、mobile、locale、timezone、生命周期 | instance_id、details_url、task_description、pages、实际设备属性、警告 |
+| `list_device_profiles` | `{}` | 完整示例 profile；可按 profile_id 使用或复制后修改 |
+| `verify_device_profile` | instance_id、page_id | 字段对比、实际能力检测及最新报告，保留到实例历史 |
+| `create_instance` | 可选 device_profile / device_profile_id（二选一）、 task_description（1–1000字符）、storage_state_id、UA、viewport、proxy/proxy_id/proxy_ref、mobile、locale、timezone、生命周期 | instance_id、details_url、task_description、pages、实际设备属性、警告 |
 | `get_instance` | instance_id | 配置和页面，隐藏凭据 |
 | `list_instances` | `{}` | 同 principal 的实例 |
 | `verify_environment` | instance_id；可选 check_url | 实际设备属性、IP 查询响应；不自动判断国家 |
@@ -51,13 +53,79 @@
 
 `create_instance.user_agent` 自动生成 Chromium UA Client Hints，不需要另传参数。HTTP API 和 MCP 行为一致；新建标签页、弹窗及 iframe 使用同一实例的声明，Worker 的 JS 提示也随 UA 设置。
 
-例如上述 Android UA 会生成 `Chromium` / `Google Chrome` 主版本 `130`、完整版本 `130.0.0.0`、`platform=Android`、`platformVersion=14`、`model=Pixel 8` 和 `mobile=true`。UA 中没有包含的 CPU 架构、位数等信息保持空值，不从宿主机补入。Windows NT 10.0 无法区分 Windows 10/11，对应平台版本也留空；简化 Android UA 的 `K` 不作为真实机型。
+例如上述 Android UA 会生成 `Chromium` / `Google Chrome` 主版本 `130`、完整版本 `130.0.0.0`、`platform=Android`、`platformVersion=14`、`model=Pixel 8` 和 `mobile=true`。UA 中没有包含的 CPU 架构、位数等信息保持空值，不从宿主机补入。Windows NT 10.0 无法区分 Windows 10/11，对应平台版本留空；冻结的 Mac Intel / 10_15_7 不代表实际 CPU 和系统版本，需通过设备档案明确指定；简化 Android UA 的 `K` 不作为真实机型。
 
 - `create_instance`、`get_instance`、`list_instances` 返回 `browser_version`（实际内核版本）和 `user_agent_metadata`（从自定义 UA 生成的声明，未生成时为 null）。这些字段也保存到历史 `environment`。
 - `verify_environment.actual.client_hints` 返回验证页可读取的低熵及高熵提示，包括 `brands`、`fullVersionList`、`platform`、`platformVersion`、`mobile`、`model`、`architecture`、`bitness` 和 `wow64`。浏览器策略可能限制返回字段；非安全页面可能没有 Client Hints。
 - 请求头仍遵守 Client Hints 的发送条件。基础提示在受支持的安全上下文提供；完整版本等高熵请求头由目标站点通过 `Accept-CH` 请求，不会为了模拟而向所有请求强行添加。
 - 省略 UA 时保留浏览器原生行为。Safari、Firefox、iOS 或不能识别为 Chromium 的自定义 UA 不生成 Chromium 提示。
 - UA 和 Client Hints 都是浏览器对外声明；真实内核保持容器自带版本，不等于对应版本的兼容性测试，也不等于真机。页面布局和触摸配置仍通过 `viewport` / `mobile` 指定。
+
+## 完整设备配置档
+
+`list_device_profiles` 返回内置示例：`macos-arm-chrome155`、`android-pixel8-chrome155`，每项包含 `profile_id`、`kind=example`、完整 `profile`。无网络请求，不启动浏览器。配置档支持两种用法：
+
+```json
+{"task_description":"检查桌面页面与下载","device_profile_id":"macos-arm-chrome155"}
+```
+
+或者把 `list_device_profiles` 返回的 `profile` 原样放入 `create_instance.device_profile`，修改所需字段。内联示例：
+
+```json
+{
+  "device_profile": {
+    "name": "macOS ARM 桌面测试",
+    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
+    "navigator_platform": "MacIntel",
+    "client_hints": {
+      "full_version": "155.0.8059.85",
+      "platform": "macOS",
+      "platform_version": "26.4.1",
+      "architecture": "arm",
+      "bitness": "64",
+      "model": "",
+      "mobile": false,
+      "wow64": false,
+      "form_factors": ["Desktop"]
+    },
+    "screen": {"width": 1920, "height": 1080},
+    "viewport": {"width": 1653, "height": 947},
+    "device_scale_factor": 1,
+    "mobile": false,
+    "touch": false,
+    "languages": ["zh", "en-US", "en"],
+    "locale": "en-US",
+    "timezone": "Asia/Shanghai",
+    "hardware_concurrency": 18,
+    "expectations": {"device_memory": 32, "webdriver": false, "pdf_viewer": true, "audio_sample_rate": 48000, "speech_voices_min": 9}
+  }
+}
+```
+
+`device_profile` 与 `device_profile_id` 互斥。配置档优先覆盖同次请求的旧设备参数，`proxy` / `proxy_id` / `proxy_ref`、任务描述、登录态和生命周期不受影响。配置在创建时固定；变更需创建新实例。`get_instance` / `list_instances` 返回完整生效配置，历史保存在 `environment.device_profile`。
+
+`client_hints.brands` 和 `full_version_list` 可选，但必须同时提供，格式与浏览器 `brands` / `fullVersionList` 相同；省略时按 UA 品牌和明确的 full_version 生成。UA 与 Client Hints 必须保持 Chromium 主版本、平台和移动标记一致。viewport 必须放得进 screen。语言列表最多8项且不得重复；locale 用于 Intl 格式，languages 用于 navigator.language/languages 和 Accept-Language，两者可以不同。
+
+`expectations` 是要比较的真实能力，不会覆盖浏览器返回值。支持 device_memory、webdriver、pdf_viewer、bluetooth、web_share、audio_sample_rate、speech_voices_min、webgl。未配置的期望不参与差异判定。设备档案只模拟声明；实际操作系统、浏览器内核、硬件和网络不因此改变。
+
+## 设备字段与能力核验
+
+```json
+{"instance_id":"ins_...","page_id":"page_..."}
+```
+
+传给 `verify_device_profile` 或 `POST /api/tools/verify_device_profile`。先在该标签页打开允许检测的 HTTPS 页面，确保 Client Hints 可用。核验不导航被检测标签页、不访问额外网站，不触发权限弹窗、蓝牙配对、系统分享或声音播放。
+
+返回：
+
+- `fields`：scope=page/worker、field、expected、actual、status=match/mismatch/unavailable、mode=emulated/expectation。
+- `capabilities`：name、method=execution/availability/reported、status、details。Canvas/WebGL 绘制读取、离线音频处理、临时专用 Worker 和本地生成的 PDF 渲染会实际执行；PDF 检测在同一浏览器的隔离临时页面验证蓝色矩形绘制结果，阻止外部请求，结束后关闭。蓝牙适配器、语音库、分享接口仅报告可用性，不等于连接硬件、朗读或分享成功。
+- `summary`：字段一致/差异/无法读取数，以及实际执行检查通过/未通过数。不是机器人评分或真实设备概率。
+- `observed`：页面和 Worker 实测属性；`browser_version` 为真实内核版本；`checked_at`、`page_id`、`url` 标记采集位置与时间。
+
+无配置档时仍可核验，返回实际观察和能力，但 fields 为空，不猜测期望值。非安全页面可能没有 Client Hints；CSP 可能阻止 Worker；移动网页缺少 viewport meta 时布局宽度可能不同，这些都会记录为差异或无法检测。报告最大约64 KiB，核验有截止时间；渲染线程超时会要求重载该标签页。
+
+最新报告存入 `environment.device_verification`，关闭实例、重启服务后仍可通过保留期内的实例详情、`inspect_instance` 或 `list_recordings` 读取。历史报告标明原采集页面，不代表其他页面或之后时刻的环境。
 
 ## 公开观看链接
 

@@ -1,6 +1,6 @@
 {
   "name": "cloudbrowser",
-  "version": "0.13.1",
+  "version": "0.14.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -10,7 +10,7 @@
     "postinstall": "node scripts/patch-playwright.mjs",
     "build": "npm run build:server && npm run build:web",
     "start": "node dist/cli.js",
-    "test": "npm run build && tsx --test test/*.test.ts",
+    "test": "npm run build && tsx --test --test-concurrency=2 --test-timeout=120000 test/*.test.ts",
     "check": "tsc --noEmit && tsc -p tsconfig.web.json",
     "smoke": "tsx scripts/smoke.ts",
     "schema": "npm run build && tsx scripts/export-schema.ts",

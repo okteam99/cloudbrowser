@@ -1,11 +1,16 @@
 /**
+ * @typedef {{brands: {brand:string,version:string}[], fullVersionList:{brand:string,version:string}[], fullVersion:string, platform:string, platformVersion:string, architecture:string, bitness:string, model:string, mobile:boolean, wow64:boolean, formFactors:string[]}} UserAgentMetadata
+ */
+/**
  * Native Chromium UA-CH metadata for the identity declared by a custom UA.
  * Kept self-contained: the pinned Playwright compatibility patch embeds this
  * function at its existing pre-navigation page/frame/worker initialization hook.
  * Unknown values stay empty rather than falling back to the host's identity.
- * @param {{userAgent?: string}} options
+ * @param {{userAgent?: string, cloudbrowserDeviceProfile?: {metadata:UserAgentMetadata}}} options
+ * @returns {UserAgentMetadata | undefined}
  */
 export function userAgentMetadata(options) {
+  if (options.cloudbrowserDeviceProfile) return options.cloudbrowserDeviceProfile.metadata;
   const ua = options.userAgent;
   if (!ua) return undefined;
   const chrome = ua.match(/\b(HeadlessChrome|Chrome|Chromium)\/(\d+(?:\.\d+){0,3})\b/);
@@ -58,11 +63,12 @@ export function userAgentMetadata(options) {
     platformVersion = cros[1];
   } else if (mac) {
     platform = 'macOS';
-    platformVersion = mac[1].replaceAll('_', '.');
+    // This token is frozen on modern macOS, including Apple Silicon.
+    platformVersion = mac[1] === '10_15_7' ? '' : mac[1].replaceAll('_', '.');
   } else if (/Linux/.test(ua)) platform = 'Linux';
   const arm = /\b(?:arm\w*|aarch64)\b/i.test(ua);
-  const x86 = /\b(?:x86(?:_64)?|x64|Win64|WOW64|i[3-6]86|Intel)\b/i.test(ua);
-  const bits64 = /\b(?:x86_64|x64|Win64|WOW64|aarch64|arm64)\b/i.test(ua) || !!mac;
+  const x86 = /\b(?:x86(?:_64)?|x64|Win64|WOW64|i[3-6]86)\b/i.test(ua);
+  const bits64 = /\b(?:x86_64|x64|Win64|WOW64|aarch64|arm64)\b/i.test(ua);
   return {
     brands,
     fullVersionList,
@@ -84,10 +90,11 @@ export function userAgentMetadata(options) {
  * Do not add high-entropy hints without opt-in or hints to insecure requests.
  * @param {Record<string, string>} headers
  * @param {string | undefined} ua
+ * @param {{metadata:UserAgentMetadata} | undefined} [profile]
  */
-export function clientHintHeaders(headers, ua) {
+export function clientHintHeaders(headers, ua, profile) {
   if (!ua) return headers;
-  const hints = userAgentMetadata({ userAgent: ua });
+  const hints = userAgentMetadata({ userAgent: ua, cloudbrowserDeviceProfile: profile });
   const next = { ...headers };
   const serialize = (/** @type {{brand: string, version: string}[]} */ brands) =>
     brands.map((b) => `${JSON.stringify(b.brand)};v=${JSON.stringify(b.version)}`).join(', ');

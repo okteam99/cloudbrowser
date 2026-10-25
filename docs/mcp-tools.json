@@ -1,6 +1,55 @@
 {
   "tools": [
     {
+      "name": "list_device_profiles",
+      "description": "List complete example device profiles. Pass profile_id as create_instance.device_profile_id, or clone profile into device_profile to customize. Profiles configure declared identity; expectations are measured, not fabricated. No browser is started.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "verify_device_profile",
+      "description": "Compare the instance device profile with actual values in one live tab and a temporary dedicated Worker. Exercise Canvas/WebGL/audio processing and render a generated PDF in an isolated temporary page; inspect Bluetooth, speech and sharing availability without permission prompts. Does not navigate the inspected tab or send external probe requests. Returns mismatches and unavailable checks separately, retains the last report in instance history. A matching field does not prove a real device or human user.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "instance_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "page_id": {
+            "$ref": "#/properties/instance_id"
+          }
+        },
+        "required": [
+          "instance_id",
+          "page_id"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
       "name": "get_logs",
       "description": "Query durable, bounded service/browser/page/operation/recorder/tunnel events. Operation events retain full validated arguments, URLs and original error messages without redaction; filter component=operation for function call history. Survives instance closure and manager restart when the data volume is preserved. Only this principal and generic service events are visible. Logs require authentication and may contain credentials or input values in operation arguments. No arbitrary file access. Omit after_seq for recent events; use returned next_after_seq to read newer events.",
       "inputSchema": {
@@ -510,6 +559,259 @@
             "minLength": 1,
             "maxLength": 1000,
             "description": "Task objective shown in the console and retained with instance history."
+          },
+          "device_profile_id": {
+            "type": "string",
+            "enum": [
+              "macos-arm-chrome155",
+              "android-pixel8-chrome155"
+            ],
+            "description": "Example profile from list_device_profiles. Device profile values override legacy UA/viewport/mobile/locale/timezone parameters."
+          },
+          "device_profile": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "user_agent": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024,
+                "pattern": "^[\\x20-\\x7e]+$"
+              },
+              "navigator_platform": {
+                "type": "string",
+                "maxLength": 128,
+                "pattern": "^[\\x20-\\x7e]*$",
+                "minLength": 1
+              },
+              "client_hints": {
+                "type": "object",
+                "properties": {
+                  "full_version": {
+                    "type": "string",
+                    "pattern": "^\\d+\\.\\d+\\.\\d+\\.\\d+$"
+                  },
+                  "platform": {
+                    "type": "string",
+                    "enum": [
+                      "macOS",
+                      "Windows",
+                      "Linux",
+                      "Android",
+                      "Chrome OS"
+                    ]
+                  },
+                  "platform_version": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^[\\x20-\\x7e]*$"
+                  },
+                  "architecture": {
+                    "type": "string",
+                    "enum": [
+                      "arm",
+                      "x86",
+                      ""
+                    ]
+                  },
+                  "bitness": {
+                    "type": "string",
+                    "enum": [
+                      "32",
+                      "64",
+                      ""
+                    ]
+                  },
+                  "model": {
+                    "$ref": "#/properties/device_profile/properties/client_hints/properties/platform_version",
+                    "default": ""
+                  },
+                  "mobile": {
+                    "type": "boolean"
+                  },
+                  "wow64": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "form_factors": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "Desktop",
+                        "Mobile",
+                        "Tablet",
+                        "Automotive",
+                        "EInk",
+                        "Watch",
+                        "XR"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 4
+                  },
+                  "brands": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "brand": {
+                          "type": "string",
+                          "maxLength": 128,
+                          "pattern": "^[\\x20-\\x7e]*$",
+                          "minLength": 1
+                        },
+                        "version": {
+                          "type": "string",
+                          "pattern": "^\\d+(?:\\.\\d+){0,3}$"
+                        }
+                      },
+                      "required": [
+                        "brand",
+                        "version"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1,
+                    "maxItems": 8
+                  },
+                  "full_version_list": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/properties/device_profile/properties/client_hints/properties/brands/items"
+                    },
+                    "minItems": 1,
+                    "maxItems": 8
+                  }
+                },
+                "required": [
+                  "full_version",
+                  "platform",
+                  "platform_version",
+                  "architecture",
+                  "bitness",
+                  "mobile",
+                  "form_factors"
+                ],
+                "additionalProperties": false
+              },
+              "viewport": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 240,
+                    "maximum": 3840
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 240,
+                    "maximum": 3840
+                  }
+                },
+                "required": [
+                  "width",
+                  "height"
+                ],
+                "additionalProperties": false
+              },
+              "screen": {
+                "$ref": "#/properties/device_profile/properties/viewport"
+              },
+              "device_scale_factor": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 4,
+                "default": 1
+              },
+              "mobile": {
+                "type": "boolean",
+                "default": false
+              },
+              "touch": {
+                "type": "boolean",
+                "default": false
+              },
+              "languages": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$"
+                },
+                "minItems": 1,
+                "maxItems": 8
+              },
+              "locale": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "timezone": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "hardware_concurrency": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 256
+              },
+              "expectations": {
+                "type": "object",
+                "properties": {
+                  "device_memory": {
+                    "type": "number",
+                    "minimum": 0.25,
+                    "maximum": 64
+                  },
+                  "webdriver": {
+                    "type": "boolean"
+                  },
+                  "pdf_viewer": {
+                    "type": "boolean"
+                  },
+                  "bluetooth": {
+                    "type": "boolean"
+                  },
+                  "web_share": {
+                    "type": "boolean"
+                  },
+                  "audio_sample_rate": {
+                    "type": "integer",
+                    "minimum": 8000,
+                    "maximum": 192000
+                  },
+                  "speech_voices_min": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000
+                  },
+                  "webgl": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false,
+                "default": {},
+                "description": "Observed capabilities to compare, not values to fabricate. Hardware, automation state and permissions remain real."
+              }
+            },
+            "required": [
+              "name",
+              "user_agent",
+              "navigator_platform",
+              "client_hints",
+              "viewport",
+              "screen",
+              "languages",
+              "locale",
+              "timezone"
+            ],
+            "additionalProperties": false,
+            "description": "Complete inline device profile. Mutually exclusive with device_profile_id. Applied declarations and measured capabilities are reported separately."
           },
           "storage_state_id": {
             "type": "string",

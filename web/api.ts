@@ -38,6 +38,10 @@ export type BrowserInstance = {
   created_at: string;
   viewport: { width: number; height: number };
   user_agent: string;
+  browser_version?: string;
+  browser_mode?: string;
+  device_profile?: DeviceProfileView | null;
+  device_verification?: DeviceVerificationView | null;
   country?: string | null;
   country_source?: 'proxy_config' | 'unknown';
   locale: string;
@@ -63,6 +67,10 @@ export type Recording = {
   environment?: {
     captured_at: string;
     user_agent: string | null;
+    browser_version?: string;
+    browser_mode?: string;
+    device_profile?: DeviceProfileView | null;
+    device_verification?: DeviceVerificationView | null;
     os: string | null;
     country: string | null;
     country_source: 'proxy_config' | 'unknown';
@@ -79,6 +87,36 @@ export type Recording = {
   bytes: number;
   error?: string;
   details_url?: string;
+};
+export type DeviceProfileView = { name: string; [key: string]: unknown };
+export type DeviceVerificationView = {
+  checked_at: string;
+  page_id: string;
+  url: string;
+  profile_name: string | null;
+  browser_version: string;
+  fields: {
+    scope: string;
+    field: string;
+    expected: unknown;
+    actual: unknown;
+    status: string;
+    mode: string;
+  }[];
+  capabilities: {
+    name: string;
+    method: string;
+    status: string;
+    details: Record<string, unknown>;
+  }[];
+  summary: {
+    matched: number;
+    mismatched: number;
+    unavailable: number;
+    execution_passed: number;
+    execution_failed: number;
+  };
+  notes: string[];
 };
 export type InstanceDetails = {
   details_url?: string;

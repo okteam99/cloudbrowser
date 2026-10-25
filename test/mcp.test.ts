@@ -50,7 +50,7 @@ test('MCP stdio discovery, operation lookup, artifact transfer, reconnect and pr
     assert.ok(ready, logs);
     a = await connect('alice');
     const tools = await a.listTools();
-    assert.equal(tools.tools.length, 42);
+    assert.equal(tools.tools.length, 44);
     for (const [name, required] of [
       ['create_instance', ['proxy_id', 'user_agent', 'viewport', 'task_description']],
       ['proxy_curl', ['proxy_id', 'url', 'headers', 'body', 'timeout_ms']],

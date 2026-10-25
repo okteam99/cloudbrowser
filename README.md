@@ -166,6 +166,23 @@ Agent 必须支持远程 Streamable HTTP MCP 及自定义 Authorization 请求�
 
 `verify_environment` 默认访问第三方 `https://api.ipify.org?format=json`，可传自己的 `check_url`。地区数据库未内置。
 
+## 完整设备配置档与核验
+
+默认使用完整 Chromium 的新版无头模式。调用 `list_device_profiles` 获取完整示例配置；创建时传 `device_profile_id`，或把示例中的 `profile` 复制到 `device_profile` 后修改。两者互斥，配置档中的设备参数优先于旧的单独 UA / viewport / mobile / locale / timezone 参数，代理和实例生命周期仍单独设置。
+
+```json
+{
+  "task_description": "核验桌面设备属性和网页功能",
+  "device_profile_id": "macos-arm-chrome155"
+}
+```
+
+配置档明确保存完整浏览器版本、Client Hints、navigator.platform、屏幕/视口、缩放、语言列表、Intl 区域、时区、触控及逻辑核心数，避免从冻结的 Mac UA 猜测真实架构和系统版本。示例是可修改的测试声明，不是实际 Mac/手机，也不会安装对应版本的内核。
+
+打开测试页面后调用 `verify_device_profile`，传 `instance_id`、`page_id`：逐字段比较目标值与页面/Worker 实测值，实际执行 Canvas/WebGL 绘制、音频处理、Worker 与隔离页面中的本地 PDF 渲染，另外报告蓝牙、系统语音及分享接口可用性。报告区分一致、差异、无法读取、执行通过和仅报告可用性。不会伪造 webdriver、设备内存、蓝牙硬件、语音库或 GPU 能力。
+
+实例详情的“设备配置与核验”展示完整配置、差异列表及能力结果，可复制配置档；最新核验报告会随实例历史和录屏元信息保留。核验只在显式调用时运行，不会因刷新控制台而重复操作浏览器。
+
 ## 实例详情与问题回溯
 
 `create_instance` 返回 `details_url`，`get_instance`、`list_instances`、`inspect_instance` 和 `list_recordings` 也会提供对应地址。例如：
@@ -348,10 +365,11 @@ Agent 调用 `list_proxies` 查询列表，可传 `country: "US"`、`protocol: "
 
 ## 浏览器操作与分析
 
-当前提供 **42 个 MCP 工具**。除了多实例、多标签页、点击输入、iframe、上传下载，还支持：
+当前提供 **44 个 MCP 工具**。除了多实例、多标签页、点击输入、iframe、上传下载，还支持：
 
 | 能力 | MCP 工具 |
 | --- | --- |
+| 设备配置与核验 | list_device_profiles / verify_device_profile，创建时可传 device_profile 或 device_profile_id |
 | 查看实例与 Tab | list_instances / get_instance / list_pages / get_page，忙碌时也可查询 |
 | 切换焦点和直播页面 | select_page |
 | 结构化读取元素 | read_element，返回文本、值、属性、状态和坐标 |
@@ -436,10 +454,10 @@ bash scripts/publish-docker.sh
 ## 源码构建及 stdio 接入
 
 ```sh
-docker build -t cloudbrowser:0.13.1 .
+docker build -t cloudbrowser:0.14.0 .
 ```
 
-将一行部署命令最后的镜像名换成 `cloudbrowser:0.13.1` 即可本地使用。
+将一行部署命令最后的镜像名换成 `cloudbrowser:0.14.0` 即可本地使用。
 
 兼容配置见 [本地 stdio](examples/mcp.local.json)、[SSH stdio](examples/mcp.ssh.json)。仍使用 `docker exec -i`，不得使用 `-t`。MCP_PRINCIPAL 是可信 SSH/Docker 接入中的命名空间，不是独立认证。
 

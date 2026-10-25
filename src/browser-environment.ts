@@ -1,10 +1,15 @@
 import type { userAgentMetadata } from './user-agent.js';
+import type { DeviceProfile } from './device-profile.js';
+import type { DeviceVerification } from './device-verification.js';
 
 export type BrowserEnvironment = {
   captured_at: string;
   user_agent: string | null;
   browser_version?: string;
+  browser_mode?: string;
   user_agent_metadata?: ReturnType<typeof userAgentMetadata> | null;
+  device_profile?: DeviceProfile | null;
+  device_verification?: DeviceVerification | null;
   os: string | null;
   country: string | null;
   country_source: 'proxy_config' | 'unknown';

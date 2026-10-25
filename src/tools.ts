@@ -22,6 +22,18 @@ export const definitions: Record<
   string,
   { description: string; schema: z.ZodTypeAny; readOnly?: boolean }
 > = {
+  list_device_profiles: {
+    description:
+      'List complete example device profiles. Pass profile_id as create_instance.device_profile_id, or clone profile into device_profile to customize. Profiles configure declared identity; expectations are measured, not fabricated. No browser is started.',
+    schema: z.object({}).strict(),
+    readOnly: true,
+  },
+  verify_device_profile: {
+    description:
+      'Compare the instance device profile with actual values in one live tab and a temporary dedicated Worker. Exercise Canvas/WebGL/audio processing and render a generated PDF in an isolated temporary page; inspect Bluetooth, speech and sharing availability without permission prompts. Does not navigate the inspected tab or send external probe requests. Returns mismatches and unavailable checks separately, retains the last report in instance history. A matching field does not prove a real device or human user.',
+    schema: z.object({ ...page }).strict(),
+    readOnly: true,
+  },
   get_logs: {
     description:
       'Query durable, bounded service/browser/page/operation/recorder/tunnel events. Operation events retain full validated arguments, URLs and original error messages without redaction; filter component=operation for function call history. Survives instance closure and manager restart when the data volume is preserved. Only this principal and generic service events are visible. Logs require authentication and may contain credentials or input values in operation arguments. No arbitrary file access. Omit after_seq for recent events; use returned next_after_seq to read newer events.',
