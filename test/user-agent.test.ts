@@ -239,6 +239,30 @@ test(
         url: url + '/opaque',
       });
       assert.equal(requests.find((r) => r.url === '/opaque')!.headers['sec-ch-ua'], undefined);
+      const opaqueProfile = await call('create_instance', {
+        user_agent: 'CustomAgent/1.0',
+        device_profile_id: 'macos-arm-chrome155',
+      });
+      assert.equal(opaqueProfile.user_agent, 'CustomAgent/1.0');
+      assert.equal(opaqueProfile.device_profile.client_hints, null);
+      assert.equal(opaqueProfile.user_agent_metadata, null);
+      const opaqueIds = {
+        instance_id: opaqueProfile.instance_id,
+        page_id: opaqueProfile.pages[0].page_id,
+      };
+      await call('navigate', { ...opaqueIds, url: url + '/opaque-profile' });
+      const opaqueHeaders = requests.find((r) => r.url === '/opaque-profile')!.headers;
+      assert.equal(opaqueHeaders['user-agent'], 'CustomAgent/1.0');
+      assert.equal(opaqueHeaders['sec-ch-ua'], undefined);
+      assert.deepEqual(
+        (
+          await call('evaluate', {
+            ...opaqueIds,
+            script: '({ua:navigator.userAgent,platform:navigator.platform,width:screen.width})',
+          })
+        ).value,
+        { ua: 'CustomAgent/1.0', platform: 'MacIntel', width: 1920 },
+      );
       await call('close_instance', { instance_id: i.instance_id });
       const history = await call('inspect_instance', { instance_id: i.instance_id, probe: false });
       assert.equal(history.instance.environment.browser_version, i.browser_version);

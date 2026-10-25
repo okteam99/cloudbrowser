@@ -6,7 +6,7 @@
  * Kept self-contained: the pinned Playwright compatibility patch embeds this
  * function at its existing pre-navigation page/frame/worker initialization hook.
  * Unknown values stay empty rather than falling back to the host's identity.
- * @param {{userAgent?: string, cloudbrowserDeviceProfile?: {metadata:UserAgentMetadata}}} options
+ * @param {{userAgent?: string, cloudbrowserDeviceProfile?: {metadata?:UserAgentMetadata}}} options
  * @returns {UserAgentMetadata | undefined}
  */
 export function userAgentMetadata(options) {
@@ -90,7 +90,7 @@ export function userAgentMetadata(options) {
  * Do not add high-entropy hints without opt-in or hints to insecure requests.
  * @param {Record<string, string>} headers
  * @param {string | undefined} ua
- * @param {{metadata:UserAgentMetadata} | undefined} [profile]
+ * @param {{metadata?:UserAgentMetadata} | undefined} [profile]
  */
 export function clientHintHeaders(headers, ua, profile) {
   if (!ua) return headers;

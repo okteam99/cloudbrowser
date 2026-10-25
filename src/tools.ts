@@ -26,7 +26,7 @@ export const definitions: Record<
 > = {
   list_device_profiles: {
     description:
-      'List saved device profiles configured as JSON in console System Settings. Filter by platform or query (ID/name); defaults to enabled profiles. Each item includes profile_id, enabled, revision and complete profile. Pass profile_id to create_instance.device_profile_id. No browser is started. UA alone does not select a profile.',
+      'List saved device profiles configured as JSON in console System Settings. Filter by platform or query (ID/name); defaults to enabled profiles. Items include profile_id, enabled, is_default, default_for_platform, revision and complete profile. create_instance accepts an explicit profile_id, or automatically selects the default for the supplied UA OS when no profile is specified. No browser is started.',
     schema: listDeviceProfilesSchema,
     readOnly: true,
   },
@@ -175,7 +175,7 @@ export const definitions: Record<
   },
   create_instance: {
     description:
-      'Create an isolated Chromium instance. Select a saved device_profile_id from list_device_profiles/get_device_profile, or provide an inline device_profile (mutually exclusive); the full profile overrides individual device parameters and is frozen for this instance. Optional task_description is shown in console/history. UA alone generates Client Hints but does not select a profile or change the engine. Returns details_url (empty access_token= hint), actual browser_version, effective profile and user_agent_metadata. Optional authenticated HTTP/SOCKS5 proxy: use proxy_id from list_proxies, inline proxy, or legacy proxy_ref (mutually exclusive). No direct fallback. No proxy means explicit direct mode.',
+      'Create an isolated Chromium instance. Explicit user_agent takes precedence over any selected profile and regenerates Client Hints; other device settings come from that profile. Choose device_profile_id or inline device_profile (mutually exclusive); if omitted with a UA, auto-select the enabled default for the same OS (is_default first, otherwise first enabled match). No match uses UA-only settings and returns a warning. Without UA/profile keep native defaults. Returns frozen effective device_profile, device_profile_id, device_profile_source, actual browser_version, user_agent_metadata and details_url (empty access_token= hint). Optional task_description is shown in console/history. Proxy: use proxy_id, inline proxy, or proxy_ref (mutually exclusive). No direct fallback. No proxy means direct mode.',
     schema: createSchema,
   },
   list_instances: {

@@ -88,3 +88,46 @@ test('failed catalog writes retain saved values, and corrupt JSON is never repla
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('UA defaults prefer the marked enabled OS profile, fall back in catalog order, and migrate old JSON', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'cb-device-defaults-'));
+  try {
+    const store = new DeviceProfileStore(dir);
+    await store.init();
+    const original = store.snapshot();
+    const android = original.profiles[1];
+    const ua = android.profile.user_agent.replace('155.0.0.0', '130.0.0.0');
+    const first = { ...android, profile_id: 'android-first', is_default: false };
+    const second = { ...android, profile_id: 'android-default', is_default: true };
+    await store.update({ ...original, profiles: [original.profiles[0], first, second] });
+    assert.equal(store.defaultForUserAgent(ua)?.profile_id, 'android-default');
+    assert.equal(store.get('android-default').default_for_platform, true);
+    assert.equal(store.get('android-first').default_for_platform, false);
+    assert.throws(() =>
+      store.update({ ...store.snapshot(), profiles: [{ ...first, is_default: true }, second] }),
+    );
+    await store.update({ ...store.snapshot(), profiles: [first, { ...second, enabled: false }] });
+    assert.equal(store.defaultForUserAgent(ua)?.profile_id, 'android-first');
+    assert.equal(store.defaultForUserAgent(original.profiles[0].profile.user_agent), undefined);
+    assert.equal(store.defaultForUserAgent('CustomAgent/1'), undefined);
+    assert.equal(store.defaultForUserAgent('Mozilla/5.0 (iPhone) CriOS/130.0.0.0'), undefined);
+    assert.equal(
+      store.defaultForUserAgent('Mozilla/5.0 (X11; Linux x86_64) Chrome/130.0.0.0'),
+      undefined,
+    );
+    const before = store.snapshot();
+    const file = join(dir, 'device-profiles.json');
+    await writeFile(
+      file,
+      JSON.stringify({ version: 1, profiles: before.profiles.map(({ is_default, ...p }) => p) }),
+    );
+    const migrated = new DeviceProfileStore(dir);
+    await migrated.init();
+    assert.equal(migrated.defaultForUserAgent(ua)?.profile_id, 'android-first');
+    assert.equal(migrated.get('android-first').is_default, false);
+    await migrated.update({ ...migrated.snapshot(), profiles: [] });
+    assert.equal(migrated.defaultForUserAgent(ua), undefined);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

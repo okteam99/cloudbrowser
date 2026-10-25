@@ -45,9 +45,11 @@ test('instance details are read-only while busy and preserve properties, tabs, a
     const i = await m.execute('alice', 'create_instance', {
       task_description: '详情回溯',
       user_agent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8)',
-      viewport: { width: 412, height: 915 },
-      locale: 'pt-BR',
-      timezone: 'America/Sao_Paulo',
+      device_profile: {
+        ...m.deviceProfiles.resolve('android-pixel8-chrome155'),
+        locale: 'pt-BR',
+        timezone: 'America/Sao_Paulo',
+      },
     });
     assert.equal(i.details_url, `${cfg.baseUrl}/instances/${i.instance_id}?access_token=`);
     const touched = m.instances.get(i.instance_id)!.touched;

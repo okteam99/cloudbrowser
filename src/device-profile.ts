@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { userAgentMetadata } from './user-agent.js';
+import { userAgentMetadata, type UserAgentMetadata } from './user-agent.js';
 
 const size = z
   .object({
@@ -114,6 +114,45 @@ export const deviceProfileSchema = z
     }
   });
 export type DeviceProfile = z.infer<typeof deviceProfileSchema>;
+// Effective identity may come from an opaque/non-Chromium UA, which has no UA-CH.
+// Saved templates remain strictly validated Chromium profiles.
+export type AppliedDeviceProfile = Omit<DeviceProfile, 'client_hints'> & {
+  client_hints: {
+    full_version: string;
+    platform: string;
+    platform_version: string;
+    architecture: string;
+    bitness: string;
+    model: string;
+    mobile: boolean;
+    wow64: boolean;
+    form_factors: string[];
+    brands?: UserAgentMetadata['brands'];
+    full_version_list?: UserAgentMetadata['fullVersionList'];
+  } | null;
+};
+export function applyProfileUserAgent(profile: DeviceProfile, ua?: string): AppliedDeviceProfile {
+  const effective: AppliedDeviceProfile = structuredClone(profile);
+  if (ua === undefined) return effective;
+  const h = userAgentMetadata({ userAgent: ua });
+  effective.user_agent = ua;
+  effective.client_hints = h
+    ? {
+        full_version: h.fullVersion,
+        platform: h.platform,
+        platform_version: h.platformVersion,
+        architecture: h.architecture,
+        bitness: h.bitness,
+        model: h.model,
+        mobile: h.mobile,
+        wow64: h.wow64,
+        form_factors: h.formFactors,
+        brands: h.brands,
+        full_version_list: h.fullVersionList,
+      }
+    : null;
+  return effective;
+}
 export const deviceProfileIdSchema = z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$/);
 
 const mac = deviceProfileSchema.parse({
@@ -191,8 +230,9 @@ export function listDeviceProfiles() {
     note: 'A declared test environment, not a real device or browser-version installation. Clone profile into device_profile to customize.',
   }));
 }
-export function profileMetadata(profile: DeviceProfile) {
+export function profileMetadata(profile: AppliedDeviceProfile): UserAgentMetadata | undefined {
   const h = profile.client_hints;
+  if (!h) return undefined;
   const inferred = userAgentMetadata({ userAgent: profile.user_agent })!;
   return {
     brands: h.brands ?? inferred.brands,
@@ -215,7 +255,7 @@ export function profileMetadata(profile: DeviceProfile) {
     formFactors: h.form_factors,
   };
 }
-export function protocolProfile(profile: DeviceProfile) {
+export function protocolProfile(profile: AppliedDeviceProfile) {
   return {
     metadata: profileMetadata(profile),
     platform: profile.navigator_platform,

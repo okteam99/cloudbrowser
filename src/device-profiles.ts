@@ -8,11 +8,13 @@ import {
   listDeviceProfiles,
 } from './device-profile.js';
 import { ToolError } from './errors.js';
+import { operatingSystem } from './browser-environment.js';
 
 export const savedDeviceProfileSchema = z
   .object({
     profile_id: deviceProfileIdSchema,
     enabled: z.boolean().default(true),
+    is_default: z.boolean().default(false),
     profile: deviceProfileSchema,
   })
   .strict();
@@ -21,6 +23,7 @@ export const deviceProfileCatalogSchema = z
   .max(100)
   .superRefine((items, ctx) => {
     const seen = new Set<string>();
+    const defaults = new Set<string>();
     items.forEach((item, index) => {
       if (seen.has(item.profile_id))
         ctx.addIssue({
@@ -29,6 +32,16 @@ export const deviceProfileCatalogSchema = z
           message: 'Duplicate profile_id',
         });
       seen.add(item.profile_id);
+      if (item.enabled && item.is_default) {
+        const platform = item.profile.client_hints.platform;
+        if (defaults.has(platform))
+          ctx.addIssue({
+            code: 'custom',
+            path: [index, 'is_default'],
+            message: 'Only one enabled default profile is allowed per operating system',
+          });
+        defaults.add(platform);
+      }
     });
   });
 export const updateDeviceProfilesSchema = z
@@ -66,6 +79,7 @@ export class DeviceProfileStore {
       const defaults = listDeviceProfiles().map(({ profile_id, profile }) => ({
         profile_id,
         enabled: true,
+        is_default: true,
         profile,
       }));
       await this.persist(defaults);
@@ -79,7 +93,24 @@ export class DeviceProfileStore {
     return createHash('sha256').update(JSON.stringify(this.records)).digest('hex');
   }
   private entry(record: Entry) {
-    return { ...structuredClone(record), kind: 'configured', revision: this.revision() };
+    return {
+      ...structuredClone(record),
+      kind: 'configured',
+      revision: this.revision(),
+      default_for_platform:
+        this.defaultRecord(record.profile.client_hints.platform)?.profile_id === record.profile_id,
+    };
+  }
+  private defaultRecord(platform: string) {
+    const candidates = this.records.filter(
+      (r) => r.enabled && r.profile.client_hints.platform === platform,
+    );
+    return candidates.find((r) => r.is_default) ?? candidates[0];
+  }
+  defaultForUserAgent(ua: string) {
+    const os = operatingSystem(ua);
+    const record = os ? this.defaultRecord(os === 'ChromeOS' ? 'Chrome OS' : os) : undefined;
+    return record ? this.entry(record) : undefined;
   }
   list(raw: unknown = {}) {
     const filter = listDeviceProfilesSchema.parse(raw);

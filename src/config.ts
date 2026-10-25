@@ -37,12 +37,12 @@ export const createSchema = z
     device_profile_id: deviceProfileIdSchema
       .optional()
       .describe(
-        'Enabled saved profile from list_device_profiles/get_device_profile. Selects a snapshot at creation; later edits do not affect this instance. Profile values override legacy UA/viewport/mobile/locale/timezone parameters.',
+        'Enabled saved profile from list_device_profiles/get_device_profile. Explicit user_agent overrides the profile UA and regenerates all Client Hints; other device values come from the profile. The effective configuration is frozen at creation.',
       ),
     device_profile: deviceProfileSchema
       .optional()
       .describe(
-        'Complete inline device profile. Mutually exclusive with device_profile_id. Applied declarations and measured capabilities are reported separately.',
+        'Complete inline device profile. Mutually exclusive with device_profile_id. Explicit user_agent overrides its UA and regenerates Client Hints, retaining all other profile settings.',
       ),
     storage_state_id: z
       .string()
@@ -55,7 +55,7 @@ export const createSchema = z
       .min(1)
       .max(1024)
       .describe(
-        'Custom UA. Chromium UA Client Hints are derived automatically from this UA, including versions; this does not change the installed browser engine. Omit for native UA and hints.',
+        'Highest-priority UA. Regenerates Client Hints from this UA even with a profile. If no profile is specified, selects the enabled default profile for the same OS (is_default first, otherwise first enabled match); no match uses UA-only settings. No UA and no profile preserves native browser defaults. Does not change the actual engine.',
       )
       .optional(),
     viewport: z

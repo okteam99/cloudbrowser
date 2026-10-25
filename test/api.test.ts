@@ -232,18 +232,24 @@ test('HTTP tool API and MCP share instances, validation, idempotent actions, art
       404,
     );
     const profiled = await request('create_instance', {
-      device_profile_id: customProfile.profile_id,
+      user_agent: customProfile.profile.user_agent.replace('155.0.0.0', '130.0.6723.58'),
     });
     assert.equal(profiled.response.status, 200, JSON.stringify(profiled.result));
     const profiledId = profiled.result.data.instance_id;
     assert.equal(profiled.result.data.device_profile_id, customProfile.profile_id);
+    assert.equal(profiled.result.data.device_profile_source, 'ua_default');
+    assert.equal(profiled.result.data.user_agent_metadata.fullVersion, '130.0.6723.58');
+    const effectiveProfile = profiled.result.data.device_profile;
     const measured = await mcpCall('evaluate', {
       instance_id: profiledId,
       page_id: profiled.result.data.pages[0].page_id,
       script:
         '({ua:navigator.userAgent,platform:navigator.platform,screenWidth:screen.width,touch:navigator.maxTouchPoints})',
     });
-    assert.equal(measured.data.value.ua, customProfile.profile.user_agent);
+    assert.equal(
+      measured.data.value.ua,
+      customProfile.profile.user_agent.replace('155.0.0.0', '130.0.6723.58'),
+    );
     assert.equal(measured.data.value.platform, customProfile.profile.navigator_platform);
     assert.equal(measured.data.value.screenWidth, 412);
     assert.ok(measured.data.value.touch > 0);
@@ -263,13 +269,25 @@ test('HTTP tool API and MCP share instances, validation, idempotent actions, art
     assert.equal((await saveProfiles({ ...disabled, profiles: [] })).status, 200);
     assert.deepEqual(
       (await mcpCall('get_instance', { instance_id: profiledId })).data.device_profile,
-      customProfile.profile,
+      effectiveProfile,
     );
     await mcpCall('close_instance', { instance_id: profiledId });
     const history = (await mcpCall('inspect_instance', { instance_id: profiledId, probe: false }))
       .data;
-    assert.deepEqual(history.instance.environment.device_profile, customProfile.profile);
+    assert.deepEqual(history.instance.environment.device_profile, effectiveProfile);
     assert.equal(history.instance.environment.device_profile_id, customProfile.profile_id);
+    assert.equal(history.instance.environment.device_profile_source, 'ua_default');
+    const unmatched = await request('create_instance', {
+      user_agent: customProfile.profile.user_agent,
+      viewport: { width: 640, height: 480 },
+    });
+    assert.equal(unmatched.result.data.device_profile, null);
+    assert.equal(unmatched.result.data.device_profile_source, 'ua_unmatched');
+    assert.equal(unmatched.result.data.viewport.width, 640);
+    assert.ok(
+      unmatched.result.data.warnings.some((s: string) => s.includes('No enabled profile matches')),
+    );
+    await mcpCall('close_instance', { instance_id: unmatched.result.data.instance_id });
     const createArgs = {
       task_description: 'API 与 MCP 交替验收',
       viewport: { width: 640, height: 480 },

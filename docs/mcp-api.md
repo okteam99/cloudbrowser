@@ -59,14 +59,14 @@
 - `create_instance`、`get_instance`、`list_instances` 返回 `browser_version`（实际内核版本）和 `user_agent_metadata`（从自定义 UA 生成的声明，未生成时为 null）。这些字段也保存到历史 `environment`。
 - `verify_environment.actual.client_hints` 返回验证页可读取的低熵及高熵提示，包括 `brands`、`fullVersionList`、`platform`、`platformVersion`、`mobile`、`model`、`architecture`、`bitness` 和 `wow64`。浏览器策略可能限制返回字段；非安全页面可能没有 Client Hints。
 - 请求头仍遵守 Client Hints 的发送条件。基础提示在受支持的安全上下文提供；完整版本等高熵请求头由目标站点通过 `Accept-CH` 请求，不会为了模拟而向所有请求强行添加。
-- 省略 UA 时保留浏览器原生行为。Safari、Firefox、iOS 或不能识别为 Chromium 的自定义 UA 不生成 Chromium 提示。
-- UA 和 Client Hints 都是浏览器对外声明；真实内核保持容器自带版本，不等于对应版本的兼容性测试，也不等于真机。页面布局和触摸配置仍通过 `viewport` / `mobile` 指定。
+- 同时省略 UA 和档案时保留浏览器原生行为。Safari、Firefox、iOS 或不能识别为 Chromium 的自定义 UA 不生成 Chromium 提示。
+- UA 和 Client Hints 都是浏览器对外声明；真实内核保持容器自带版本，不等于对应版本的兼容性测试，也不等于真机。页面布局和触摸配置优先沿用所选档案，无档案时通过 `viewport` / `mobile` 指定。
 
 ## 完整设备配置档
 
-管理员在 **系统设置 → 设备档案** 编辑 JSON 数组；每项为 `{ "profile_id": "自定义唯一ID", "enabled": true, "profile": { ...完整设备字段... } }`。ID 为 1–100 位英文字母、数字、下划线或连字符，首位为字母/数字。最多 100 份；重复 ID、UA / Client Hints 冲突、无效语言/时区等会被拒绝，并返回具体字段路径。保存后新实例立即可用，重启后保留；空数组表示没有可选档案，不会重新补入示例。
+管理员在 **系统设置 → 设备档案** 编辑 JSON 数组；每项为 `{ "profile_id": "自定义唯一ID", "enabled": true, "is_default": false, "profile": { ...完整设备字段... } }`。ID 为 1–100 位英文字母、数字、下划线或连字符，首位为字母/数字。最多 100 份；重复 ID、UA / Client Hints 冲突、无效语言/时区等会被拒绝，并返回具体字段路径。保存后新实例立即可用，重启后保留；空数组表示没有可选档案，不会重新补入示例。
 
-首次初始化提供 `macos-arm-chrome155`、`android-pixel8-chrome155` 两份可编辑示例。`list_device_profiles` 返回当前配置而非固定枚举，每项包含 `profile_id`、`enabled`、`kind=configured`、`revision`、完整 `profile`。默认只返回启用项；传 `enabled_only:false` 可查看停用档案。`platform` 可为 macOS / Windows / Linux / Android / Chrome OS，`query` 按 ID 或名称匹配，不区分大小写。`get_device_profile` 可读取单份启用或停用档案。两个接口均不启动浏览器、不发送外部请求。
+首次初始化提供 `macos-arm-chrome155`、`android-pixel8-chrome155` 两份可编辑示例。`list_device_profiles` 返回当前配置而非固定枚举，每项包含 `profile_id`、`enabled`、`is_default`、`default_for_platform`（当前系统实际默认项）、`kind=configured`、`revision`、完整 `profile`。默认只返回启用项；传 `enabled_only:false` 可查看停用档案。`platform` 可为 macOS / Windows / Linux / Android / Chrome OS，`query` 按 ID 或名称匹配，不区分大小写。`get_device_profile` 可读取单份启用或停用档案。两个接口均不启动浏览器、不发送外部请求。
 
 Agent 的选择流程（HTTP API 与 MCP 同名同参）：
 
@@ -74,7 +74,7 @@ Agent 的选择流程（HTTP API 与 MCP 同名同参）：
 2. `get_device_profile({"profile_id":"android-pixel8-chrome155"})` 检查完整配置。
 3. `create_instance({"device_profile_id":"android-pixel8-chrome155","task_description":"测试移动端登录流程"})` 创建独立实例。
 
-没有全局选中状态；每次创建都传 ID。仅传 UA 会生成 Client Hints，不会自动选档案。设备档案是测试声明，不改变实际浏览器内核。也可以选择桌面档案：
+没有全局选中状态。明确传 ID 或内联档案时优先用指定档案；仅传 `user_agent` 时，按 UA 的操作系统自动匹配启用档案，优先 `is_default:true`，否则按 JSON 顺序选同系统第一份。每个系统最多一份启用的默认档案，缺省 `is_default:false`；停用项不参与自动匹配。没有同系统档案时使用原有 UA 模式并返回说明，不跨系统匹配；两者都不传则保留浏览器默认环境。设备档案是测试声明，不改变实际浏览器内核。也可以选择桌面档案：
 
 ```json
 {"task_description":"检查桌面页面与下载","device_profile_id":"macos-arm-chrome155"}
@@ -113,7 +113,7 @@ Agent 的选择流程（HTTP API 与 MCP 同名同参）：
 }
 ```
 
-`device_profile` 与 `device_profile_id` 互斥。配置档优先覆盖同次请求的旧设备参数，`proxy` / `proxy_id` / `proxy_ref`、任务描述、登录态和生命周期不受影响。按 ID 创建会复制创建时的完整配置；随后修改、停用、删除该 ID，不影响运行中实例或已保存历史。`get_instance` / `list_instances` 返回完整生效配置和 `device_profile_id`，历史保存在 `environment.device_profile` / `environment.device_profile_id`。未知 ID 返回 `DEVICE_PROFILE_NOT_FOUND`，停用 ID 返回 `DEVICE_PROFILE_DISABLED`，均不会回退为默认环境。配置变更需创建新实例。
+`device_profile` 与 `device_profile_id` 互斥。单独传入的 `user_agent` 优先于档案内的 UA，并从该 UA 重新生成全部 Client Hints（品牌、版本、系统、机型、移动标记等）；无法推断的提示字段留空，Safari/Firefox/iOS/不透明 UA 不生成 Chromium 提示，此时生效快照 `client_hints:null`。其余设备参数（包含 navigator_platform、屏幕、触控、语言、时区、CPU）沿用所选档案。跨系统明确指定档案时也不会暗中更换其他配置，调用方应选择所需的系统环境。`proxy` / `proxy_id` / `proxy_ref`、任务描述、登录态和生命周期不受影响。创建时复制档案，再应用 UA 覆盖，不修改后台模板。`device_profile_source` 为 explicit_id / inline / ua_default / ua_unmatched / none，历史也记录该来源。随后修改、停用、删除该 ID，不影响运行中实例或已保存历史。`get_instance` / `list_instances` 返回完整生效配置和 `device_profile_id`，历史保存在 `environment.device_profile` / `environment.device_profile_id`。例如 `create_instance({"user_agent":"Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.58 Mobile Safari/537.36"})` 会选择启用的 Android 默认档案并生成 Chrome 130 提示。未知 ID 返回 `DEVICE_PROFILE_NOT_FOUND`，停用 ID 返回 `DEVICE_PROFILE_DISABLED`，均不会回退为默认环境。配置变更需创建新实例。
 
 `client_hints.brands` 和 `full_version_list` 可选，但必须同时提供，格式与浏览器 `brands` / `fullVersionList` 相同；省略时按 UA 品牌和明确的 full_version 生成。UA 与 Client Hints 必须保持 Chromium 主版本、平台和移动标记一致。viewport 必须放得进 screen。语言列表最多8项且不得重复；locale 用于 Intl 格式，languages 用于 navigator.language/languages 和 Accept-Language，两者可以不同。
 

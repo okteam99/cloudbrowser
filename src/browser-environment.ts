@@ -1,5 +1,5 @@
 import type { userAgentMetadata } from './user-agent.js';
-import type { DeviceProfile } from './device-profile.js';
+import type { AppliedDeviceProfile } from './device-profile.js';
 import type { DeviceVerification } from './device-verification.js';
 
 export type BrowserEnvironment = {
@@ -8,8 +8,9 @@ export type BrowserEnvironment = {
   browser_version?: string;
   browser_mode?: string;
   user_agent_metadata?: ReturnType<typeof userAgentMetadata> | null;
-  device_profile?: DeviceProfile | null;
+  device_profile?: AppliedDeviceProfile | null;
   device_profile_id?: string | null;
+  device_profile_source?: string;
   device_verification?: DeviceVerification | null;
   os: string | null;
   country: string | null;

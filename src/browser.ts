@@ -38,7 +38,13 @@ import { readStorageState, storageLimit, deadline } from './browser-state.js';
 import sharp from 'sharp';
 import { operatingSystem, type BrowserEnvironment } from './browser-environment.js';
 import { userAgentMetadata } from './user-agent.js';
-import { profileMetadata, protocolProfile, acceptLanguage } from './device-profile.js';
+import {
+  profileMetadata,
+  protocolProfile,
+  acceptLanguage,
+  applyProfileUserAgent,
+  type AppliedDeviceProfile,
+} from './device-profile.js';
 import { DeviceProfileStore } from './device-profiles.js';
 import { verifyDeviceProfile, type DeviceVerification } from './device-verification.js';
 import { SystemSettings } from './system-settings.js';
@@ -57,6 +63,10 @@ type PageEntry = {
   requiresReload?: boolean;
   watchdogs: Map<Frame, CDPSession>;
 };
+type EffectiveInstanceOptions = Omit<InstanceOptions, 'device_profile'> & {
+  device_profile?: AppliedDeviceProfile;
+  device_profile_source: 'explicit_id' | 'inline' | 'ua_default' | 'ua_unmatched' | 'none';
+};
 type Instance = {
   id: string;
   owner: string;
@@ -72,7 +82,7 @@ type Instance = {
   probes: Map<string, Promise<{ status: string }>>;
   context: BrowserContext;
   gateway: Server;
-  options: InstanceOptions;
+  options: EffectiveInstanceOptions;
   proxy?: Proxy;
   userAgent?: string;
   proxyCountry?: string;
@@ -399,9 +409,10 @@ export class BrowserManager {
       browser_mode: 'chromium_new_headless',
       device_profile: i.options.device_profile ?? null,
       device_profile_id: i.options.device_profile_id ?? null,
+      device_profile_source: i.options.device_profile_source,
       device_verification: i.deviceVerification ?? null,
       user_agent_metadata: i.options.device_profile
-        ? profileMetadata(i.options.device_profile)
+        ? (profileMetadata(i.options.device_profile) ?? null)
         : (userAgentMetadata({ userAgent: i.options.user_agent }) ?? null),
       country: i.proxyCountry ?? null,
       country_source: i.proxyCountry ? ('proxy_config' as const) : ('unknown' as const),
@@ -420,6 +431,11 @@ export class BrowserManager {
       max_lifetime_seconds: i.options.max_lifetime_seconds,
       pages: Array.from(i.pages, ([page_id, p]) => ({ page_id, url: p.page.url() })),
       warnings: [
+        ...(i.options.device_profile_source === 'ua_unmatched'
+          ? [
+              'No enabled profile matches the UA operating system. Using UA-only settings without a device profile.',
+            ]
+          : []),
         'Custom Chromium UA Client Hints follow the supplied UA. browser_version is the actual engine; changing UA does not install that engine or create a real mobile device. Verify on the target.',
         'Host policy is defense in depth; use trusted upstream proxies and a network firewall for strict egress isolation.',
       ],
@@ -437,6 +453,7 @@ export class BrowserManager {
       user_agent_metadata: current.user_agent_metadata,
       device_profile: current.device_profile,
       device_profile_id: current.device_profile_id,
+      device_profile_source: current.device_profile_source,
       device_verification: i.deviceVerification ?? null,
       os: operatingSystem(userAgent),
       country: i.proxyCountry ?? null,
@@ -494,12 +511,31 @@ export class BrowserManager {
       code: 'browser_launch_started',
     });
     try {
-      const options = createSchema.parse(raw);
-      const profile =
-        options.device_profile ??
-        (options.device_profile_id
-          ? this.deviceProfiles.resolve(options.device_profile_id)
-          : undefined);
+      const requested = createSchema.parse(raw);
+      const auto =
+        !requested.device_profile && !requested.device_profile_id && requested.user_agent
+          ? this.deviceProfiles.defaultForUserAgent(requested.user_agent)
+          : undefined;
+      const selected =
+        requested.device_profile ??
+        (requested.device_profile_id
+          ? this.deviceProfiles.resolve(requested.device_profile_id)
+          : auto?.profile);
+      const profile = selected ? applyProfileUserAgent(selected, requested.user_agent) : undefined;
+      const options: EffectiveInstanceOptions = {
+        ...requested,
+        device_profile: profile,
+        device_profile_id: requested.device_profile_id ?? auto?.profile_id,
+        device_profile_source: requested.device_profile
+          ? 'inline'
+          : requested.device_profile_id
+            ? 'explicit_id'
+            : auto
+              ? 'ua_default'
+              : requested.user_agent
+                ? 'ua_unmatched'
+                : 'none',
+      };
       if (profile)
         Object.assign(options, {
           device_profile: profile,
@@ -1286,7 +1322,7 @@ export class BrowserManager {
     if (name === 'health')
       return {
         status: 'ok',
-        version: '0.15.0',
+        version: '0.15.1',
         base_url: this.cfg.baseUrl,
         public_url_mode: this.cfg.quickTunnel
           ? 'quick_tunnel'

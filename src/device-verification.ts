@@ -1,6 +1,6 @@
 import type { Page, Browser } from 'playwright';
 import sharp from 'sharp';
-import { type DeviceProfile, profileMetadata } from './device-profile.js';
+import { type AppliedDeviceProfile, profileMetadata } from './device-profile.js';
 import { deadline } from './browser-state.js';
 
 export type DeviceFieldCheck = {
@@ -40,7 +40,7 @@ export async function verifyDeviceProfile(
   page: Page,
   pageId: string,
   browser: Browser,
-  profile?: DeviceProfile,
+  profile?: AppliedDeviceProfile,
 ): Promise<DeviceVerification> {
   const probe = async () => {
     const n = navigator as any;
@@ -281,19 +281,21 @@ export async function verifyDeviceProfile(
         : {}),
     };
     const metadata = profileMetadata(profile);
-    const wantedHints = {
-      brands: metadata.brands,
-      fullVersionList: metadata.fullVersionList,
-      uaFullVersion: metadata.fullVersion,
-      platform: metadata.platform,
-      platformVersion: metadata.platformVersion,
-      architecture: metadata.architecture,
-      bitness: metadata.bitness,
-      model: metadata.model,
-      mobile: metadata.mobile,
-      wow64: metadata.wow64,
-      formFactors: metadata.formFactors,
-    };
+    const wantedHints = metadata
+      ? {
+          brands: metadata.brands,
+          fullVersionList: metadata.fullVersionList,
+          uaFullVersion: metadata.fullVersion,
+          platform: metadata.platform,
+          platformVersion: metadata.platformVersion,
+          architecture: metadata.architecture,
+          bitness: metadata.bitness,
+          model: metadata.model,
+          mobile: metadata.mobile,
+          wow64: metadata.wow64,
+          formFactors: metadata.formFactors,
+        }
+      : {};
     for (const scope of ['page', 'worker'] as const) {
       const actual = scope === 'page' ? observed : observed.worker;
       for (const [field, expected] of Object.entries(common))

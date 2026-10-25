@@ -281,6 +281,7 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
       const uiProfile = {
         ...originalProfiles[1],
         profile_id: 'ui-android',
+        is_default: false,
         profile: { ...originalProfiles[1].profile, name: 'UI Android 测试' },
       };
       await profileEditor.fill('{invalid');

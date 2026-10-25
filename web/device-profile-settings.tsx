@@ -104,13 +104,13 @@ export function DeviceProfileSettings() {
     >
       <Paragraph>
         在下方 JSON 中新增、修改或删除设备档案。每项包含唯一的 <Text code>profile_id</Text>、
-        <Text code>enabled</Text> 和完整的 <Text code>profile</Text>。可复制已有档案修改，最多 100
-        份。
+        <Text code>enabled</Text>、<Text code>is_default</Text> 和完整的 <Text code>profile</Text>
+        。可复制已有档案修改，最多 100 份。
       </Paragraph>
       <Paragraph type="secondary">
-        Agent 调用 list_device_profiles（支持按系统筛选）或 get_device_profile 读取档案，然后将 ID
-        传入 create_instance.device_profile_id。档案内包含 UA 和 Client Hints，不会仅凭单独的 UA
-        自动选择档案。
+        只传 UA 时，自动匹配相同操作系统的默认档案。每个系统最多启用一份 is_default=true
+        的档案；未标记时，使用该系统第一份启用档案。也可通过 device_profile_id 明确选择。单独指定的
+        UA 优先，Client Hints 自动重新生成，其他配置沿用档案。
       </Paragraph>
       {error && (
         <Alert

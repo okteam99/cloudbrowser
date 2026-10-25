@@ -160,7 +160,7 @@ Agent 必须支持远程 Streamable HTTP MCP 及自定义 Authorization 请求�
 - 环境参数创建后固定，切换环境需新建实例。
 - 传入 Chromium UA 后，自动按 UA 生成 Client Hints 的品牌、主/完整版本、平台、机型和移动标记；无需额外参数。例如 Chrome/130.0.0.0 对应版本提示 130 / 130.0.0.0。
 - `browser_version` 返回实际运行的 Chromium 内核版本，`user_agent_metadata` 返回自动生成的声明；UA 配置不会安装或切换内核。`verify_environment.actual.client_hints` 可核对目标页面实际读到的提示。
-- 未指定 UA 时保留原生 UA 和 Client Hints。无法从 UA 判断的机型、系统版本或 CPU 信息留空；Safari、Firefox、iOS 和无法识别的自定义 UA 不附带 Chromium 版本提示。移动布局与触摸仍由 viewport/mobile 控制。
+- 未指定 UA 和档案时保留原生 UA 和 Client Hints。无法从 UA 判断的机型、系统版本或 CPU 信息留空；Safari、Firefox、iOS 和无法识别的自定义 UA 不附带 Chromium 版本提示。移动布局与触摸使用所选档案；无档案时由 viewport/mobile 控制。
 - viewport 是 CSS 像素的设备视口；移动页面没有 viewport meta 时，layout_viewport 可能约为 980px。
 - 返回 instance_id、初始 page_id 和实际设备属性。用 `verify_environment` 验证出口，不把配置的国家标签当作真实地区。
 
@@ -168,11 +168,21 @@ Agent 必须支持远程 Streamable HTTP MCP 及自定义 Authorization 请求�
 
 ## 完整设备配置档与核验
 
-默认使用完整 Chromium 的新版无头模式。在控制台 **系统设置 → 设备档案** 编辑 JSON 数组，每项包含唯一的 `profile_id`、`enabled` 和完整的 `profile`。首次启动预置 macOS 与 Android 两份示例，可新增、修改、停用或删除；最多 100 份。保存时校验 UA / Client Hints 的版本和系统、屏幕、语言等字段，配置持久化到 `/data/device-profiles.json`，无需重启。
+默认使用完整 Chromium 的新版无头模式。在控制台 **系统设置 → 设备档案** 编辑 JSON 数组，每项包含唯一的 `profile_id`、`enabled`、`is_default` 和完整的 `profile`。首次启动预置 macOS 与 Android 两份示例，可新增、修改、停用或删除；最多 100 份。保存时校验 UA / Client Hints 的版本和系统、屏幕、语言等字段，配置持久化到 `/data/device-profiles.json`，无需重启。
 
-Agent 调用 `list_device_profiles` 查询已启用档案，可传 `{"platform":"Android"}` 或 `{"query":"pixel"}` 筛选。`get_device_profile({"profile_id":"android-pixel8-chrome155"})` 读取完整 JSON 和启用状态；创建时传 `device_profile_id`。也可把返回的 `profile` 放入内联 `device_profile` 后修改。两者互斥，配置档中的设备参数优先于旧的单独 UA / viewport / mobile / locale / timezone 参数，代理和实例生命周期仍单独设置。
+Agent 调用 `list_device_profiles` 查询已启用档案，可传 `{"platform":"Android"}` 或 `{"query":"pixel"}` 筛选。`get_device_profile({"profile_id":"android-pixel8-chrome155"})` 读取完整 JSON 和启用状态；创建时传 `device_profile_id`。也可把返回的 `profile` 放入内联 `device_profile` 后修改。两者互斥，单独指定的 `user_agent` 优先，并自动重新生成全部 Client Hints；viewport / mobile / locale / timezone 等其他设备参数沿用档案，代理和实例生命周期仍单独设置。
 
-每个实例独立选择档案，没有全局“当前选中档案”。只传 UA 不会自动选取档案。已删除或停用的 ID 无法创建新实例；修改档案只影响后续创建，运行中实例和历史记录保留原配置及档案 ID。
+每个实例独立选择档案，没有全局“当前选中档案”。只传 UA 时按操作系统自动匹配启用档案：优先 `is_default:true`，否则按 JSON 顺序取同系统第一份启用档案。每个系统最多一份启用的默认档案；缺省 `is_default:false`，旧配置无需修改即可匹配。没有同系统可用档案时保留 UA 模式并返回说明，不会选择其他系统。已删除或停用的 ID 无法创建新实例；修改档案只影响后续创建，运行中实例和历史记录保留原配置及档案 ID。
+
+例如只传 Android UA，自动沿用后台 Android 默认档案的屏幕、触控、语言、时区及 CPU：
+
+```json
+{
+  "user_agent": "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.58 Mobile Safari/537.36"
+}
+```
+
+明确指定档案时也可追加 `user_agent` 覆盖其 UA 和 Client Hints。UA 无法判断的 Client Hints 字段留空，不沿用档案中的旧品牌、版本、机型或架构；其余档案属性不变。返回 `device_profile_source`（explicit_id / inline / ua_default / ua_unmatched / none）说明选择来源，`device_profile` 是创建时实际生效的快照，不会修改后台模板。
 
 ```json
 {
@@ -458,10 +468,10 @@ bash scripts/publish-docker.sh
 ## 源码构建及 stdio 接入
 
 ```sh
-docker build -t cloudbrowser:0.15.0 .
+docker build -t cloudbrowser:0.15.1 .
 ```
 
-将一行部署命令最后的镜像名换成 `cloudbrowser:0.15.0` 即可本地使用。
+将一行部署命令最后的镜像名换成 `cloudbrowser:0.15.1` 即可本地使用。
 
 兼容配置见 [本地 stdio](examples/mcp.local.json)、[SSH stdio](examples/mcp.ssh.json)。仍使用 `docker exec -i`，不得使用 `-t`。MCP_PRINCIPAL 是可信 SSH/Docker 接入中的命名空间，不是独立认证。
 

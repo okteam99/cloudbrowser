@@ -41,12 +41,14 @@ const value = (v: unknown) =>
 export function DeviceProfileCard({
   profile,
   profileId,
+  profileSource,
   report,
   browserVersion,
   browserMode,
 }: {
   profile?: DeviceProfileView | null;
   profileId?: string | null;
+  profileSource?: string;
   report?: DeviceVerificationView | null;
   browserVersion?: string;
   browserMode?: string;
@@ -75,6 +77,8 @@ export function DeviceProfileCard({
     >
       <Space wrap>
         <Text strong>{profile?.name ?? '未指定设备配置档'}</Text>
+        {profileSource === 'ua_default' && <Tag color="blue">按 UA 系统自动匹配</Tag>}
+        {profileSource === 'ua_unmatched' && <Tag>无同系统可用档案 · 仅 UA</Tag>}
         {profileId && (
           <Text code copyable>
             {profileId}
