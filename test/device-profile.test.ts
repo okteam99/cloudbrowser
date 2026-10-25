@@ -92,6 +92,7 @@ test(
         );
       };
       check(await p.evaluate('window.first'));
+      for (let n = 0; n < 3; n++) check((await call('evaluate', { ...ids, script: read })).value);
       for (const frame of p.frames()) {
         await frame.waitForFunction('window.first');
         check(await frame.evaluate('window.first'));
@@ -101,6 +102,15 @@ test(
       const popup = await popupPromise;
       await popup.waitForLoadState();
       check(await popup.evaluate('window.first'));
+      const popupId = [...m.instances.get(i.instance_id)!.pages].find(
+        ([, v]) => v.page === popup,
+      )![0];
+      check(
+        (await call('evaluate', { instance_id: i.instance_id, page_id: popupId, script: read }))
+          .value,
+      );
+      await call('close_page', { instance_id: i.instance_id, page_id: popupId });
+      check((await call('evaluate', { ...ids, script: read })).value);
       const worker = await p.evaluate(
         () =>
           new Promise((resolve, reject) => {
@@ -157,6 +167,7 @@ test(
         verified.capabilities.find((c: any) => c.name === 'pdf_viewer').method,
         'execution',
       );
+      check((await call('evaluate', { ...ids, script: read })).value);
       await assert.rejects(m.execute('bob', 'verify_device_profile', ids), {
         code: 'INSTANCE_NOT_FOUND',
       });
@@ -178,6 +189,69 @@ test(
     } finally {
       await m.shutdown();
       await new Promise<void>((r) => fixture.close(() => r()));
+      await rm(dir, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'CDP watchdog reuse preserves a foreign platform through evaluate, verification and reload',
+  { timeout: 30000 },
+  async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'cb-profile-watchdog-'));
+    const server = http.createServer((q, r) => {
+      r.setHeader('Content-Type', 'text/html');
+      r.end('<meta name="viewport" content="width=device-width,initial-scale=1"><h1>Fixture</h1>');
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    const m = new BrowserManager({
+      ...config(),
+      dataDir: dir,
+      recordVideo: false,
+      allowPrivate: true,
+    });
+    await m.init();
+    const call = (name: string, args: any) => m.execute('alice', name, args);
+    try {
+      const i = await call('create_instance', { device_profile_id: 'android-pixel8-chrome155' });
+      const ids = { instance_id: i.instance_id, page_id: i.pages[0].page_id };
+      await call('navigate', { ...ids, url: `http://127.0.0.1:${(server.address() as any).port}` });
+      const entry = m.instances.get(i.instance_id)!.pages.get(ids.page_id)!;
+      for (let n = 0; n < 3; n++)
+        assert.equal(
+          (await call('evaluate', { ...ids, script: 'navigator.platform' })).value,
+          'Linux armv81',
+        );
+      assert.equal(entry.watchdogs.size, 1);
+      const report = await call('verify_device_profile', ids);
+      assert.equal(
+        report.fields.find((f: any) => f.scope === 'page' && f.field === 'navigator_platform')
+          .status,
+        'match',
+      );
+      assert.equal(
+        (await call('evaluate', { ...ids, script: 'navigator.platform' })).value,
+        'Linux armv81',
+      );
+      await call('navigate', { ...ids, action: 'reload' });
+      assert.equal(
+        (await call('evaluate', { ...ids, script: 'navigator.platform' })).value,
+        'Linux armv81',
+      );
+      const afterReload = await call('verify_device_profile', ids);
+      assert.ok(
+        afterReload.fields
+          .filter((f: any) => f.mode === 'emulated')
+          .every((f: any) => f.status === 'match'),
+        JSON.stringify(
+          afterReload.fields.filter((f: any) => f.mode === 'emulated' && f.status !== 'match'),
+        ),
+      );
+      await call('close_instance', { instance_id: i.instance_id });
+      assert.equal(entry.watchdogs.size, 0);
+    } finally {
+      await m.shutdown();
+      await new Promise<void>((r) => server.close(() => r()));
       await rm(dir, { recursive: true, force: true });
     }
   },

@@ -55,3 +55,5 @@ Playwright 1.64.1 的内置 UA metadata 解析没有填写品牌和版本；Chro
 - 兼容层保存原始 dependency bundle 后幂等应用补丁；从旧版开发环境升级时先 npm ci。升级 Playwright 仍需审查版本、源码校验和锚点。
 - verify_device_profile 对字段和能力分开计数，记录不支持、CSP限制和超时；webdriver、内存、PDF、蓝牙、语音等期望值不通过假对象覆盖。
 - 核验历史通过原有受认证详情接口显示；旧记录无配置档时显示未配置，不能标成新版运行模式。
+
+设备档案还覆盖连续 evaluate / verify_device_profile / reload 的状态保持：辅助 CDP 调试会话在页面/独立 iframe 生命周期内复用，关闭目标时释放，避免 Chromium 在每次 detach 时重置平台覆盖。包含宿主系统不同的 Android 平台回归，防止只在 macOS 上测试 MacIntel 而漏掉回退问题。

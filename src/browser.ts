@@ -9,6 +9,8 @@ import {
   type Dialog,
   type Download,
   type Request,
+  type Frame,
+  type CDPSession,
 } from 'playwright';
 import type { Server } from 'proxy-chain';
 import { randomUUID } from 'node:crypto';
@@ -58,6 +60,7 @@ type PageEntry = {
   dialog?: Dialog;
   crashed?: boolean;
   requiresReload?: boolean;
+  watchdogs: Map<Frame, CDPSession>;
 };
 type Instance = {
   id: string;
@@ -205,7 +208,7 @@ export class BrowserManager {
       this.event(i, { type: 'page_limit' });
       return id;
     }
-    const entry: PageEntry = { page, generation: 0, refs: new Map() };
+    const entry: PageEntry = { page, generation: 0, refs: new Map(), watchdogs: new Map() };
     i.pages.set(id, entry);
     i.pageData.set(id, new PageData(page));
     while (i.pageData.size > this.cfg.maxPages) {
@@ -216,11 +219,18 @@ export class BrowserManager {
     }
     i.activePageId = id;
     page.on('close', () => {
+      for (const session of entry.watchdogs.values()) void session.detach().catch(() => {});
+      entry.watchdogs.clear();
       this.clearRefs(entry);
       i.pages.delete(id);
       i.probes.delete(id);
       if (i.activePageId === id) i.activePageId = [...i.pages.keys()].at(-1);
       this.event(i, { type: 'page_closed', page_id: id, instance_closing: i.closing });
+    });
+    page.on('framedetached', (frame) => {
+      const session = entry.watchdogs.get(frame);
+      entry.watchdogs.delete(frame);
+      if (session) void session.detach().catch(() => {});
     });
     page.on('framenavigated', (frame) => {
       if (frame === page.mainFrame()) {
@@ -1271,7 +1281,7 @@ export class BrowserManager {
     if (name === 'health')
       return {
         status: 'ok',
-        version: '0.14.0',
+        version: '0.14.1',
         base_url: this.cfg.baseUrl,
         public_url_mode: this.cfg.quickTunnel
           ? 'quick_tunnel'
@@ -1356,6 +1366,43 @@ export class BrowserManager {
       i.touched = Date.now();
     }
   }
+  // Chromium resets some emulation state when an auxiliary CDP session detaches.
+  // Keep timeout watchdogs for the target lifetime, shared by evaluate and verify.
+  private async watchdog(
+    i: Instance,
+    p: PageEntry,
+    frame = p.page.mainFrame(),
+  ): Promise<CDPSession> {
+    const existing = p.watchdogs.get(frame);
+    if (existing) return existing;
+    let session: CDPSession;
+    try {
+      session = await i.context.newCDPSession(frame === p.page.mainFrame() ? p.page : frame);
+    } catch (error) {
+      if (frame === p.page.mainFrame()) throw error;
+      return this.watchdog(i, p);
+    }
+    p.watchdogs.set(frame, session);
+    session.on('close', () => {
+      if (p.watchdogs.get(frame) === session) p.watchdogs.delete(frame);
+    });
+    const profile = i.options.device_profile;
+    if (profile) {
+      // Every inspector session must carry the same platform override; an empty
+      // auxiliary session otherwise restores the native value on navigation.
+      await session.send('Emulation.setUserAgentOverride', {
+        userAgent: profile.user_agent,
+        platform: profile.navigator_platform,
+        acceptLanguage: profile.languages.join(','),
+        userAgentMetadata: profileMetadata(profile),
+      });
+      if (profile.hardware_concurrency)
+        await session.send('Emulation.setHardwareConcurrencyOverride', {
+          hardwareConcurrency: profile.hardware_concurrency,
+        });
+    }
+    return session;
+  }
   private async evaluate(i: Instance, p: PageEntry, a: any) {
     const frame = a.frame_id ? i.pageData.get(a.page_id)!.frame(a.frame_id) : p.page.mainFrame();
     let argument: string;
@@ -1364,9 +1411,7 @@ export class BrowserManager {
     } catch {
       throw new ToolError('INVALID_ARGUMENT', 'Script arg must be JSON serializable.');
     }
-    const session = await i.context
-      .newCDPSession(frame)
-      .catch(() => i.context.newCDPSession(p.page));
+    const session = await this.watchdog(i, p, frame);
     const expression = `(async () => { const candidate = (${a.script}); const value = await (typeof candidate === 'function' ? candidate(JSON.parse(${JSON.stringify(argument)})) : candidate); let json; try { json = JSON.stringify(value); } catch (e) { return {serialization_error: String(e)}; } if (json === undefined) return {json:'null', value_type:typeof value}; const bytes = new TextEncoder().encode(json).length; if (bytes > ${a.max_result_bytes ?? 65536}) return {too_large:true,bytes}; return {json,bytes,value_type:typeof value}; })()`;
     let timer: NodeJS.Timeout | undefined;
     try {
@@ -1405,7 +1450,6 @@ export class BrowserManager {
     } finally {
       clearTimeout(timer);
       this.clearRefs(p);
-      void session.detach().catch(() => {});
     }
   }
   private async pointer(i: Instance, p: PageEntry, a: any) {
@@ -1463,7 +1507,7 @@ export class BrowserManager {
       const p = this.page(i, a.page_id);
       if (p.requiresReload)
         throw new ToolError('PAGE_RELOAD_REQUIRED', 'Reload this tab before another verification.');
-      const session = await i.context.newCDPSession(p.page);
+      const session = await this.watchdog(i, p);
       try {
         const result = await verifyDeviceProfile(
           p.page,
@@ -1480,8 +1524,6 @@ export class BrowserManager {
           await session.send('Runtime.terminateExecution').catch(() => {});
         }
         throw error;
-      } finally {
-        await session.detach().catch(() => {});
       }
     }
     if (name === 'save_storage_state') {

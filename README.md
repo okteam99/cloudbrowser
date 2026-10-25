@@ -454,10 +454,10 @@ bash scripts/publish-docker.sh
 ## 源码构建及 stdio 接入
 
 ```sh
-docker build -t cloudbrowser:0.14.0 .
+docker build -t cloudbrowser:0.14.1 .
 ```
 
-将一行部署命令最后的镜像名换成 `cloudbrowser:0.14.0` 即可本地使用。
+将一行部署命令最后的镜像名换成 `cloudbrowser:0.14.1` 即可本地使用。
 
 兼容配置见 [本地 stdio](examples/mcp.local.json)、[SSH stdio](examples/mcp.ssh.json)。仍使用 `docker exec -i`，不得使用 `-t`。MCP_PRINCIPAL 是可信 SSH/Docker 接入中的命名空间，不是独立认证。
 
