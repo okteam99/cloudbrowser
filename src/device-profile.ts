@@ -114,6 +114,7 @@ export const deviceProfileSchema = z
     }
   });
 export type DeviceProfile = z.infer<typeof deviceProfileSchema>;
+export const deviceProfileIdSchema = z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$/);
 
 const mac = deviceProfileSchema.parse({
   name: 'macOS ARM · Chrome 155 · desktop example',
@@ -182,7 +183,6 @@ const android = deviceProfileSchema.parse({
   hardware_concurrency: 8,
 });
 const templates = { 'macos-arm-chrome155': mac, 'android-pixel8-chrome155': android };
-export const deviceProfileIds = ['macos-arm-chrome155', 'android-pixel8-chrome155'] as const;
 export function listDeviceProfiles() {
   return Object.entries(templates).map(([profile_id, profile]) => ({
     profile_id,
@@ -190,15 +190,6 @@ export function listDeviceProfiles() {
     profile: structuredClone(profile),
     note: 'A declared test environment, not a real device or browser-version installation. Clone profile into device_profile to customize.',
   }));
-}
-export function resolveDeviceProfile(options: {
-  device_profile?: DeviceProfile;
-  device_profile_id?: keyof typeof templates;
-}) {
-  return (
-    options.device_profile ??
-    (options.device_profile_id ? structuredClone(templates[options.device_profile_id]) : undefined)
-  );
 }
 export function profileMetadata(profile: DeviceProfile) {
   const h = profile.client_hints;

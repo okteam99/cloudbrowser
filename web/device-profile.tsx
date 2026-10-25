@@ -40,11 +40,13 @@ const value = (v: unknown) =>
   v === null || v === undefined ? '未读取' : typeof v === 'string' ? v : JSON.stringify(v);
 export function DeviceProfileCard({
   profile,
+  profileId,
   report,
   browserVersion,
   browserMode,
 }: {
   profile?: DeviceProfileView | null;
+  profileId?: string | null;
   report?: DeviceVerificationView | null;
   browserVersion?: string;
   browserMode?: string;
@@ -73,6 +75,11 @@ export function DeviceProfileCard({
     >
       <Space wrap>
         <Text strong>{profile?.name ?? '未指定设备配置档'}</Text>
+        {profileId && (
+          <Text code copyable>
+            {profileId}
+          </Text>
+        )}
         <Tag>实际内核 {browserVersion ?? report?.browser_version ?? '未记录'}</Tag>
         {browserMode === 'chromium_new_headless' && <Tag>完整 Chromium · 新版无头模式</Tag>}
       </Space>

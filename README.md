@@ -168,7 +168,11 @@ Agent 必须支持远程 Streamable HTTP MCP 及自定义 Authorization 请求�
 
 ## 完整设备配置档与核验
 
-默认使用完整 Chromium 的新版无头模式。调用 `list_device_profiles` 获取完整示例配置；创建时传 `device_profile_id`，或把示例中的 `profile` 复制到 `device_profile` 后修改。两者互斥，配置档中的设备参数优先于旧的单独 UA / viewport / mobile / locale / timezone 参数，代理和实例生命周期仍单独设置。
+默认使用完整 Chromium 的新版无头模式。在控制台 **系统设置 → 设备档案** 编辑 JSON 数组，每项包含唯一的 `profile_id`、`enabled` 和完整的 `profile`。首次启动预置 macOS 与 Android 两份示例，可新增、修改、停用或删除；最多 100 份。保存时校验 UA / Client Hints 的版本和系统、屏幕、语言等字段，配置持久化到 `/data/device-profiles.json`，无需重启。
+
+Agent 调用 `list_device_profiles` 查询已启用档案，可传 `{"platform":"Android"}` 或 `{"query":"pixel"}` 筛选。`get_device_profile({"profile_id":"android-pixel8-chrome155"})` 读取完整 JSON 和启用状态；创建时传 `device_profile_id`。也可把返回的 `profile` 放入内联 `device_profile` 后修改。两者互斥，配置档中的设备参数优先于旧的单独 UA / viewport / mobile / locale / timezone 参数，代理和实例生命周期仍单独设置。
+
+每个实例独立选择档案，没有全局“当前选中档案”。只传 UA 不会自动选取档案。已删除或停用的 ID 无法创建新实例；修改档案只影响后续创建，运行中实例和历史记录保留原配置及档案 ID。
 
 ```json
 {
@@ -365,11 +369,11 @@ Agent 调用 `list_proxies` 查询列表，可传 `country: "US"`、`protocol: "
 
 ## 浏览器操作与分析
 
-当前提供 **44 个 MCP 工具**。除了多实例、多标签页、点击输入、iframe、上传下载，还支持：
+当前提供 **45 个 MCP 工具**。除了多实例、多标签页、点击输入、iframe、上传下载，还支持：
 
 | 能力 | MCP 工具 |
 | --- | --- |
-| 设备配置与核验 | list_device_profiles / verify_device_profile，创建时可传 device_profile 或 device_profile_id |
+| 设备配置与核验 | list_device_profiles / get_device_profile / verify_device_profile，后台 JSON 管理，创建时可传 device_profile 或 device_profile_id |
 | 查看实例与 Tab | list_instances / get_instance / list_pages / get_page，忙碌时也可查询 |
 | 切换焦点和直播页面 | select_page |
 | 结构化读取元素 | read_element，返回文本、值、属性、状态和坐标 |
@@ -454,10 +458,10 @@ bash scripts/publish-docker.sh
 ## 源码构建及 stdio 接入
 
 ```sh
-docker build -t cloudbrowser:0.14.1 .
+docker build -t cloudbrowser:0.15.0 .
 ```
 
-将一行部署命令最后的镜像名换成 `cloudbrowser:0.14.1` 即可本地使用。
+将一行部署命令最后的镜像名换成 `cloudbrowser:0.15.0` 即可本地使用。
 
 兼容配置见 [本地 stdio](examples/mcp.local.json)、[SSH stdio](examples/mcp.ssh.json)。仍使用 `docker exec -i`，不得使用 `-t`。MCP_PRINCIPAL 是可信 SSH/Docker 接入中的命名空间，不是独立认证。
 

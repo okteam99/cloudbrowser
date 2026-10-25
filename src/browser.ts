@@ -38,13 +38,8 @@ import { readStorageState, storageLimit, deadline } from './browser-state.js';
 import sharp from 'sharp';
 import { operatingSystem, type BrowserEnvironment } from './browser-environment.js';
 import { userAgentMetadata } from './user-agent.js';
-import {
-  resolveDeviceProfile,
-  profileMetadata,
-  protocolProfile,
-  acceptLanguage,
-  listDeviceProfiles,
-} from './device-profile.js';
+import { profileMetadata, protocolProfile, acceptLanguage } from './device-profile.js';
+import { DeviceProfileStore } from './device-profiles.js';
 import { verifyDeviceProfile, type DeviceVerification } from './device-verification.js';
 import { SystemSettings } from './system-settings.js';
 import {
@@ -115,11 +110,13 @@ export class BrowserManager {
   proxies: ProxyStore;
   proxyHealth: ProxyHealthMonitor;
   settings: SystemSettings;
+  deviceProfiles: DeviceProfileStore;
   private curlActive = 0;
   private creating = 0;
   private closing = 0;
   constructor(public cfg: Config) {
     this.settings = new SystemSettings(cfg);
+    this.deviceProfiles = new DeviceProfileStore(cfg.dataDir);
     this.artifacts = new Artifacts(cfg);
     this.policy = new NetworkPolicy(cfg);
     this.logs = new Diagnostics(cfg);
@@ -138,6 +135,7 @@ export class BrowserManager {
   async init() {
     await mkdir(this.cfg.dataDir, { recursive: true, mode: 0o700 });
     await this.settings.init();
+    await this.deviceProfiles.init();
     await this.logs.init();
     await this.proxies.init();
     for (const p of this.proxies.list())
@@ -400,6 +398,7 @@ export class BrowserManager {
       browser_version: i.browser.version(),
       browser_mode: 'chromium_new_headless',
       device_profile: i.options.device_profile ?? null,
+      device_profile_id: i.options.device_profile_id ?? null,
       device_verification: i.deviceVerification ?? null,
       user_agent_metadata: i.options.device_profile
         ? profileMetadata(i.options.device_profile)
@@ -437,6 +436,7 @@ export class BrowserManager {
       browser_mode: current.browser_mode,
       user_agent_metadata: current.user_agent_metadata,
       device_profile: current.device_profile,
+      device_profile_id: current.device_profile_id,
       device_verification: i.deviceVerification ?? null,
       os: operatingSystem(userAgent),
       country: i.proxyCountry ?? null,
@@ -495,7 +495,11 @@ export class BrowserManager {
     });
     try {
       const options = createSchema.parse(raw);
-      const profile = resolveDeviceProfile(options);
+      const profile =
+        options.device_profile ??
+        (options.device_profile_id
+          ? this.deviceProfiles.resolve(options.device_profile_id)
+          : undefined);
       if (profile)
         Object.assign(options, {
           device_profile: profile,
@@ -1167,7 +1171,8 @@ export class BrowserManager {
     operationId: string,
     instanceId?: string,
   ): Promise<any> {
-    if (name === 'list_device_profiles') return listDeviceProfiles();
+    if (name === 'list_device_profiles') return this.deviceProfiles.list(a);
+    if (name === 'get_device_profile') return this.deviceProfiles.get(a.profile_id);
     if (
       [
         'get_instance',
@@ -1281,7 +1286,7 @@ export class BrowserManager {
     if (name === 'health')
       return {
         status: 'ok',
-        version: '0.14.1',
+        version: '0.15.0',
         base_url: this.cfg.baseUrl,
         public_url_mode: this.cfg.quickTunnel
           ? 'quick_tunnel'

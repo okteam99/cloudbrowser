@@ -25,7 +25,8 @@
 | `health` | `{}` | 服务状态与容量 |
 | `list_proxies` | 可选 country（两位大写国家码）、protocol（socks5/http/https）、enabled_only（默认true）、status（healthy/unhealthy/unknown/checking/disabled） | proxy_id、兼容 proxy_ref、名称、地址、国家、启用状态、status、health（checked_at / next_check_at / latency_ms / observed_ip / http_status / error_code / checking）、鉴权标记；不返回用户名或密码 |
 | `check_proxy` | proxy、proxy_id、proxy_ref 三选一；可选 check_url | 临时浏览器查询出口，始终清理；不验证国家 |
-| `list_device_profiles` | `{}` | 完整示例 profile；可按 profile_id 使用或复制后修改 |
+| `list_device_profiles` | 可选 platform、query（ID/名称）、enabled_only（默认 true） | 后台已保存的完整档案列表；默认仅启用项 |
+| `get_device_profile` | profile_id | 一份档案的完整 profile、enabled、revision；不启动浏览器 |
 | `verify_device_profile` | instance_id、page_id | 字段对比、实际能力检测及最新报告，保留到实例历史 |
 | `create_instance` | 可选 device_profile / device_profile_id（二选一）、 task_description（1–1000字符）、storage_state_id、UA、viewport、proxy/proxy_id/proxy_ref、mobile、locale、timezone、生命周期 | instance_id、details_url、task_description、pages、实际设备属性、警告 |
 | `get_instance` | instance_id | 配置和页面，隐藏凭据 |
@@ -63,7 +64,17 @@
 
 ## 完整设备配置档
 
-`list_device_profiles` 返回内置示例：`macos-arm-chrome155`、`android-pixel8-chrome155`，每项包含 `profile_id`、`kind=example`、完整 `profile`。无网络请求，不启动浏览器。配置档支持两种用法：
+管理员在 **系统设置 → 设备档案** 编辑 JSON 数组；每项为 `{ "profile_id": "自定义唯一ID", "enabled": true, "profile": { ...完整设备字段... } }`。ID 为 1–100 位英文字母、数字、下划线或连字符，首位为字母/数字。最多 100 份；重复 ID、UA / Client Hints 冲突、无效语言/时区等会被拒绝，并返回具体字段路径。保存后新实例立即可用，重启后保留；空数组表示没有可选档案，不会重新补入示例。
+
+首次初始化提供 `macos-arm-chrome155`、`android-pixel8-chrome155` 两份可编辑示例。`list_device_profiles` 返回当前配置而非固定枚举，每项包含 `profile_id`、`enabled`、`kind=configured`、`revision`、完整 `profile`。默认只返回启用项；传 `enabled_only:false` 可查看停用档案。`platform` 可为 macOS / Windows / Linux / Android / Chrome OS，`query` 按 ID 或名称匹配，不区分大小写。`get_device_profile` 可读取单份启用或停用档案。两个接口均不启动浏览器、不发送外部请求。
+
+Agent 的选择流程（HTTP API 与 MCP 同名同参）：
+
+1. `list_device_profiles({"platform":"Android"})` 获取候选项。
+2. `get_device_profile({"profile_id":"android-pixel8-chrome155"})` 检查完整配置。
+3. `create_instance({"device_profile_id":"android-pixel8-chrome155","task_description":"测试移动端登录流程"})` 创建独立实例。
+
+没有全局选中状态；每次创建都传 ID。仅传 UA 会生成 Client Hints，不会自动选档案。设备档案是测试声明，不改变实际浏览器内核。也可以选择桌面档案：
 
 ```json
 {"task_description":"检查桌面页面与下载","device_profile_id":"macos-arm-chrome155"}
@@ -102,7 +113,7 @@
 }
 ```
 
-`device_profile` 与 `device_profile_id` 互斥。配置档优先覆盖同次请求的旧设备参数，`proxy` / `proxy_id` / `proxy_ref`、任务描述、登录态和生命周期不受影响。配置在创建时固定；变更需创建新实例。`get_instance` / `list_instances` 返回完整生效配置，历史保存在 `environment.device_profile`。
+`device_profile` 与 `device_profile_id` 互斥。配置档优先覆盖同次请求的旧设备参数，`proxy` / `proxy_id` / `proxy_ref`、任务描述、登录态和生命周期不受影响。按 ID 创建会复制创建时的完整配置；随后修改、停用、删除该 ID，不影响运行中实例或已保存历史。`get_instance` / `list_instances` 返回完整生效配置和 `device_profile_id`，历史保存在 `environment.device_profile` / `environment.device_profile_id`。未知 ID 返回 `DEVICE_PROFILE_NOT_FOUND`，停用 ID 返回 `DEVICE_PROFILE_DISABLED`，均不会回退为默认环境。配置变更需创建新实例。
 
 `client_hints.brands` 和 `full_version_list` 可选，但必须同时提供，格式与浏览器 `brands` / `fullVersionList` 相同；省略时按 UA 品牌和明确的 full_version 生成。UA 与 Client Hints 必须保持 Chromium 主版本、平台和移动标记一致。viewport 必须放得进 screen。语言列表最多8项且不得重复；locale 用于 Intl 格式，languages 用于 navigator.language/languages 和 Accept-Language，两者可以不同。
 
@@ -376,6 +387,8 @@ inspect_instance和get_logs不占用浏览器执行锁；get_diagnostics也可�
 - `GET /api/recordings`：历史录像。
 - `GET /api/settings`：已登录管理员读取当前 storage 和 usage（产物用量、分类和磁盘可用空间）。
 - `PUT /api/settings`：保存 `{ "max_data_bytes": 214748364800, "screenshot_retention_days": 7 }`；需要网页登录及 CSRF 请求头或现有 Bearer。配额最少1 MiB，截图保留1–365天，配置持久化且即时生效。MCP `health.storage` 返回当前设置。
+- `GET /api/settings/device-profiles`：需登录或 Bearer，返回 `{ "revision": "当前配置摘要", "profiles": [...] }`，包含停用档案。
+- `PUT /api/settings/device-profiles`：需登录及 CSRF 或 Bearer，提交 GET 返回的 `revision` 和完整 `profiles` 数组。原子保存到 `/data/device-profiles.json`；JSON 上限 1 MiB。配置无效返回 400 与字段路径，其他窗口已更新返回 409 `DEVICE_PROFILES_CONFLICT`（需重新读取并合并），写入失败保留旧配置。MCP 提供查询和创建时选择；平台档案管理在后台完成。
 - `GET /api/recordings/{recording_id}/video`：WebM 播放/下载，支持 Range；录像未完成返回 409。
 - `GET /docs/README.md`、`/docs/mcp-api.md`、`/docs/mcp-tools.json`、`/docs/agent-workflow.md`：完整文档。
 

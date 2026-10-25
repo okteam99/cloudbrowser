@@ -18,8 +18,8 @@ jobs:
       - run: npm run format:check
       - run: npm test
       - run: npm run schema && git diff --exit-code docs/mcp-tools.json
-      - run: docker build -t cloudbrowser:0.14.1 .
-      - run: docker run -d --init --name cloudbrowser --shm-size=1g -p 8080:8080 -e BASE_URL=http://localhost:8080 -e WEB_PASSWORD=ci-test-password cloudbrowser:0.14.1
+      - run: docker build -t cloudbrowser:0.15.0 .
+      - run: docker run -d --init --name cloudbrowser --shm-size=1g -p 8080:8080 -e BASE_URL=http://localhost:8080 -e WEB_PASSWORD=ci-test-password cloudbrowser:0.15.0
       - run: npm run smoke -- --docker
       - run: SMOKE_BASE_URL=http://localhost:8080 SMOKE_PASSWORD=ci-test-password npm run smoke:http
       - if: always()

@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { deviceProfileSchema, deviceProfileIds } from './device-profile.js';
+import { deviceProfileSchema, deviceProfileIdSchema } from './device-profile.js';
 
 export const proxySchema = z
   .object({
@@ -34,11 +34,10 @@ export const createSchema = z
       .max(1000)
       .describe('Task objective shown in the console and retained with instance history.')
       .optional(),
-    device_profile_id: z
-      .enum(deviceProfileIds)
+    device_profile_id: deviceProfileIdSchema
       .optional()
       .describe(
-        'Example profile from list_device_profiles. Device profile values override legacy UA/viewport/mobile/locale/timezone parameters.',
+        'Enabled saved profile from list_device_profiles/get_device_profile. Selects a snapshot at creation; later edits do not affect this instance. Profile values override legacy UA/viewport/mobile/locale/timezone parameters.',
       ),
     device_profile: deviceProfileSchema
       .optional()

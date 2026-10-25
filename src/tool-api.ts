@@ -65,6 +65,7 @@ export function toolHttpStatus(result: ToolResult) {
       'PAGE_NOT_FOUND',
       'ARTIFACT_NOT_FOUND',
       'PROXY_NOT_FOUND',
+      'DEVICE_PROFILE_NOT_FOUND',
       'OPERATION_NOT_FOUND',
       'REQUEST_NOT_FOUND',
       'FRAME_NOT_FOUND',

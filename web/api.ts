@@ -41,6 +41,7 @@ export type BrowserInstance = {
   browser_version?: string;
   browser_mode?: string;
   device_profile?: DeviceProfileView | null;
+  device_profile_id?: string | null;
   device_verification?: DeviceVerificationView | null;
   country?: string | null;
   country_source?: 'proxy_config' | 'unknown';
@@ -70,6 +71,7 @@ export type Recording = {
     browser_version?: string;
     browser_mode?: string;
     device_profile?: DeviceProfileView | null;
+    device_profile_id?: string | null;
     device_verification?: DeviceVerificationView | null;
     os: string | null;
     country: string | null;

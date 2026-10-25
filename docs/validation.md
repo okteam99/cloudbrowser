@@ -57,3 +57,9 @@ Playwright 1.64.1 的内置 UA metadata 解析没有填写品牌和版本；Chro
 - 核验历史通过原有受认证详情接口显示；旧记录无配置档时显示未配置，不能标成新版运行模式。
 
 设备档案还覆盖连续 evaluate / verify_device_profile / reload 的状态保持：辅助 CDP 调试会话在页面/独立 iframe 生命周期内复用，关闭目标时释放，避免 Chromium 在每次 detach 时重置平台覆盖。包含宿主系统不同的 Android 平台回归，防止只在 macOS 上测试 MacIntel 而漏掉回退问题。
+
+## 后台档案目录（0.15）
+
+- 档案 JSON 持久化、系统/名称筛选、启用停用、删除、重复 ID 与身份字段校验、并发修改冲突、磁盘写入失败保留旧值、损坏文件拒绝静默覆盖、空目录重启后不恢复示例。
+- 实际 HTTP 后台保存 → MCP 查询和读取 → 按自定义 ID 创建 Chromium → 页面读取 UA / platform / screen / touch；停用或删除后新建被拒绝，已存在实例和历史保持原配置。
+- 真实控制台登录、JSON 编辑、格式错误反馈、保存并刷新后恢复配置；管理员登录 / CSRF / Bearer 与只读 MCP 查询沿用原鉴权。

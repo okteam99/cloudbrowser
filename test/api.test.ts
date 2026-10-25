@@ -13,7 +13,7 @@ import { toolOpenApi } from '../src/api-schema.js';
 test('OpenAPI input references resolve within their own tool components', async () => {
   const spec = await toolOpenApi('https://browser.example/prefix');
   assert.equal(spec.openapi, '3.1.1');
-  assert.equal(Object.keys(spec.paths).length, 44);
+  assert.equal(Object.keys(spec.paths).length, 45);
   assert.equal(spec.servers[0].url, 'https://browser.example/prefix');
   let refs = 0;
   const visit = (value: any) => {
@@ -191,6 +191,85 @@ test('HTTP tool API and MCP share instances, validation, idempotent actions, art
       assert.equal(tool.url, `${base}/api/tools/${tool.name}`);
     }
     const op = randomUUID();
+    const profilePath = base + '/api/settings/device-profiles';
+    assert.equal((await fetch(profilePath)).status, 401);
+    assert.equal((await fetch(profilePath, { method: 'PUT', body: '{}' })).status, 401);
+    assert.equal(
+      (await fetch(profilePath, { method: 'PUT', headers: { Cookie: cookie }, body: '{}' })).status,
+      403,
+    );
+    const initialProfiles = await (await fetch(profilePath, { headers })).json();
+    const customProfile = {
+      profile_id: 'api-test-android',
+      enabled: true,
+      profile: { ...initialProfiles.profiles[1].profile, name: 'API saved Android' },
+    };
+    const saveProfiles = async (document: any) =>
+      fetch(profilePath, { method: 'PUT', headers, body: JSON.stringify(document) });
+    assert.equal(
+      (await saveProfiles({ ...initialProfiles, profiles: [customProfile, customProfile] })).status,
+      400,
+    );
+    const savedResponse = await saveProfiles({ ...initialProfiles, profiles: [customProfile] });
+    assert.equal(savedResponse.status, 200);
+    const savedProfiles = await savedResponse.json();
+    assert.equal((await saveProfiles(initialProfiles)).status, 409);
+    const filtered = await mcpCall('list_device_profiles', { platform: 'Android' });
+    assert.deepEqual(
+      filtered.data.map((p: any) => p.profile_id),
+      [customProfile.profile_id],
+    );
+    assert.deepEqual(
+      (await mcpCall('get_device_profile', { profile_id: customProfile.profile_id })).data.profile,
+      customProfile.profile,
+    );
+    assert.equal(
+      (await request('get_device_profile', { profile_id: 'unknown-profile' })).response.status,
+      404,
+    );
+    assert.equal(
+      (await request('create_instance', { device_profile_id: 'unknown-profile' })).response.status,
+      404,
+    );
+    const profiled = await request('create_instance', {
+      device_profile_id: customProfile.profile_id,
+    });
+    assert.equal(profiled.response.status, 200, JSON.stringify(profiled.result));
+    const profiledId = profiled.result.data.instance_id;
+    assert.equal(profiled.result.data.device_profile_id, customProfile.profile_id);
+    const measured = await mcpCall('evaluate', {
+      instance_id: profiledId,
+      page_id: profiled.result.data.pages[0].page_id,
+      script:
+        '({ua:navigator.userAgent,platform:navigator.platform,screenWidth:screen.width,touch:navigator.maxTouchPoints})',
+    });
+    assert.equal(measured.data.value.ua, customProfile.profile.user_agent);
+    assert.equal(measured.data.value.platform, customProfile.profile.navigator_platform);
+    assert.equal(measured.data.value.screenWidth, 412);
+    assert.ok(measured.data.value.touch > 0);
+    const disabled = await (
+      await saveProfiles({ ...savedProfiles, profiles: [{ ...customProfile, enabled: false }] })
+    ).json();
+    assert.deepEqual((await mcpCall('list_device_profiles')).data, []);
+    assert.equal(
+      (await mcpCall('get_device_profile', { profile_id: customProfile.profile_id })).data.enabled,
+      false,
+    );
+    assert.equal(
+      (await request('create_instance', { device_profile_id: customProfile.profile_id })).result
+        .error.code,
+      'DEVICE_PROFILE_DISABLED',
+    );
+    assert.equal((await saveProfiles({ ...disabled, profiles: [] })).status, 200);
+    assert.deepEqual(
+      (await mcpCall('get_instance', { instance_id: profiledId })).data.device_profile,
+      customProfile.profile,
+    );
+    await mcpCall('close_instance', { instance_id: profiledId });
+    const history = (await mcpCall('inspect_instance', { instance_id: profiledId, probe: false }))
+      .data;
+    assert.deepEqual(history.instance.environment.device_profile, customProfile.profile);
+    assert.equal(history.instance.environment.device_profile_id, customProfile.profile_id);
     const createArgs = {
       task_description: 'API 与 MCP 交替验收',
       viewport: { width: 640, height: 480 },

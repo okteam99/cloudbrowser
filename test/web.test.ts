@@ -270,6 +270,25 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
         '200',
       );
       assert.equal(await page.getByLabel('截图保留天数', { exact: true }).inputValue(), '7');
+      const profileEditor = page.getByRole('textbox', { name: '设备档案 JSON', exact: true });
+      await profileEditor.waitFor();
+      await page.waitForFunction(
+        () =>
+          !!document.querySelector<HTMLTextAreaElement>('textarea[aria-label="设备档案 JSON"]')
+            ?.value,
+      );
+      const originalProfiles = JSON.parse(await profileEditor.inputValue());
+      const uiProfile = {
+        ...originalProfiles[1],
+        profile_id: 'ui-android',
+        profile: { ...originalProfiles[1].profile, name: 'UI Android 测试' },
+      };
+      await profileEditor.fill('{invalid');
+      await page.getByRole('button', { name: '保存设备档案', exact: true }).click();
+      await page.getByText('设备档案未保存', { exact: true }).waitFor();
+      await profileEditor.fill(JSON.stringify([...originalProfiles, uiProfile]));
+      await page.getByRole('button', { name: '保存设备档案', exact: true }).click();
+      await page.getByText('设备档案已保存，新实例立即可用', { exact: true }).waitFor();
       await page.getByLabel('产物存储配额（GB）', { exact: true }).fill('201');
       await page.getByLabel('截图保留天数', { exact: true }).fill('9');
       await page.getByRole('button', { name: '保存设置' }).click();
@@ -286,6 +305,14 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
         await page.getByLabel('产物存储配额（GB）', { exact: true }).inputValue(),
         '201',
       );
+      await profileEditor.waitFor();
+      await page.waitForFunction(
+        () =>
+          !!document
+            .querySelector<HTMLTextAreaElement>('textarea[aria-label="设备档案 JSON"]')
+            ?.value.includes('ui-android'),
+      );
+      assert.equal(JSON.parse(await profileEditor.inputValue()).length, 3);
       await page.getByRole('menuitem', { name: 'MCP&API' }).click();
       await page.getByLabel('MCP 地址', { exact: true }).waitFor();
       assert.equal(await page.getByLabel('MCP 地址', { exact: true }).inputValue(), base + '/mcp');
@@ -297,7 +324,7 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
       await page.getByRole('tab', { name: 'API 文档', exact: true }).click();
       await page.getByLabel('API 地址', { exact: true }).waitFor();
       assert.equal(await page.getByLabel('API 地址', { exact: true }).inputValue(), base + '/api');
-      await page.getByText('接口参考 · 44 项能力', { exact: true }).waitFor();
+      await page.getByText('接口参考 · 45 项能力', { exact: true }).waitFor();
       await page.getByRole('button', { name: '复制 API 接入信息' }).click();
       const apiPrompt = await page.evaluate(() => navigator.clipboard.readText());
       assert.ok(apiPrompt.includes(base + '/docs/agent-guide.md'));
@@ -422,7 +449,7 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
         requestInit: { headers: auth },
       }),
     );
-    assert.equal((await client.listTools()).tools.length, 44);
+    assert.equal((await client.listTools()).tools.length, 45);
     const savedList: any = await client.callTool({
       name: 'list_proxies',
       arguments: { protocol: 'socks5', country: 'US' },

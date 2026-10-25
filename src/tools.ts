@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { createSchema, proxySchema } from './config.js';
 import { proxyCurlSchema } from './proxy-http.js';
+import { deviceProfileIdSchema } from './device-profile.js';
+import { listDeviceProfilesSchema } from './device-profiles.js';
 const id = z.string().min(1).max(100);
 const target = z
   .object({
@@ -24,8 +26,14 @@ export const definitions: Record<
 > = {
   list_device_profiles: {
     description:
-      'List complete example device profiles. Pass profile_id as create_instance.device_profile_id, or clone profile into device_profile to customize. Profiles configure declared identity; expectations are measured, not fabricated. No browser is started.',
-    schema: z.object({}).strict(),
+      'List saved device profiles configured as JSON in console System Settings. Filter by platform or query (ID/name); defaults to enabled profiles. Each item includes profile_id, enabled, revision and complete profile. Pass profile_id to create_instance.device_profile_id. No browser is started. UA alone does not select a profile.',
+    schema: listDeviceProfilesSchema,
+    readOnly: true,
+  },
+  get_device_profile: {
+    description:
+      'Read one saved device profile by profile_id, including enabled status and complete JSON. Disabled profiles can be inspected but cannot create new instances. Select a profile by passing its ID to create_instance; there is no shared current selection. Updates apply only to future instances.',
+    schema: z.object({ profile_id: deviceProfileIdSchema }).strict(),
     readOnly: true,
   },
   verify_device_profile: {
@@ -167,7 +175,7 @@ export const definitions: Record<
   },
   create_instance: {
     description:
-      'Create an isolated Chromium instance with optional task_description (1–1000 characters, shown in console/history), UA, viewport and optional authenticated HTTP/SOCKS5 proxy. Custom Chromium UA automatically determines Client Hints; browser_version reports the unchanged actual engine and user_agent_metadata reports the derived identity. Returns details_url for live view, recording, status, attributes and logs, with an empty access_token= hint (never auto-filled). Log in, use a Bearer header, or fill the existing MCP token; append format=json or format=markdown for AI-readable content. Use proxy_id from list_proxies, inline proxy, or legacy proxy_ref (mutually exclusive). No direct fallback. No proxy means explicit direct mode.',
+      'Create an isolated Chromium instance. Select a saved device_profile_id from list_device_profiles/get_device_profile, or provide an inline device_profile (mutually exclusive); the full profile overrides individual device parameters and is frozen for this instance. Optional task_description is shown in console/history. UA alone generates Client Hints but does not select a profile or change the engine. Returns details_url (empty access_token= hint), actual browser_version, effective profile and user_agent_metadata. Optional authenticated HTTP/SOCKS5 proxy: use proxy_id from list_proxies, inline proxy, or legacy proxy_ref (mutually exclusive). No direct fallback. No proxy means explicit direct mode.',
     schema: createSchema,
   },
   list_instances: {

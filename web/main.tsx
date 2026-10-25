@@ -102,7 +102,7 @@ const sectionTitles: Record<Section, { title: string; description: string }> = {
   proxies: { title: '代理管理', description: '配置国家和代理线路，由 Agent 按代理 ID 选择使用。' },
   connect: { title: 'MCP&API', description: '复制接入说明，把远程浏览器交给 Agent。' },
   docs: { title: '使用文档', description: '从首次连接到日常使用，你需要的信息都在这里。' },
-  settings: { title: '系统设置', description: '查看存储用量，调整配额和截图保留期限。' },
+  settings: { title: '系统设置', description: '管理设备档案，查看存储用量并调整保留设置。' },
 };
 function Brand({ light = false }: { light?: boolean }) {
   return (
@@ -339,7 +339,7 @@ function Dashboard() {
                 <span className="status-dot" />
                 远程浏览器服务
               </div>
-              <Text>cloudbrowser · v0.14.1</Text>
+              <Text>cloudbrowser · v0.15.0</Text>
             </div>
           </Layout.Sider>
         )}

@@ -4,7 +4,7 @@
 
 1. 从用户目标确定 URL、设备、代理和允许的写入操作。只使用用户授权的账号、文件与站点。
 2. `list_proxies` 选择代理；不把国家标签当作已验证的出口。
-3. 优先通过 `list_device_profiles` 选取示例，或提供完整 `device_profile`；`create_instance` 用 task_description 简要说明任务目标，指定 UA、viewport、mobile、locale、timezone、proxy_id，保存 instance_id、初始 page_id 和 details_url。自定义 Chromium UA 会自动生成匹配的 Client Hints；browser_version 是真实内核版本，UA 不会切换内核。
+3. 优先通过 `list_device_profiles` 查询后台配置的启用档案（例如 `{"platform":"Android"}`），用 `get_device_profile` 查看完整 JSON，再在 `create_instance` 传 `device_profile_id`；也可提供完整内联 `device_profile`。任务描述用 task_description，代理用 proxy_id，保存 instance_id、初始 page_id 和 details_url。档案每实例单独选择；UA 本身不会自动选档案。自定义 Chromium UA 会自动生成匹配的 Client Hints；browser_version 是真实内核版本，UA 不会切换内核。
 4. `verify_environment` 检查真实 IP、UA 和设备属性；失败时报告环境失败，不能当作目标网站故障。
 5. `navigate` 打开目标；需要设备一致性验证时调用 `verify_device_profile`，分别报告配置字段差异与真实能力限制；`snapshot` 获取可见结构与元素。
 6. `interact` 使用 role/name 或当前快照 ref。页面变化后重新读取，不猜测过期引用。

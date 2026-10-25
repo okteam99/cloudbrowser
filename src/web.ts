@@ -170,7 +170,7 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         return;
       }
       if (path === '/healthz') {
-        json(res, { status: 'ok', version: '0.14.1' });
+        json(res, { status: 'ok', version: '0.15.0' });
         return;
       }
       const toolRoute = /^\/api\/tools\/([^/]+)$/.exec(path);
@@ -452,6 +452,41 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         } catch (e) {
           if (e instanceof ZodError || e instanceof SyntaxError)
             json(res, { error: 'Invalid storage settings' }, 400);
+          else throw e;
+        }
+        return;
+      }
+      if (path === '/api/settings/device-profiles') {
+        if (req.method === 'GET') {
+          json(res, manager.deviceProfiles.snapshot());
+          return;
+        }
+        if (req.method !== 'PUT') {
+          res.setHeader('allow', 'GET, PUT');
+          json(res, { error: 'Method not allowed' }, 405);
+          return;
+        }
+        if (!bearer && (!session || req.headers['x-csrf-token'] !== session)) {
+          json(res, { error: 'Invalid session' }, 403);
+          return;
+        }
+        try {
+          json(res, await manager.deviceProfiles.update(JSON.parse(await body(req))));
+        } catch (e) {
+          if (e instanceof ZodError)
+            json(
+              res,
+              {
+                error: 'Invalid device profiles',
+                issues: e.issues
+                  .slice(0, 20)
+                  .map((issue) => ({ path: issue.path.join('.'), message: issue.message })),
+              },
+              400,
+            );
+          else if (e instanceof SyntaxError) json(res, { error: 'Invalid JSON' }, 400);
+          else if (e instanceof ToolError)
+            json(res, { error: publicError(e) }, e.code === 'REQUEST_TOO_LARGE' ? 413 : 409);
           else throw e;
         }
         return;

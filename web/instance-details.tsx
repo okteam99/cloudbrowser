@@ -229,6 +229,7 @@ export function InstanceDetailsPage({ instanceId }: { instanceId: string }) {
       </Row>
       <DeviceProfileCard
         profile={data.current?.device_profile ?? e?.device_profile}
+        profileId={data.current?.device_profile_id ?? e?.device_profile_id}
         report={data.current?.device_verification ?? e?.device_verification}
         browserVersion={data.current?.browser_version ?? e?.browser_version}
         browserMode={data.current?.browser_mode ?? e?.browser_mode}

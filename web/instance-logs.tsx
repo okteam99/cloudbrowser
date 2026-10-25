@@ -24,6 +24,7 @@ const tools: Record<string, string> = {
   verify_environment: '验证环境',
   verify_device_profile: '核验设备配置',
   list_device_profiles: '查询设备配置档',
+  get_device_profile: '读取设备配置档',
   create_page: '新建标签页',
   list_pages: '查询标签页',
   close_page: '关闭标签页',

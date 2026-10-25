@@ -17,6 +17,7 @@ import {
 } from 'antd';
 import { ReloadOutlined, SaveOutlined } from '@ant-design/icons';
 import { api, mutate } from './api';
+import { DeviceProfileSettings } from './device-profile-settings';
 
 type Settings = {
   storage: { max_data_bytes: number; screenshot_retention_days: number };
@@ -90,6 +91,7 @@ export function SettingsPage() {
   };
   return (
     <div className="system-settings">
+      <DeviceProfileSettings />
       {error && <Alert type="error" showIcon title={error} />}
       <Card
         className="section-card"

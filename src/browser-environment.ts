@@ -9,6 +9,7 @@ export type BrowserEnvironment = {
   browser_mode?: string;
   user_agent_metadata?: ReturnType<typeof userAgentMetadata> | null;
   device_profile?: DeviceProfile | null;
+  device_profile_id?: string | null;
   device_verification?: DeviceVerification | null;
   os: string | null;
   country: string | null;
