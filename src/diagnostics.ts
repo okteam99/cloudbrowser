@@ -15,9 +15,11 @@ import type { Config } from './config.js';
 import { ToolError } from './errors.js';
 import type { BrowserEnvironment } from './browser-environment.js';
 import type { InstanceProperties, InstancePage } from './instance-details.js';
+import type { NavigationEvent } from './navigation.js';
 
 export type Level = 'info' | 'warn' | 'error';
-export type Component = 'service' | 'browser' | 'page' | 'operation' | 'recorder' | 'tunnel';
+export type Component =
+  'service' | 'browser' | 'page' | 'operation' | 'recorder' | 'tunnel' | 'navigation';
 export type LogEvent = {
   seq: number;
   time: string;
@@ -30,8 +32,10 @@ export type LogEvent = {
   operation_id?: string;
   fields?: Record<string, string | number | boolean | null>;
   arguments?: Record<string, unknown>;
+  navigation?: NavigationEvent;
 };
 export type InstanceRecord = {
+  navigation_since_seq?: number;
   instance_id: string;
   task_description?: string;
   environment?: BrowserEnvironment;
@@ -129,6 +133,9 @@ export class Diagnostics {
   }
   async flush() {
     await this.pending;
+  }
+  sequence() {
+    return this.next;
   }
   async init() {
     await mkdir(join(this.dir, 'instances'), { recursive: true, mode: 0o700 });
@@ -250,6 +257,43 @@ export class Diagnostics {
       ...(await this.query(record.owner, { ...options, instance_id: id })),
     };
   }
+  async navigation(
+    owner: string,
+    id: string,
+    options: { page_id?: string; after_seq?: number; limit?: number },
+  ) {
+    const record = this.get(owner, id);
+    const result = await this.query(owner, {
+      instance_id: id,
+      component: 'navigation',
+      page_id: options.page_id,
+      after_seq: options.after_seq ?? record.navigation_since_seq ?? 0,
+      limit: options.limit ?? 100,
+    });
+    return {
+      ...result,
+      instance_id: id,
+      recorded: record.navigation_since_seq !== undefined,
+      scope: 'top_level',
+      entries: result.entries
+        .filter((e) => e.navigation)
+        .map((e) => ({
+          seq: e.seq,
+          time: e.time,
+          page_id: e.page_id,
+          operation_id: e.operation_id,
+          ...e.navigation!,
+        })),
+    };
+  }
+  async adminNavigation(
+    id: string,
+    options: { page_id?: string; after_seq?: number; limit?: number },
+  ) {
+    const record = this.records.get(id);
+    if (!record) throw new ToolError('INSTANCE_NOT_FOUND', 'Unknown or expired instance history.');
+    return this.navigation(record.owner, id, options);
+  }
   private async readEvents() {
     const all: LogEvent[] = [];
     for (let i = 3; i >= 0; i--) {
@@ -272,6 +316,7 @@ export class Diagnostics {
     owner: string,
     options: {
       instance_id?: string;
+      page_id?: string;
       operation_id?: string;
       component?: Component;
       level?: Level;
@@ -310,6 +355,7 @@ export class Diagnostics {
       (e) =>
         (e.owner === owner || !e.owner) &&
         (!options.instance_id || e.instance_id === options.instance_id) &&
+        (!options.page_id || e.page_id === options.page_id) &&
         (!options.operation_id || e.operation_id === options.operation_id) &&
         (!options.component || e.component === options.component) &&
         (!options.level || ranks[e.level] >= ranks[options.level]) &&

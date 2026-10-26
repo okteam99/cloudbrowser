@@ -33,6 +33,7 @@ import {
 import { InstanceLogsPanel } from './instance-logs';
 import { LiveImage } from './live-image';
 import { DeviceProfileCard } from './device-profile';
+import { NavigationHistory } from './navigation-history';
 const { Text, Paragraph } = Typography;
 const pageStates: Record<string, string> = {
   ready: '已加载',
@@ -274,6 +275,9 @@ export function InstanceDetailsPage({ instanceId }: { instanceId: string }) {
           ]}
         />
       </Card>
+      {data.logs_available && (
+        <NavigationHistory instanceId={instanceId} pages={data.pages} active={!!data.current} />
+      )}
       <Card title="调用日志" className="section-card">
         {data.logs_available ? (
           <InstanceLogsPanel

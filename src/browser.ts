@@ -34,6 +34,7 @@ import { ProxyStore } from './proxies.js';
 import { ProxyHealthMonitor } from './proxy-health.js';
 import { proxyCurl } from './proxy-http.js';
 import { PageData } from './page-data.js';
+import { NavigationRecorder } from './navigation.js';
 import { readStorageState, storageLimit, deadline } from './browser-state.js';
 import sharp from 'sharp';
 import { operatingSystem, type BrowserEnvironment } from './browser-environment.js';
@@ -62,6 +63,9 @@ type PageEntry = {
   crashed?: boolean;
   requiresReload?: boolean;
   watchdogs: Map<Frame, CDPSession>;
+  watchdogPending: Map<Frame, Promise<CDPSession>>;
+  navigation: NavigationRecorder;
+  navigationReady: Promise<void>;
 };
 type EffectiveInstanceOptions = Omit<InstanceOptions, 'device_profile'> & {
   device_profile?: AppliedDeviceProfile;
@@ -216,9 +220,34 @@ export class BrowserManager {
       this.event(i, { type: 'page_limit' });
       return id;
     }
-    const entry: PageEntry = { page, generation: 0, refs: new Map(), watchdogs: new Map() };
+    const navigation = new NavigationRecorder(page, (event) =>
+      this.logs.log({
+        owner: i.owner,
+        instance_id: i.id,
+        page_id: id,
+        operation_id: i.operation?.operation_id,
+        component: 'navigation',
+        level: event.kind === 'failed' || event.kind === 'capture_warning' ? 'warn' : 'info',
+        code: `navigation_${event.kind}`,
+        navigation: event,
+      }),
+    );
+    const entry: PageEntry = {
+      page,
+      generation: 0,
+      refs: new Map(),
+      watchdogs: new Map(),
+      watchdogPending: new Map(),
+      navigation,
+      navigationReady: Promise.resolve(),
+    };
     i.pages.set(id, entry);
     i.pageData.set(id, new PageData(page));
+    entry.navigationReady = deadline(
+      this.watchdog(i, entry).then((session) => navigation.attach(session)),
+      3000,
+      'Navigation observer initialization timed out.',
+    ).catch(() => navigation.warning());
     while (i.pageData.size > this.cfg.maxPages) {
       const old = [...i.pageData].find(([, data]) => data.closed);
       if (!old) break;
@@ -284,6 +313,7 @@ export class BrowserManager {
       entry.dialog = dialog;
     });
     page.on('download', (download) => {
+      navigation.download(download.url(), download.suggestedFilename());
       void this.download(i, id, download);
     });
     page.on('crash', () => {
@@ -498,6 +528,7 @@ export class BrowserManager {
       failed = false;
     this.logs.register({
       instance_id: id,
+      navigation_since_seq: this.logs.sequence(),
       owner,
       created_at: new Date().toISOString(),
       status: 'starting',
@@ -688,7 +719,9 @@ export class BrowserManager {
           const pageId = this.attach(i, page);
           const data = i.pageData.get(pageId);
           data?.request(request);
-          return data;
+          const navigation = i.pages.get(pageId)?.navigation;
+          navigation?.request(request);
+          return { data, navigation };
         } catch {
           return undefined;
         }
@@ -697,13 +730,17 @@ export class BrowserManager {
         dataFor(request);
       });
       context.on('response', (response) => {
-        dataFor(response.request())?.response(response);
+        const entry = dataFor(response.request());
+        entry?.data?.response(response);
+        entry?.navigation?.response(response);
       });
       context.on('requestfinished', (request) => {
-        dataFor(request)?.finished(request);
+        dataFor(request)?.data?.finished(request);
       });
       context.on('requestfailed', (request) => {
-        dataFor(request)?.failed(request);
+        const entry = dataFor(request);
+        entry?.data?.failed(request);
+        entry?.navigation?.failed(request);
       });
       browser.on('disconnected', () => {
         this.logs.log({
@@ -736,6 +773,7 @@ export class BrowserManager {
         },
       });
       const p = await context.newPage();
+      await [...i.pages.values()].find((entry) => entry.page === p)?.navigationReady;
       const recorder = await this.recordings.start(
         i.id,
         owner,
@@ -876,6 +914,13 @@ export class BrowserManager {
     i.closing = true;
     this.instances.delete(id);
     this.closing++;
+    await Promise.allSettled(
+      [...i.pages.values()].map((page) =>
+        deadline(page.navigation.flush(), 1000, 'Navigation metadata flush timed out.').catch(() =>
+          page.navigation.warning(),
+        ),
+      ),
+    );
     await this.persistEnvironment(i);
     this.logs.update(id, { status: 'closing', close_reason: reason });
     this.logs.log({
@@ -1019,6 +1064,7 @@ export class BrowserManager {
       pages: active ? this.instancePages(active) : (instance.pages ?? latest?.pages ?? []),
       recordings: recordings.map(({ owner: _owner, ...recording }) => recording),
       logs_available: !!history,
+      navigation_available: history?.navigation_since_seq !== undefined,
     };
   }
   async shutdown() {
@@ -1110,6 +1156,7 @@ export class BrowserManager {
     operationId: string = randomUUID(),
   ): Promise<any> {
     if (name === 'get_logs') return this.logs.query(owner, a);
+    if (name === 'list_navigation_events') return this.logs.navigation(owner, a.instance_id, a);
     const started = Date.now();
     const own = this.instances.get(a.instance_id);
     let id =
@@ -1195,7 +1242,12 @@ export class BrowserManager {
         fields: {
           ...fields,
           error_code: publicError(error).code,
-          error_message: error instanceof Error ? error.message : String(error),
+          error_message:
+            error instanceof Error
+              ? error.cause instanceof Error
+                ? error.cause.message
+                : error.message
+              : String(error),
           elapsed_ms: Date.now() - started,
         },
       });
@@ -1324,7 +1376,7 @@ export class BrowserManager {
     if (name === 'health')
       return {
         status: 'ok',
-        version: '0.15.3',
+        version: '0.16.0',
         base_url: this.cfg.baseUrl,
         public_url_mode: this.cfg.quickTunnel
           ? 'quick_tunnel'
@@ -1411,13 +1463,20 @@ export class BrowserManager {
   }
   // Chromium resets some emulation state when an auxiliary CDP session detaches.
   // Keep timeout watchdogs for the target lifetime, shared by evaluate and verify.
-  private async watchdog(
-    i: Instance,
-    p: PageEntry,
-    frame = p.page.mainFrame(),
-  ): Promise<CDPSession> {
+  private watchdog(i: Instance, p: PageEntry, frame = p.page.mainFrame()): Promise<CDPSession> {
+    const pending = p.watchdogPending.get(frame);
+    if (pending) return pending;
     const existing = p.watchdogs.get(frame);
-    if (existing) return existing;
+    if (existing) return Promise.resolve(existing);
+    const work = this.openWatchdog(i, p, frame);
+    p.watchdogPending.set(frame, work);
+    const clear = () => {
+      if (p.watchdogPending.get(frame) === work) p.watchdogPending.delete(frame);
+    };
+    void work.then(clear, clear);
+    return work;
+  }
+  private async openWatchdog(i: Instance, p: PageEntry, frame: Frame): Promise<CDPSession> {
     let session: CDPSession;
     try {
       session = await i.context.newCDPSession(frame === p.page.mainFrame() ? p.page : frame);
@@ -1545,6 +1604,28 @@ export class BrowserManager {
       for (const modifier of held.reverse()) await p.page.keyboard.up(modifier).catch(() => {});
     }
   }
+  private async navigationAttempt<T>(page: PageEntry, work: () => Promise<T>): Promise<T> {
+    await page.navigationReady;
+    page.navigation.begin();
+    try {
+      return await work();
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+      const download = /Download is starting/.test(error.message);
+      if (!download && !/net::ERR_ABORTED/.test(error.message)) throw error;
+      const external = page.navigation.lastExternal;
+      const wrapped = new ToolError(
+        download ? 'NAVIGATION_DOWNLOAD' : external ? 'EXTERNAL_PROTOCOL' : 'NAVIGATION_ABORTED',
+        download
+          ? 'Navigation became a download. Inspect list_downloads for completion; no web document was opened.'
+          : external
+            ? `Navigation redirected to an external application protocol (${external.split(':')[0]}:). No web document was opened. Inspect list_navigation_events for the full target; do not replay automatically.`
+            : 'Navigation was aborted before a web document loaded. Inspect list_navigation_events and list_downloads to distinguish redirects, downloads and cancellation; do not replay automatically.',
+      );
+      wrapped.cause = error;
+      throw wrapped;
+    }
+  }
   private async action(i: Instance, name: string, a: any): Promise<any> {
     if (name === 'verify_device_profile') {
       const p = this.page(i, a.page_id);
@@ -1609,7 +1690,11 @@ export class BrowserManager {
       if (a.url) await this.policy.url(a.url);
       const p = await i.context.newPage();
       const page_id = Array.from(i.pages).find(([, e]) => e.page === p)![0];
-      if (a.url) await p.goto(a.url, { waitUntil: 'domcontentloaded' });
+      await i.pages.get(page_id)!.navigationReady;
+      if (a.url)
+        await this.navigationAttempt(i.pages.get(page_id)!, () =>
+          p.goto(a.url, { waitUntil: 'domcontentloaded' }),
+        );
       return { page_id, url: p.url() };
     }
     if (name === 'list_downloads') return i.downloads;
@@ -1620,6 +1705,7 @@ export class BrowserManager {
         throw new ToolError('PAGE_LIMIT', 'Free a page before verifying environment.');
       const p = await i.context.newPage();
       try {
+        await [...i.pages.values()].find((entry) => entry.page === p)?.navigationReady;
         const response = await p.goto(u, { waitUntil: 'domcontentloaded' });
         const content = (await p.locator('body').innerText()).slice(0, 16384);
         if (!response || response.status() >= 400)
@@ -1653,6 +1739,7 @@ export class BrowserManager {
       }
     }
     const p = this.page(i, a.page_id);
+    if (name !== 'close_page') await p.navigationReady;
     if (
       p.requiresReload &&
       !['navigate', 'close_page', 'snapshot', 'screenshot', 'read_element'].includes(name)
@@ -1746,20 +1833,20 @@ export class BrowserManager {
       };
     }
     if (name === 'close_page') {
+      await deadline(p.navigation.flush(), 1000, 'Navigation metadata flush timed out.').catch(() =>
+        p.navigation.warning(),
+      );
       await p.page.close();
       return { status: 'closed' };
     }
     if (name === 'navigate') {
-      let response;
-      if (a.action === 'back') response = await p.page.goBack({ waitUntil: 'domcontentloaded' });
-      else if (a.action === 'forward')
-        response = await p.page.goForward({ waitUntil: 'domcontentloaded' });
-      else if (a.action === 'reload')
-        response = await p.page.reload({ waitUntil: 'domcontentloaded' });
-      else {
+      const response = await this.navigationAttempt(p, async () => {
+        if (a.action === 'back') return p.page.goBack({ waitUntil: 'domcontentloaded' });
+        if (a.action === 'forward') return p.page.goForward({ waitUntil: 'domcontentloaded' });
+        if (a.action === 'reload') return p.page.reload({ waitUntil: 'domcontentloaded' });
         await this.policy.url(a.url);
-        response = await p.page.goto(a.url, { waitUntil: 'domcontentloaded' });
-      }
+        return p.page.goto(a.url, { waitUntil: 'domcontentloaded' });
+      });
       p.requiresReload = false;
       i.pageData.get(a.page_id)!.title = await p.page.title();
       return {

@@ -24,6 +24,19 @@ export const definitions: Record<
   string,
   { description: string; schema: z.ZodTypeAny; readOnly?: boolean }
 > = {
+  list_navigation_events: {
+    description:
+      'Read durable top-level URL navigation history for a live or closed instance: full URLs, HTTP redirect targets/statuses, page commits, same-document changes, downloads, external app protocols and failures. No requests are replayed. Filter by page_id; paginate with next_after_seq when has_more. URLs are private and unredacted, capped at 16 KiB with truncation flags; retention follows diagnostic limits. recorded=false means this older instance was not instrumented. A redirect to intent:/market: requires an external handler and is not a successful web landing.',
+    schema: z
+      .object({
+        instance_id: id,
+        page_id: id.optional(),
+        after_seq: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
+        limit: z.number().int().min(1).max(200).default(100),
+      })
+      .strict(),
+    readOnly: true,
+  },
   list_device_profiles: {
     description:
       'List saved device profiles configured as JSON in console System Settings. Filter by platform or query (ID/name); defaults to enabled profiles. Items include profile_id, enabled, is_default, default_for_platform, revision and complete profile. create_instance accepts an explicit profile_id, or automatically selects the default for the supplied UA OS when no profile is specified. No browser is started.',
@@ -50,7 +63,7 @@ export const definitions: Record<
         instance_id: id.optional(),
         operation_id: z.string().uuid().optional(),
         component: z
-          .enum(['service', 'browser', 'page', 'operation', 'recorder', 'tunnel'])
+          .enum(['service', 'browser', 'page', 'operation', 'recorder', 'tunnel', 'navigation'])
           .optional(),
         level: z.enum(['info', 'warn', 'error']).optional(),
         since: z.string().datetime({ offset: true }).optional(),
@@ -184,7 +197,8 @@ export const definitions: Record<
     readOnly: true,
   },
   get_instance: {
-    description: 'Read instance configuration without proxy secrets.',
+    description:
+      'Read live instance configuration without proxy secrets. Closed instances return INSTANCE_NOT_FOUND; use inspect_instance and list_navigation_events for retained history.',
     schema: z.object(instance),
     readOnly: true,
   },

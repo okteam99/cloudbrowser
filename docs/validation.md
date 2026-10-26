@@ -83,3 +83,10 @@ Playwright 1.64.1 的内置 UA metadata 解析没有填写品牌和版本；Chro
 `test/keepalive.test.ts` 通过真实 daemon 的 MCP HTTP POST 执行只读 health。代理侧暂停处理 I/O 跨过原来的 5 秒空闲连接边界，再复用连接：旧设置产生 ECONNRESET；服务端保留 120 秒后，同一连接可完成下一次 POST。只改服务端连接生命周期，不重放浏览器动作。
 
 隧道日志测试验证分片输出、stdout/stderr 隔离、重复摘要去重、敏感字段不保留、回源错误分类，以及 tunnel 就绪之后的错误仍可持久化并由 get_logs 查询。连接重置说明传输失败，本身不证明业务操作是否执行。
+
+
+## 独立跳转历史（0.16）
+
+真实 Chromium 回归覆盖多跳 302/307（保留完整 query）、页面提交/DOMContentLoaded、history.pushState、弹窗早期重定向补充、intent/market 外部应用目标、204 无内容响应、下载触发、关闭后与重启后的查询、分页和 principal 隔离。新原生观察会话与已有设备模拟 watchdog 共用，继续运行 UA/Client Hints 的页面、iframe、Worker、刷新回归。
+
+原始浏览器错误在 operation 日志中保留；导航的用户可读错误码区分 EXTERNAL_PROTOCOL / NAVIGATION_ABORTED / NAVIGATION_DOWNLOAD。跳转记录受诊断日志时间、容量和写入限制；旧实例不会伪造补齐。

@@ -325,7 +325,7 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
       await page.getByRole('tab', { name: 'API 文档', exact: true }).click();
       await page.getByLabel('API 地址', { exact: true }).waitFor();
       assert.equal(await page.getByLabel('API 地址', { exact: true }).inputValue(), base + '/api');
-      await page.getByText('接口参考 · 45 项能力', { exact: true }).waitFor();
+      await page.getByText('接口参考 · 46 项能力', { exact: true }).waitFor();
       await page.getByRole('button', { name: '复制 API 接入信息' }).click();
       const apiPrompt = await page.evaluate(() => navigator.clipboard.readText());
       assert.ok(apiPrompt.includes(base + '/docs/agent-guide.md'));
@@ -450,7 +450,7 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
         requestInit: { headers: auth },
       }),
     );
-    assert.equal((await client.listTools()).tools.length, 45);
+    assert.equal((await client.listTools()).tools.length, 46);
     const savedList: any = await client.callTool({
       name: 'list_proxies',
       arguments: { protocol: 'socks5', country: 'US' },
@@ -502,6 +502,16 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     assert.equal(detailData.current.viewport.width, 390);
     assert.equal(detailData.details_url, detailUrl);
     assert.ok(detailData.logs.entries.length);
+    assert.equal(detailData.navigation.recorded, true);
+    assert.equal(
+      detailData.links.navigation,
+      `${base}/api/instances/${id}/navigation?access_token=`,
+    );
+    assert.equal((await fetch(`${base}/api/instances/${id}/navigation`)).status, 401);
+    assert.equal(
+      (await fetch(`${base}/api/instances/${id}/navigation?access_token=wrong`)).status,
+      401,
+    );
     assert.ok(
       !JSON.stringify(detailData).includes(accessToken),
       'Default returned links must not fill in the token',
@@ -817,6 +827,20 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     const closedDetails = await (await fetch(`${base}/api/instances/${id}`, { headers })).json();
     assert.equal(closedDetails.current, null);
     assert.equal(closedDetails.instance.status, 'closed');
+    const navUrl = `${base}/api/instances/${id}/navigation?access_token=${accessToken}`;
+    const navigation = await (await fetch(navUrl)).json();
+    assert.equal(navigation.recorded, true);
+    assert.ok(
+      navigation.entries.some((e: any) => e.kind === 'loaded' && e.url.startsWith(fixtureUrl)),
+    );
+    const mcpNavigation = await call('list_navigation_events', { instance_id: id });
+    assert.deepEqual(mcpNavigation.data.entries, navigation.entries);
+    await detailPage
+      .locator('.navigation-history-card')
+      .getByText('页面落地', { exact: true })
+      .first()
+      .waitFor();
+    await detailPage.getByLabel('跳转历史标签页').waitFor();
     assert.equal(closedDetails.instance.properties.viewport.width, 390);
     assert.equal(closedDetails.instance.environment.device_profile.name, '设备配置界面回归');
     assert.equal(

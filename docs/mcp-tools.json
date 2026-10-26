@@ -1,6 +1,47 @@
 {
   "tools": [
     {
+      "name": "list_navigation_events",
+      "description": "Read durable top-level URL navigation history for a live or closed instance: full URLs, HTTP redirect targets/statuses, page commits, same-document changes, downloads, external app protocols and failures. No requests are replayed. Filter by page_id; paginate with next_after_seq when has_more. URLs are private and unredacted, capped at 16 KiB with truncation flags; retention follows diagnostic limits. recorded=false means this older instance was not instrumented. A redirect to intent:/market: requires an external handler and is not a successful web landing.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "instance_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "page_id": {
+            "$ref": "#/properties/instance_id"
+          },
+          "after_seq": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 100
+          }
+        },
+        "required": [
+          "instance_id"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
       "name": "list_device_profiles",
       "description": "List saved device profiles configured as JSON in console System Settings. Filter by platform or query (ID/name); defaults to enabled profiles. Items include profile_id, enabled, is_default, default_for_platform, revision and complete profile. create_instance accepts an explicit profile_id, or automatically selects the default for the supplied UA OS when no profile is specified. No browser is started.",
       "inputSchema": {
@@ -117,7 +158,8 @@
               "page",
               "operation",
               "recorder",
-              "tunnel"
+              "tunnel",
+              "navigation"
             ]
           },
           "level": {
@@ -996,7 +1038,7 @@
     },
     {
       "name": "get_instance",
-      "description": "Read instance configuration without proxy secrets.",
+      "description": "Read live instance configuration without proxy secrets. Closed instances return INSTANCE_NOT_FOUND; use inspect_instance and list_navigation_events for retained history.",
       "inputSchema": {
         "type": "object",
         "properties": {

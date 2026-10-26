@@ -41,6 +41,12 @@
 
 使用 `get_logs({"instance_id":"ins_...","component":"operation","limit":200})` 查询功能调用，按 operation_id 关联开始与结果，查看完整 arguments、耗时、错误码和原始错误信息。调用参数和 URL 不脱敏。使用返回的 next_after_seq 增量查询新事件；has_more=true 时继续读取。实例关闭后和服务重启后仍可在保留期内查询；控制台实时实例和历史录屏的日志入口展示相同记录。
 
+## 导航失败或跳转异常
+
+优先查询 `list_navigation_events`，按 instance_id / page_id 分页，找到最后一个 HTTP 响应、Location 和是否提交了新文档。不要只看 navigate 最初的 URL。EXTERNAL_PROTOCOL 表示目标需要 App／商店等外部处理；NAVIGATION_DOWNLOAD 要结合 list_downloads；NAVIGATION_ABORTED 仍需检查取消、无内容响应或其他原因，不能直接判为服务故障。记录缺失或旧实例 recorded=false 时明确证据不足，不编造跳转链。
+
+get_instance/list_pages 面向活跃实例；实例已关闭时使用 inspect_instance、list_navigation_events 和详情链接读取历史，避免把 INSTANCE_NOT_FOUND 误报为新增故障。
+
 ## 实例退出或疑似卡死
 
 1. 调用 `inspect_instance`（instance_id，probe=true）读取关闭原因、进程信号、正在执行的操作与耗时、采样/编码器状态及资源信息；探测有独立时限，不与业务步骤争抢执行锁。

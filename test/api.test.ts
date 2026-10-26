@@ -13,7 +13,7 @@ import { toolOpenApi } from '../src/api-schema.js';
 test('OpenAPI input references resolve within their own tool components', async () => {
   const spec = await toolOpenApi('https://browser.example/prefix');
   assert.equal(spec.openapi, '3.1.1');
-  assert.equal(Object.keys(spec.paths).length, 45);
+  assert.equal(Object.keys(spec.paths).length, 46);
   assert.equal(spec.servers[0].url, 'https://browser.example/prefix');
   let refs = 0;
   const visit = (value: any) => {

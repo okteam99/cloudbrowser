@@ -155,6 +155,7 @@ export async function daemon() {
     if (
       ![
         'get_logs',
+        'list_navigation_events',
         'inspect_instance',
         'get_instance',
         'list_instances',

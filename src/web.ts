@@ -114,7 +114,7 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
     const queryToken = requestUrl.searchParams.get('access_token');
     const queryAllowed =
       ['GET', 'HEAD'].includes(req.method ?? '') &&
-      /^(?:\/instances\/ins_[a-f0-9-]{36}|\/api\/instances\/ins_[a-f0-9-]{36}(?:\/(?:logs|frame|live))?|\/api\/recordings\/rec_[a-f0-9-]{36}\/video)$/.test(
+      /^(?:\/instances\/ins_[a-f0-9-]{36}|\/api\/instances\/ins_[a-f0-9-]{36}(?:\/(?:logs|navigation|frame|live))?|\/api\/recordings\/rec_[a-f0-9-]{36}\/video)$/.test(
         path,
       );
     const queryAuthenticated = queryAllowed && !!queryToken && auth.bearer(`Bearer ${queryToken}`);
@@ -170,7 +170,7 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         return;
       }
       if (path === '/healthz') {
-        json(res, { status: 'ok', version: '0.15.3' });
+        json(res, { status: 'ok', version: '0.16.0' });
         return;
       }
       const toolRoute = /^\/api\/tools\/([^/]+)$/.exec(path);
@@ -610,6 +610,31 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         return;
       }
       const instanceLogs = /^\/api\/instances\/(ins_[a-f0-9-]{36})\/logs$/.exec(path);
+      const instanceNavigation = /^\/api\/instances\/(ins_[a-f0-9-]{36})\/navigation$/.exec(path);
+      if (instanceNavigation && req.method === 'GET') {
+        const parsed = definitions.list_navigation_events.schema.safeParse({
+          instance_id: instanceNavigation[1],
+          page_id: requestUrl.searchParams.get('page_id') ?? undefined,
+          after_seq: requestUrl.searchParams.has('after_seq')
+            ? Number(requestUrl.searchParams.get('after_seq'))
+            : undefined,
+          limit: requestUrl.searchParams.has('limit')
+            ? Number(requestUrl.searchParams.get('limit'))
+            : 100,
+        });
+        if (!parsed.success) {
+          json(res, { error: 'Invalid navigation query' }, 400);
+          return;
+        }
+        try {
+          json(res, await manager.logs.adminNavigation(instanceNavigation[1], parsed.data));
+        } catch (error) {
+          if (error instanceof ToolError && error.code === 'INSTANCE_NOT_FOUND')
+            json(res, { error: publicError(error) }, 404);
+          else throw error;
+        }
+        return;
+      }
       if (instanceLogs && req.method === 'GET') {
         const parsed = definitions.get_logs.schema.safeParse({
           instance_id: instanceLogs[1],

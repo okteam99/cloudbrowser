@@ -25,6 +25,7 @@
 | `health` | `{}` | 服务状态与容量 |
 | `list_proxies` | 可选 country（两位大写国家码）、protocol（socks5/http/https）、enabled_only（默认true）、status（healthy/unhealthy/unknown/checking/disabled） | proxy_id、兼容 proxy_ref、名称、地址、国家、启用状态、status、health（checked_at / next_check_at / latency_ms / observed_ip / http_status / error_code / checking）、鉴权标记；不返回用户名或密码 |
 | `check_proxy` | proxy、proxy_id、proxy_ref 三选一；可选 check_url | 临时浏览器查询出口，始终清理；不验证国家 |
+| `list_navigation_events` | instance_id；可选 page_id、after_seq、limit（1–200，默认100） | 顶层跳转事件，支持关闭后的历史、完整 URL、分页和缺失提示 |
 | `list_device_profiles` | 可选 platform、query（ID/名称）、enabled_only（默认 true） | 后台已保存的完整档案列表；默认仅启用项 |
 | `get_device_profile` | profile_id | 一份档案的完整 profile、enabled、revision；不启动浏览器 |
 | `verify_device_profile` | instance_id、page_id | 字段对比、实际能力检测及最新报告，保留到实例历史 |
@@ -352,11 +353,23 @@ inspect_instance和get_logs不占用浏览器执行锁；get_diagnostics也可�
 
 控制台实时实例、历史录屏均可按实例查看调用日志，支持结果筛选与5秒自动更新。创建时的可选 task_description（首尾空格会去除，1–1000字符）同时保存在实例状态与录屏元信息，可由 get_instance/list_instances、inspect_instance、list_recordings 读取。旧记录无该字段；公开分享页不会附带任务描述和日志。
 
-其他诊断事件记录事件码、错误类型、HTTP状态、脱敏URL等元信息，不记录原始console文本和响应正文。浏览器原生stderr和编码器stderr仅提取固定故障类别，不返回原始输出。日志查询和状态探测不会挤占最近500个业务操作结果的缓存；这两个只读工具失败后可重新查询。
+跳转事件另存于 component=navigation 的 navigation 对象，保留完整 URL 与目标地址。其他诊断事件记录事件码、错误类型、HTTP状态、脱敏URL等元信息，不记录原始console文本和响应正文。浏览器原生stderr和编码器stderr仅提取固定故障类别，不返回原始输出。日志查询和状态探测不会挤占最近500个业务操作结果的缓存；这两个只读工具失败后可重新查询。
 
 `component:tunnel` 包含连接建立及回源错误：`tunnel_origin_error` 的 `fields` 提供 `source_time`、`connection_index`、`ingress_rule`、`origin` 和 `reason`（connection_reset / connection_refused / timeout / eof / tls / other）。事件在就绪之后仍持续记录并持久化，不包含连接器 Token 或原始远程配置。MCP 出现 502 时先检查 `health`，再按发生时间查隧道与操作日志；不据传输错误直接重放未知操作。HTTP 服务端空闲连接保留 120 秒，Cloudflare Tunnel 默认连接池为 90 秒；自定义代理应先于服务端回收空闲连接。
 
 进程重启后，先前仍活跃且没有关闭记录的实例标记manager_interrupted；这表示管理进程中断，不能据此确认浏览器或宿主机的具体故障。此前未采集的事件无法追溯。整个服务不可用时需由部署方检查docker logs和docker inspect的状态摘要。
+
+## URL 跳转历史
+
+`list_navigation_events` 独立于功能调用日志和内存网络请求列表，适用于活跃或已关闭实例。每条包含 seq、time、page_id、当时活动的 operation_id（用于关联，不保证因果）、navigation_id、hop_id、parent_hop_id、kind、完整 url，以及可用时的 to_url、status、method、initiator、content_type、elapsed_ms、filename、error。记录顶层页面，不把广告 iframe 的全部子请求混入页面跳转链。
+
+kind 区分 request、redirect、response、committed、loaded、same_document、external_protocol、download、failed、capture_warning。收到 HTTP 响应不代表页面已经落地；committed 表示文档已提交，loaded 表示 DOMContentLoaded，并不保证业务功能成功。下载事件只表示已触发，完成情况仍查 list_downloads。外部协议只记录地址，不启动系统应用，也不修改广告链接的 fallback。
+
+HTTP 重定向主要来自真实浏览器网络事件，浏览器原生事件补充未提交文档时的状态和外部协议；初始弹窗可从保留的 Request.redirectedFrom 链补充早期跳转，不发起重复请求。navigation_id/hop_id 用于关联观测到的跳转；浏览器观测缺失会尽量记录 capture_warning。
+
+URL 和 Location 不脱敏，单字段最多 16 KiB，超出时 url_truncated=true。不记录完整响应正文或全部请求头。记录与诊断日志共用 LOG_RETENTION_HOURS / MAX_LOG_BYTES 上限，过期、轮转或写入丢弃可能使历史不完整；检查 history_truncated、dropped_events、write_errors。旧实例返回 recorded=false。默认从该实例开始采集的位置读取，使用 next_after_seq 继续，has_more=true 时不要漏读后续页。
+
+只读 GET `/api/instances/{instance_id}/navigation` 接受 page_id、after_seq、limit 查询参数；沿用登录、Bearer 或实例范围的 access_token 鉴权。实例详情 JSON/Markdown 提供 navigation 数据和 links.navigation，默认链接保留空的 access_token=。公开分享链接不包含跳转历史。
 
 ## 错误与并发
 
@@ -365,6 +378,7 @@ inspect_instance和get_logs不占用浏览器执行锁；get_diagnostics也可�
 - PAGE_LIMIT / PAGE_NOT_FOUND
 - NETWORK_BLOCKED / PROXY_NOT_FOUND / PROXY_CONNECTION_FAILED
 - ENVIRONMENT_CHECK_FAILED / TIMEOUT / BROWSER_CLOSED
+- EXTERNAL_PROTOCOL / NAVIGATION_ABORTED / NAVIGATION_DOWNLOAD（查看跳转历史，不能直接当作代理故障或落地成功）
 - STALE_ELEMENT_REFERENCE / AMBIGUOUS_ELEMENT / ELEMENT_ERROR
 - DOWNLOAD_FAILED / DOWNLOAD_TOO_LARGE / DOWNLOAD_NOT_FOUND
 - ARTIFACT_NOT_FOUND / ARTIFACT_TOO_LARGE / STORAGE_LIMIT
