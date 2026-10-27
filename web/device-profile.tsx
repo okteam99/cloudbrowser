@@ -84,11 +84,12 @@ export function DeviceProfileCard({
             {profileId}
           </Text>
         )}
+        {!!profile?.web_observables && <Tag color="purple">网页读取接口模拟</Tag>}
         <Tag>实际内核 {browserVersion ?? report?.browser_version ?? '未记录'}</Tag>
         {browserMode === 'chromium_new_headless' && <Tag>完整 Chromium · 新版无头模式</Tag>}
       </Space>
       <Paragraph type="secondary">
-        配置值用于浏览器模拟；能力期望只做实测比较。字段一致不代表实际硬件相同。
+        配置值用于浏览器模拟；能力期望只做实测比较。启用网页读取接口模拟时，相关元信息和查询结果依据档案返回，硬件连接操作不可用。
       </Paragraph>
       {profile && (
         <Collapse

@@ -44,6 +44,7 @@ import {
   protocolProfile,
   acceptLanguage,
   applyProfileUserAgent,
+  webObservablesScript,
   type AppliedDeviceProfile,
 } from './device-profile.js';
 import { DeviceProfileStore } from './device-profiles.js';
@@ -673,11 +674,31 @@ export class BrowserManager {
         deviceScaleFactor: options.mobile?.device_scale_factor ?? 1,
         locale: options.locale,
         timezoneId: options.timezone,
+        colorScheme:
+          profile?.web_observables?.media?.['prefers-color-scheme: dark'] === undefined
+            ? undefined
+            : profile.web_observables.media['prefers-color-scheme: dark']
+              ? ('dark' as const)
+              : ('light' as const),
+        reducedMotion:
+          profile?.web_observables?.media?.['prefers-reduced-motion: reduce'] === undefined
+            ? undefined
+            : profile.web_observables.media['prefers-reduced-motion: reduce']
+              ? ('reduce' as const)
+              : ('no-preference' as const),
+        forcedColors:
+          profile?.web_observables?.media?.['forced-colors: active'] === undefined
+            ? undefined
+            : profile.web_observables.media['forced-colors: active']
+              ? ('active' as const)
+              : ('none' as const),
         acceptDownloads: true,
         serviceWorkers: 'block' as const,
         storageState: storage,
       };
       const context = await browser.newContext(contextOptions);
+      if (profile?.web_observables)
+        await context.addInitScript({ content: webObservablesScript(profile) });
       context.setDefaultTimeout(this.cfg.timeout);
       context.setDefaultNavigationTimeout(this.cfg.timeout);
       // Reject local schemes and redirects before request execution; the gateway also validates each destination.
@@ -1390,7 +1411,7 @@ export class BrowserManager {
     if (name === 'health')
       return {
         status: 'ok',
-        version: '0.18.1',
+        version: '0.19.0',
         base_url: this.cfg.baseUrl,
         public_url_mode: this.cfg.quickTunnel
           ? 'quick_tunnel'
@@ -1515,6 +1536,10 @@ export class BrowserManager {
       if (profile.hardware_concurrency)
         await session.send('Emulation.setHardwareConcurrencyOverride', {
           hardwareConcurrency: profile.hardware_concurrency,
+        });
+      if (profile.web_observables?.navigator?.webdriver !== undefined)
+        await session.send('Emulation.setAutomationOverride', {
+          enabled: profile.web_observables.navigator.webdriver,
         });
     }
     return session;

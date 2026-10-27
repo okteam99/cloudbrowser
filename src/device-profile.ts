@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { userAgentMetadata, type UserAgentMetadata } from './user-agent.js';
+import { webObservablesSchema } from './web-observables.js';
+import { installWebObservables } from './web-observables-runtime.js';
 
 const size = z
   .object({
@@ -54,6 +56,7 @@ export const deviceProfileSchema = z
     locale: z.string().min(1).max(64),
     timezone: z.string().min(1).max(128),
     hardware_concurrency: z.number().int().min(1).max(256).optional(),
+    web_observables: webObservablesSchema.optional(),
     expectations: z
       .object({
         device_memory: z.number().min(0.25).max(64).optional(),
@@ -68,7 +71,7 @@ export const deviceProfileSchema = z
       .strict()
       .default({})
       .describe(
-        'Observed capabilities to compare, not values to fabricate. Hardware, automation state and permissions remain real.',
+        'Expected values for comparison only. Use web_observables for explicit simulation; omitted fields retain native behavior.',
       ),
   })
   .strict()
@@ -261,7 +264,12 @@ export function protocolProfile(profile: AppliedDeviceProfile) {
     platform: profile.navigator_platform,
     languages: profile.languages,
     hardwareConcurrency: profile.hardware_concurrency,
+    observables: profile.web_observables,
+    observablesScript: profile.web_observables ? webObservablesScript(profile) : undefined,
   };
+}
+export function webObservablesScript(profile: AppliedDeviceProfile) {
+  return `(${installWebObservables.toString()})(${JSON.stringify(profile.web_observables)})`;
 }
 export function acceptLanguage(languages: string[]) {
   return languages

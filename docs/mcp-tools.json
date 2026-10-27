@@ -871,6 +871,1568 @@
                 "minimum": 1,
                 "maximum": 256
               },
+              "web_observables": {
+                "type": "object",
+                "properties": {
+                  "reference": {
+                    "type": "object",
+                    "properties": {
+                      "sha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "captured_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "label": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "notes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 1024
+                        },
+                        "maxItems": 20
+                      }
+                    },
+                    "required": [
+                      "sha256",
+                      "captured_at",
+                      "label",
+                      "notes"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "navigator": {
+                    "type": "object",
+                    "properties": {
+                      "device_memory": {
+                        "type": "number",
+                        "minimum": 0.25,
+                        "maximum": 1024
+                      },
+                      "webdriver": {
+                        "type": "boolean"
+                      },
+                      "pdf_viewer_enabled": {
+                        "type": "boolean"
+                      },
+                      "max_touch_points": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 16
+                      },
+                      "vendor": {
+                        "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                      },
+                      "product_sub": {
+                        "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "screen": {
+                    "type": "object",
+                    "properties": {
+                      "available_width": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "available_height": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "color_depth": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 64
+                      },
+                      "pixel_depth": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 64
+                      },
+                      "orientation": {
+                        "type": "string",
+                        "enum": [
+                          "landscape-primary",
+                          "landscape-secondary",
+                          "portrait-primary",
+                          "portrait-secondary"
+                        ]
+                      },
+                      "orientation_angle": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 359
+                      }
+                    },
+                    "required": [
+                      "available_width",
+                      "available_height",
+                      "color_depth",
+                      "pixel_depth",
+                      "orientation",
+                      "orientation_angle"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "window": {
+                    "type": "object",
+                    "properties": {
+                      "outer_width": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "outer_height": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      }
+                    },
+                    "required": [
+                      "outer_width",
+                      "outer_height"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "media": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "boolean"
+                    },
+                    "propertyNames": {
+                      "enum": [
+                        "prefers-color-scheme: dark",
+                        "prefers-reduced-motion: reduce",
+                        "pointer: coarse",
+                        "pointer: fine",
+                        "hover: hover",
+                        "color-gamut: p3",
+                        "forced-colors: active"
+                      ]
+                    }
+                  },
+                  "connection": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "effective_type": {
+                            "type": "string",
+                            "enum": [
+                              "slow-2g",
+                              "2g",
+                              "3g",
+                              "4g"
+                            ]
+                          },
+                          "downlink": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "rtt": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "save_data": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "effective_type",
+                          "downlink",
+                          "rtt",
+                          "save_data"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "battery": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "const": "reported"
+                          },
+                          "value": {
+                            "type": "object",
+                            "properties": {
+                              "charging": {
+                                "type": "boolean"
+                              },
+                              "level": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1
+                              },
+                              "charging_time": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": 0
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "discharging_time": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": 0
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "charging",
+                              "level",
+                              "charging_time",
+                              "discharging_time"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "status",
+                          "value"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "const": "measured"
+                          },
+                          "value": {
+                            "$ref": "#/properties/device_profile/properties/web_observables/properties/battery/anyOf/0/properties/value"
+                          }
+                        },
+                        "required": [
+                          "status",
+                          "value"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "const": "unsupported"
+                          }
+                        },
+                        "required": [
+                          "status"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "blocked",
+                              "unavailable"
+                            ]
+                          },
+                          "error_name": {
+                            "type": "string",
+                            "enum": [
+                              "TypeError",
+                              "SecurityError",
+                              "NotAllowedError",
+                              "NotFoundError",
+                              "NotSupportedError",
+                              "InvalidStateError",
+                              "AbortError",
+                              "Error"
+                            ]
+                          },
+                          "error": {
+                            "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                          }
+                        },
+                        "required": [
+                          "status",
+                          "error_name",
+                          "error"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "voices": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                        },
+                        "lang": {
+                          "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                        },
+                        "local_service": {
+                          "type": "boolean"
+                        },
+                        "default": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "lang",
+                        "local_service",
+                        "default"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "maxItems": 128
+                  },
+                  "web_share": {
+                    "type": "boolean"
+                  },
+                  "hardware": {
+                    "type": "object",
+                    "properties": {
+                      "bluetooth": {
+                        "type": "object",
+                        "properties": {
+                          "api_supported": {
+                            "type": "boolean"
+                          },
+                          "availability": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "reported"
+                                  },
+                                  "value": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "measured"
+                                  },
+                                  "value": {
+                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/hardware/properties/bluetooth/properties/availability/anyOf/0/properties/value"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "unsupported"
+                                  }
+                                },
+                                "required": [
+                                  "status"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "blocked",
+                                      "unavailable"
+                                    ]
+                                  },
+                                  "error_name": {
+                                    "type": "string",
+                                    "enum": [
+                                      "TypeError",
+                                      "SecurityError",
+                                      "NotAllowedError",
+                                      "NotFoundError",
+                                      "NotSupportedError",
+                                      "InvalidStateError",
+                                      "AbortError",
+                                      "Error"
+                                    ]
+                                  },
+                                  "error": {
+                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "error_name",
+                                  "error"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          },
+                          "granted_devices": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "reported"
+                                  },
+                                  "value": {
+                                    "type": "object",
+                                    "properties": {
+                                      "count": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 128
+                                      },
+                                      "truncated": {
+                                        "type": "boolean",
+                                        "const": false
+                                      },
+                                      "devices": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "additionalProperties": {
+                                            "anyOf": [
+                                              {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "null"
+                                                  },
+                                                  {
+                                                    "type": "boolean"
+                                                  },
+                                                  {
+                                                    "type": "number"
+                                                  },
+                                                  {
+                                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                                                  }
+                                                ]
+                                              },
+                                              {
+                                                "type": "array",
+                                                "items": {
+                                                  "$ref": "#/properties/device_profile/properties/web_observables/properties/hardware/properties/bluetooth/properties/granted_devices/anyOf/0/properties/value/properties/devices/items/additionalProperties/anyOf/0"
+                                                },
+                                                "maxItems": 128
+                                              },
+                                              {
+                                                "type": "object",
+                                                "additionalProperties": {
+                                                  "$ref": "#/properties/device_profile/properties/web_observables/properties/hardware/properties/bluetooth/properties/granted_devices/anyOf/0/properties/value/properties/devices/items/additionalProperties/anyOf/0"
+                                                },
+                                                "propertyNames": {
+                                                  "maxLength": 100
+                                                }
+                                              },
+                                              {
+                                                "type": "array",
+                                                "items": {
+                                                  "$ref": "#/properties/device_profile/properties/web_observables/properties/hardware/properties/bluetooth/properties/granted_devices/anyOf/0/properties/value/properties/devices/items/additionalProperties/anyOf/2"
+                                                },
+                                                "maxItems": 128
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "maxItems": 128
+                                      }
+                                    },
+                                    "required": [
+                                      "count",
+                                      "truncated",
+                                      "devices"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "measured"
+                                  },
+                                  "value": {
+                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/hardware/properties/bluetooth/properties/granted_devices/anyOf/0/properties/value"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "unsupported"
+                                  }
+                                },
+                                "required": [
+                                  "status"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "blocked",
+                                      "unavailable"
+                                    ]
+                                  },
+                                  "error_name": {
+                                    "type": "string",
+                                    "enum": [
+                                      "TypeError",
+                                      "SecurityError",
+                                      "NotAllowedError",
+                                      "NotFoundError",
+                                      "NotSupportedError",
+                                      "InvalidStateError",
+                                      "AbortError",
+                                      "Error"
+                                    ]
+                                  },
+                                  "error": {
+                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "error_name",
+                                  "error"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "api_supported"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "media_devices": {
+                        "type": "object",
+                        "properties": {
+                          "api_supported": {
+                            "type": "boolean"
+                          },
+                          "enumeration": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "reported"
+                                  },
+                                  "value": {
+                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/hardware/properties/bluetooth/properties/granted_devices/anyOf/0/properties/value"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "measured"
+                                  },
+                                  "value": {
+                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/hardware/properties/bluetooth/properties/granted_devices/anyOf/0/properties/value"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "unsupported"
+                                  }
+                                },
+                                "required": [
+                                  "status"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "blocked",
+                                      "unavailable"
+                                    ]
+                                  },
+                                  "error_name": {
+                                    "type": "string",
+                                    "enum": [
+                                      "TypeError",
+                                      "SecurityError",
+                                      "NotAllowedError",
+                                      "NotFoundError",
+                                      "NotSupportedError",
+                                      "InvalidStateError",
+                                      "AbortError",
+                                      "Error"
+                                    ]
+                                  },
+                                  "error": {
+                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "error_name",
+                                  "error"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "api_supported"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "usb": {
+                        "type": "object",
+                        "properties": {
+                          "api_supported": {
+                            "type": "boolean"
+                          },
+                          "granted_devices": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "reported"
+                                  },
+                                  "value": {
+                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/hardware/properties/bluetooth/properties/granted_devices/anyOf/0/properties/value"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "measured"
+                                  },
+                                  "value": {
+                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/hardware/properties/bluetooth/properties/granted_devices/anyOf/0/properties/value"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "unsupported"
+                                  }
+                                },
+                                "required": [
+                                  "status"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "blocked",
+                                      "unavailable"
+                                    ]
+                                  },
+                                  "error_name": {
+                                    "type": "string",
+                                    "enum": [
+                                      "TypeError",
+                                      "SecurityError",
+                                      "NotAllowedError",
+                                      "NotFoundError",
+                                      "NotSupportedError",
+                                      "InvalidStateError",
+                                      "AbortError",
+                                      "Error"
+                                    ]
+                                  },
+                                  "error": {
+                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "error_name",
+                                  "error"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "api_supported"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "hid": {
+                        "type": "object",
+                        "properties": {
+                          "api_supported": {
+                            "type": "boolean"
+                          },
+                          "granted_devices": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "reported"
+                                  },
+                                  "value": {
+                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/hardware/properties/bluetooth/properties/granted_devices/anyOf/0/properties/value"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "measured"
+                                  },
+                                  "value": {
+                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/hardware/properties/bluetooth/properties/granted_devices/anyOf/0/properties/value"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "unsupported"
+                                  }
+                                },
+                                "required": [
+                                  "status"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "blocked",
+                                      "unavailable"
+                                    ]
+                                  },
+                                  "error_name": {
+                                    "type": "string",
+                                    "enum": [
+                                      "TypeError",
+                                      "SecurityError",
+                                      "NotAllowedError",
+                                      "NotFoundError",
+                                      "NotSupportedError",
+                                      "InvalidStateError",
+                                      "AbortError",
+                                      "Error"
+                                    ]
+                                  },
+                                  "error": {
+                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "error_name",
+                                  "error"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "api_supported"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "serial": {
+                        "type": "object",
+                        "properties": {
+                          "api_supported": {
+                            "type": "boolean"
+                          },
+                          "granted_ports": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "reported"
+                                  },
+                                  "value": {
+                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/hardware/properties/bluetooth/properties/granted_devices/anyOf/0/properties/value"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "measured"
+                                  },
+                                  "value": {
+                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/hardware/properties/bluetooth/properties/granted_devices/anyOf/0/properties/value"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "unsupported"
+                                  }
+                                },
+                                "required": [
+                                  "status"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "blocked",
+                                      "unavailable"
+                                    ]
+                                  },
+                                  "error_name": {
+                                    "type": "string",
+                                    "enum": [
+                                      "TypeError",
+                                      "SecurityError",
+                                      "NotAllowedError",
+                                      "NotFoundError",
+                                      "NotSupportedError",
+                                      "InvalidStateError",
+                                      "AbortError",
+                                      "Error"
+                                    ]
+                                  },
+                                  "error": {
+                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "error_name",
+                                  "error"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "api_supported"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "gamepads": {
+                        "type": "object",
+                        "properties": {
+                          "enumeration": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "reported"
+                                  },
+                                  "value": {
+                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/hardware/properties/bluetooth/properties/granted_devices/anyOf/0/properties/value"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "measured"
+                                  },
+                                  "value": {
+                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/hardware/properties/bluetooth/properties/granted_devices/anyOf/0/properties/value"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "unsupported"
+                                  }
+                                },
+                                "required": [
+                                  "status"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "blocked",
+                                      "unavailable"
+                                    ]
+                                  },
+                                  "error_name": {
+                                    "type": "string",
+                                    "enum": [
+                                      "TypeError",
+                                      "SecurityError",
+                                      "NotAllowedError",
+                                      "NotFoundError",
+                                      "NotSupportedError",
+                                      "InvalidStateError",
+                                      "AbortError",
+                                      "Error"
+                                    ]
+                                  },
+                                  "error": {
+                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "error_name",
+                                  "error"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "enumeration"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "audio_output": {
+                        "type": "object",
+                        "properties": {
+                          "parameters": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "reported"
+                                  },
+                                  "value": {
+                                    "type": "object",
+                                    "properties": {
+                                      "sample_rate": {
+                                        "type": "integer",
+                                        "minimum": 8000,
+                                        "maximum": 192000
+                                      },
+                                      "state": {
+                                        "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                                      },
+                                      "base_latency_seconds": {
+                                        "anyOf": [
+                                          {
+                                            "$ref": "#/properties/device_profile/properties/web_observables/properties/hardware/properties/bluetooth/properties/granted_devices/anyOf/0/properties/value/properties/devices/items/additionalProperties/anyOf/0/anyOf/2"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "output_latency_seconds": {
+                                        "anyOf": [
+                                          {
+                                            "$ref": "#/properties/device_profile/properties/web_observables/properties/hardware/properties/bluetooth/properties/granted_devices/anyOf/0/properties/value/properties/devices/items/additionalProperties/anyOf/0/anyOf/2"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "max_channels": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 32
+                                      },
+                                      "channel_count": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 32
+                                      },
+                                      "audible_output": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "sample_rate",
+                                      "state",
+                                      "base_latency_seconds",
+                                      "output_latency_seconds",
+                                      "max_channels",
+                                      "channel_count",
+                                      "audible_output"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "measured"
+                                  },
+                                  "value": {
+                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/hardware/properties/audio_output/properties/parameters/anyOf/0/properties/value"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "unsupported"
+                                  }
+                                },
+                                "required": [
+                                  "status"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "blocked",
+                                      "unavailable"
+                                    ]
+                                  },
+                                  "error_name": {
+                                    "type": "string",
+                                    "enum": [
+                                      "TypeError",
+                                      "SecurityError",
+                                      "NotAllowedError",
+                                      "NotFoundError",
+                                      "NotSupportedError",
+                                      "InvalidStateError",
+                                      "AbortError",
+                                      "Error"
+                                    ]
+                                  },
+                                  "error": {
+                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "error_name",
+                                  "error"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "parameters"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "webgpu": {
+                        "type": "object",
+                        "properties": {
+                          "adapter": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "reported"
+                                  },
+                                  "value": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                      "$ref": "#/properties/device_profile/properties/web_observables/properties/hardware/properties/bluetooth/properties/granted_devices/anyOf/0/properties/value/properties/devices/items/additionalProperties"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "measured"
+                                  },
+                                  "value": {
+                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/hardware/properties/webgpu/properties/adapter/anyOf/0/properties/value"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "const": "unsupported"
+                                  }
+                                },
+                                "required": [
+                                  "status"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "blocked",
+                                      "unavailable"
+                                    ]
+                                  },
+                                  "error_name": {
+                                    "type": "string",
+                                    "enum": [
+                                      "TypeError",
+                                      "SecurityError",
+                                      "NotAllowedError",
+                                      "NotFoundError",
+                                      "NotSupportedError",
+                                      "InvalidStateError",
+                                      "AbortError",
+                                      "Error"
+                                    ]
+                                  },
+                                  "error": {
+                                    "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "error_name",
+                                  "error"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "adapter"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "sensors": {
+                        "type": "object",
+                        "properties": {
+                          "constructors": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "boolean"
+                            },
+                            "propertyNames": {
+                              "enum": [
+                                "Accelerometer",
+                                "LinearAccelerationSensor",
+                                "GravitySensor",
+                                "Gyroscope",
+                                "Magnetometer",
+                                "AbsoluteOrientationSensor",
+                                "RelativeOrientationSensor",
+                                "AmbientLightSensor",
+                                "DeviceMotionEvent",
+                                "DeviceOrientationEvent"
+                              ]
+                            }
+                          },
+                          "motion_permission_request_supported": {
+                            "type": "boolean"
+                          },
+                          "orientation_permission_request_supported": {
+                            "type": "boolean"
+                          },
+                          "nfc_api_supported": {
+                            "type": "boolean"
+                          },
+                          "midi_api_supported": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "constructors",
+                          "motion_permission_request_supported",
+                          "orientation_permission_request_supported",
+                          "nfc_api_supported",
+                          "midi_api_supported"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "permissions": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "status": {
+                                  "type": "string",
+                                  "const": "reported"
+                                },
+                                "value": {
+                                  "type": "object",
+                                  "properties": {
+                                    "state": {
+                                      "type": "string",
+                                      "enum": [
+                                        "granted",
+                                        "prompt",
+                                        "denied"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "state"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "status",
+                                "value"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "status": {
+                                  "type": "string",
+                                  "const": "measured"
+                                },
+                                "value": {
+                                  "$ref": "#/properties/device_profile/properties/web_observables/properties/hardware/properties/permissions/additionalProperties/anyOf/0/properties/value"
+                                }
+                              },
+                              "required": [
+                                "status",
+                                "value"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "status": {
+                                  "type": "string",
+                                  "const": "unsupported"
+                                }
+                              },
+                              "required": [
+                                "status"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "blocked",
+                                    "unavailable"
+                                  ]
+                                },
+                                "error_name": {
+                                  "type": "string",
+                                  "enum": [
+                                    "TypeError",
+                                    "SecurityError",
+                                    "NotAllowedError",
+                                    "NotFoundError",
+                                    "NotSupportedError",
+                                    "InvalidStateError",
+                                    "AbortError",
+                                    "Error"
+                                  ]
+                                },
+                                "error": {
+                                  "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                                }
+                              },
+                              "required": [
+                                "status",
+                                "error_name",
+                                "error"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "propertyNames": {
+                          "enum": [
+                            "camera",
+                            "microphone",
+                            "speaker-selection",
+                            "geolocation",
+                            "accelerometer",
+                            "gyroscope",
+                            "magnetometer",
+                            "ambient-light-sensor",
+                            "midi",
+                            "notifications"
+                          ]
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "webgl": {
+                    "type": "object",
+                    "properties": {
+                      "vendor": {
+                        "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                      },
+                      "renderer": {
+                        "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                      },
+                      "version": {
+                        "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                      },
+                      "shading_language_version": {
+                        "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                      },
+                      "unmasked_vendor": {
+                        "anyOf": [
+                          {
+                            "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "unmasked_renderer": {
+                        "anyOf": [
+                          {
+                            "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "max_texture_size": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "max_renderbuffer_size": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "extensions": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/properties/device_profile/properties/web_observables/properties/reference/properties/notes/items"
+                        },
+                        "maxItems": 128
+                      }
+                    },
+                    "required": [
+                      "vendor",
+                      "renderer",
+                      "version",
+                      "shading_language_version",
+                      "unmasked_vendor",
+                      "unmasked_renderer",
+                      "max_texture_size",
+                      "max_renderbuffer_size",
+                      "extensions"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "webgl2": {
+                    "$ref": "#/properties/device_profile/properties/web_observables/properties/webgl"
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Explicit, per-instance simulation of web-visible metadata and read APIs. Omitted fields remain native. Configured hardware APIs never perform real device I/O. Native rendering outputs remain measured, not replaced with expected hashes."
+              },
               "expectations": {
                 "type": "object",
                 "properties": {
@@ -907,7 +2469,7 @@
                 },
                 "additionalProperties": false,
                 "default": {},
-                "description": "Observed capabilities to compare, not values to fabricate. Hardware, automation state and permissions remain real."
+                "description": "Expected values for comparison only. Use web_observables for explicit simulation; omitted fields retain native behavior."
               }
             },
             "required": [

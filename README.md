@@ -181,9 +181,11 @@ Agent 调用 `list_device_profiles` 查询已启用档案，可传 `{"platform":
 
 配置档明确保存完整浏览器版本、Client Hints、navigator.platform、屏幕/视口、缩放、语言列表、Intl 区域、时区、触控及逻辑核心数，避免从冻结的 Mac UA 猜测真实架构和系统版本。示例是可修改的测试声明，不是实际 Mac/手机，也不会安装对应版本的内核。Worker 的 platform 在原生覆盖未生效时通过启动脚本补齐；字段一致不代表原型或底层实现与真机相同。
 
-打开测试页面后调用 `verify_device_profile`，传 `instance_id`、`page_id`：逐字段比较目标值与页面/Worker 实测值，实际执行 Canvas/WebGL 绘制、音频处理、Worker 与隔离页面中的本地 PDF 渲染，另外报告蓝牙、系统语音及分享接口可用性。报告区分一致、差异、无法读取、执行通过和仅报告可用性。不会伪造 webdriver、设备内存、蓝牙硬件、语音库或 GPU 能力。
+打开测试页面后调用 `verify_device_profile`，传 `instance_id`、`page_id`：逐字段比较目标值与页面/Worker 实测值，实际执行 Canvas/WebGL 绘制、音频处理、Worker 与隔离页面中的本地 PDF 渲染，另外报告蓝牙、系统语音及分享接口可用性。报告区分一致、差异、无法读取、执行通过和仅报告可用性。可通过显式 web_observables 仿真网页读取字段和查询结果；硬件连接不可用，Canvas/音频/GPU 绘制仍由真实内核执行。
 
 实例详情的“设备配置与核验”展示完整配置、差异列表及能力结果，可复制配置档；最新核验报告会随实例历史和录屏元信息保留。核验只在显式调用时运行，不会因刷新控制台而重复操作浏览器。
+
+设备档案可用 `web_observables` 保存网页可见字段与 API 读取行为，包括蓝牙可用性、媒体设备列表、权限、语音、电池、屏幕补充信息等。未配置的值保持原生；模拟对象不会连接真实硬件。配置和限制见 [共用工具参考](docs/mcp-api.md#网页可观察行为模拟)。
 
 ## 公开设备指纹检测
 
@@ -490,10 +492,10 @@ bash scripts/publish-docker.sh
 ## 源码构建及 stdio 接入
 
 ```sh
-docker build -t cloudbrowser:0.18.1 .
+docker build -t cloudbrowser:0.19.0 .
 ```
 
-将一行部署命令最后的镜像名换成 `cloudbrowser:0.18.1` 即可本地使用。
+将一行部署命令最后的镜像名换成 `cloudbrowser:0.19.0` 即可本地使用。
 
 兼容配置见 [本地 stdio](examples/mcp.local.json)、[SSH stdio](examples/mcp.ssh.json)。仍使用 `docker exec -i`，不得使用 `-t`。MCP_PRINCIPAL 是可信 SSH/Docker 接入中的命名空间，不是独立认证。
 

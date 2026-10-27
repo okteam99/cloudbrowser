@@ -1,4 +1,4 @@
-# 共用工具参考 V0.18（MCP & API）
+# 共用工具参考 V0.19（MCP & API）
 
 推荐使用 `BASE_URL/mcp` 的 Streamable HTTP，携带 `Authorization: Bearer <登录网页自动生成的 Token>`。网页登录后可复制完整配置。兼容 MCP stdio，通过 SSH 或 docker exec 接入。HTTP 调用共享 web principal，stdio 仍按 MCP_PRINCIPAL 隔离。
 
@@ -445,3 +445,40 @@ HTTP 信息来自同源公开 `GET /fingerprint/request`，不含 Cookie、Autho
 硬件信息会单独展示蓝牙 API/可用状态及本站已授权设备、USB/HID/串口授权列表、摄像头/麦克风/扬声器枚举、游戏手柄描述、AudioContext 输出参数、WebGPU 适配器、传感器 API 和网站权限状态。数据在导出 JSON 的 `hardware` 中，报告 `schema_version=2`；原有字段保持兼容。
 
 页面只做被动读取，不调用 requestDevice、requestPort、getUserMedia、传感器启动或设备连接。返回 reported / unsupported / blocked / timeout / unavailable 状态；权限未授予时媒体名称或 ID 可能为空，已授权列表为空也不能证明没有硬件。蓝牙可用状态只是浏览器报告，不读取蓝牙 MAC 或扫描周边。设备 ID 常按网站/会话隔离，用同一域名采集对照；不把 ID 差异当作硬件差异。音频仅读取处理参数并关闭上下文，不播放声音。
+
+
+## 网页可观察行为模拟
+
+设备档案可增加可选 `web_observables`。只有显式配置的字段生效，原有档案不变；新实例冻结配置，UA 覆盖规则保持原样。要完整使用已采集档案的 Client Hints，请传 device_profile_id，不另传 user_agent。
+
+该配置支持 navigator 的内存、自动化标志、PDF、触点及部分标识，屏幕可用区与色深、外层窗口尺寸、媒体偏好、连接声明、电池、语音列表、Web Share，以及蓝牙、媒体设备、USB/HID/串口、游戏手柄、权限查询、传感器接口、音频默认参数和 GPU 标识。适用于页面、iframe、弹窗及 Dedicated Worker 中可用的接口；浏览器原有安全上下文限制仍适用。媒体偏好和自动化标志优先通过 Chromium 原生仿真设置，其他读接口为隔离的脚本仿真。对象支持 Promise、只读属性、事件订阅和指定异常；反射、未采集的调用路径不保证与真机逐字一致。
+
+例如仅声明蓝牙可用，并保持样本中不存在的 getDevices 方法：
+
+```json
+{
+  "web_observables": {
+    "hardware": {
+      "bluetooth": {
+        "api_supported": true,
+        "availability": {"status":"reported","value":true},
+        "granted_devices": {"status":"unsupported"}
+      },
+      "usb": {
+        "api_supported": true,
+        "granted_devices": {"status":"reported","value":{"count":0,"truncated":false,"devices":[]}}
+      },
+      "permissions": {
+        "camera": {"status":"reported","value":{"state":"prompt"}},
+        "speaker-selection": {"status":"unavailable","error_name":"TypeError","error":"目标设备采集到的原始错误"}
+      }
+    }
+  }
+}
+```
+
+该片段须合入完整 profile。reported/measured 返回配置值，unsupported 隐藏对应读取方法，blocked/unavailable 以配置的 Error/DOMException 拒绝 Promise。timeout 和被截断列表不是完整行为证据，不能直接作为返回配置导入。整个 web_observables 不超过128 KiB；完整 Schema 以 tools/list 为准。
+
+配置硬件接口后，requestDevice、requestPort、getUserMedia、设备读写等操作以 NotSupportedError 拒绝，不连接实际硬件。语音仅模拟目录，朗读发出 synthesis-unavailable 错误事件。音频上下文使用静音 sink，默认参数与状态可仿真，音频处理仍由真实内核执行。传感器只保留接口及读取状态，start 不启动硬件。
+
+WebGL/WebGPU 可映射标识并隐藏目标档案没有的能力；扩展列表和数值限制只暴露真实实现支持的交集。绘制、shader、Canvas 像素及离线音频样本不替换为目标散列。真实设备导出的 SHA-256 仅用于实测对照，不能反推出原始渲染输出。IP 和HTTP出口由实际连接/代理决定，不通过设备档案伪造。参考样本可在 reference 中记录 SHA-256、采集时间和说明，不需要上传原始请求头或网络地址。

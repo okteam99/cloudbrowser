@@ -363,6 +363,11 @@ export async function verifyDeviceProfile(
       ).length,
     },
     notes: [
+      ...(profile?.web_observables
+        ? [
+            'This profile explicitly simulates selected web-visible metadata and read API results. Read availability is not evidence of physical hardware; device I/O is disabled for configured hardware interfaces. GPU rendering and extension implementations remain native.',
+          ]
+        : []),
       'Field matches measure declared values, not physical hardware or human behavior. browser_version is the actual engine.',
       'Worker navigator.platform uses a bootstrap getter when Chromium does not apply its native platform override. Matching property values does not guarantee identical prototypes or implementation behavior.',
       'The inspected tab is not navigated. PDF is rendered in an isolated temporary page from generated local data with external network requests blocked. No permission prompts, audio output, Bluetooth connection or share dialog are triggered. Availability/reported checks do not prove the underlying function works.',
