@@ -51,6 +51,21 @@ test('UA hints derive declared versions and avoid inventing absent device inform
     clientHintHeaders({ 'sec-ch-ua': 'native', accept: 'text/html' }, 'CustomAgent/1.0'),
     { accept: 'text/html' },
   );
+  const languageProfile = {
+    httpAcceptLanguage: 'en-SG,en-GB;q=0.9,en;q=0.8',
+    nativeAcceptLanguages: ['en-SG'],
+  };
+  assert.deepEqual(
+    clientHintHeaders(
+      { 'accept-language': 'en-SG', 'sec-ch-ua': 'native' },
+      'CriOS/155',
+      languageProfile,
+    ),
+    { 'Accept-Language': languageProfile.httpAcceptLanguage },
+  );
+  assert.deepEqual(clientHintHeaders({ 'accept-language': 'fr' }, 'CriOS/155', languageProfile), {
+    'accept-language': 'fr',
+  });
 });
 
 test(

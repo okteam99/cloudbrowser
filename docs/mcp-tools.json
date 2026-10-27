@@ -70,7 +70,7 @@
     },
     {
       "name": "list_device_profiles",
-      "description": "List saved device profiles configured as JSON in console System Settings. Filter by platform or query (ID/name); defaults to enabled profiles. Items include profile_id, enabled, is_default, default_for_platform, revision and complete profile. create_instance accepts an explicit profile_id, or automatically selects the default for the supplied UA OS when no profile is specified. No browser is started.",
+      "description": "List saved device profiles configured as JSON in console System Settings. Filter by platform or query (ID/name); defaults to enabled profiles. Items include profile_id, platform (including iOS), enabled, is_default, default_for_platform, revision and complete profile. iOS profiles use client_hints:null. create_instance accepts an explicit profile_id, or automatically selects the default for the supplied UA OS when no profile is specified. No browser is started.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -81,7 +81,8 @@
               "Windows",
               "Linux",
               "Android",
-              "Chrome OS"
+              "Chrome OS",
+              "iOS"
             ]
           },
           "query": {
@@ -699,116 +700,134 @@
                 "pattern": "^[\\x20-\\x7e]*$",
                 "minLength": 1
               },
+              "operating_system": {
+                "type": "string",
+                "enum": [
+                  "macOS",
+                  "Windows",
+                  "Linux",
+                  "Android",
+                  "Chrome OS",
+                  "iOS"
+                ]
+              },
               "client_hints": {
-                "type": "object",
-                "properties": {
-                  "full_version": {
-                    "type": "string",
-                    "pattern": "^\\d+\\.\\d+\\.\\d+\\.\\d+$"
-                  },
-                  "platform": {
-                    "type": "string",
-                    "enum": [
-                      "macOS",
-                      "Windows",
-                      "Linux",
-                      "Android",
-                      "Chrome OS"
-                    ]
-                  },
-                  "platform_version": {
-                    "type": "string",
-                    "maxLength": 128,
-                    "pattern": "^[\\x20-\\x7e]*$"
-                  },
-                  "architecture": {
-                    "type": "string",
-                    "enum": [
-                      "arm",
-                      "x86",
-                      ""
-                    ]
-                  },
-                  "bitness": {
-                    "type": "string",
-                    "enum": [
-                      "32",
-                      "64",
-                      ""
-                    ]
-                  },
-                  "model": {
-                    "$ref": "#/properties/device_profile/properties/client_hints/properties/platform_version",
-                    "default": ""
-                  },
-                  "mobile": {
-                    "type": "boolean"
-                  },
-                  "wow64": {
-                    "type": "boolean",
-                    "default": false
-                  },
-                  "form_factors": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "enum": [
-                        "Desktop",
-                        "Mobile",
-                        "Tablet",
-                        "Automotive",
-                        "EInk",
-                        "Watch",
-                        "XR"
-                      ]
-                    },
-                    "minItems": 1,
-                    "maxItems": 4
-                  },
-                  "brands": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "brand": {
-                          "type": "string",
-                          "maxLength": 128,
-                          "pattern": "^[\\x20-\\x7e]*$",
-                          "minLength": 1
-                        },
-                        "version": {
-                          "type": "string",
-                          "pattern": "^\\d+(?:\\.\\d+){0,3}$"
-                        }
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "full_version": {
+                        "type": "string",
+                        "pattern": "^\\d+\\.\\d+\\.\\d+\\.\\d+$"
                       },
-                      "required": [
-                        "brand",
-                        "version"
-                      ],
-                      "additionalProperties": false
+                      "platform": {
+                        "type": "string",
+                        "enum": [
+                          "macOS",
+                          "Windows",
+                          "Linux",
+                          "Android",
+                          "Chrome OS"
+                        ]
+                      },
+                      "platform_version": {
+                        "type": "string",
+                        "maxLength": 128,
+                        "pattern": "^[\\x20-\\x7e]*$"
+                      },
+                      "architecture": {
+                        "type": "string",
+                        "enum": [
+                          "arm",
+                          "x86",
+                          ""
+                        ]
+                      },
+                      "bitness": {
+                        "type": "string",
+                        "enum": [
+                          "32",
+                          "64",
+                          ""
+                        ]
+                      },
+                      "model": {
+                        "$ref": "#/properties/device_profile/properties/client_hints/anyOf/0/properties/platform_version",
+                        "default": ""
+                      },
+                      "mobile": {
+                        "type": "boolean"
+                      },
+                      "wow64": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "form_factors": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "Desktop",
+                            "Mobile",
+                            "Tablet",
+                            "Automotive",
+                            "EInk",
+                            "Watch",
+                            "XR"
+                          ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 4
+                      },
+                      "brands": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "brand": {
+                              "type": "string",
+                              "maxLength": 128,
+                              "pattern": "^[\\x20-\\x7e]*$",
+                              "minLength": 1
+                            },
+                            "version": {
+                              "type": "string",
+                              "pattern": "^\\d+(?:\\.\\d+){0,3}$"
+                            }
+                          },
+                          "required": [
+                            "brand",
+                            "version"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "minItems": 1,
+                        "maxItems": 8
+                      },
+                      "full_version_list": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/properties/device_profile/properties/client_hints/anyOf/0/properties/brands/items"
+                        },
+                        "minItems": 1,
+                        "maxItems": 8
+                      }
                     },
-                    "minItems": 1,
-                    "maxItems": 8
+                    "required": [
+                      "full_version",
+                      "platform",
+                      "platform_version",
+                      "architecture",
+                      "bitness",
+                      "mobile",
+                      "form_factors"
+                    ],
+                    "additionalProperties": false
                   },
-                  "full_version_list": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/properties/device_profile/properties/client_hints/properties/brands/items"
-                    },
-                    "minItems": 1,
-                    "maxItems": 8
+                  {
+                    "type": "null"
                   }
-                },
-                "required": [
-                  "full_version",
-                  "platform",
-                  "platform_version",
-                  "architecture",
-                  "bitness",
-                  "mobile",
-                  "form_factors"
-                ],
-                "additionalProperties": false
+                ]
               },
               "viewport": {
                 "type": "object",
@@ -855,6 +874,12 @@
                 },
                 "minItems": 1,
                 "maxItems": 8
+              },
+              "http_accept_language": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "pattern": "^[A-Za-z0-9*;,= ._-]+$"
               },
               "locale": {
                 "type": "string",
@@ -910,9 +935,16 @@
                     "type": "object",
                     "properties": {
                       "device_memory": {
-                        "type": "number",
-                        "minimum": 0.25,
-                        "maximum": 1024
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "minimum": 0.25,
+                            "maximum": 1024
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       },
                       "webdriver": {
                         "type": "boolean"
@@ -2437,9 +2469,16 @@
                 "type": "object",
                 "properties": {
                   "device_memory": {
-                    "type": "number",
-                    "minimum": 0.25,
-                    "maximum": 64
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0.25,
+                        "maximum": 1024
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "webdriver": {
                     "type": "boolean"

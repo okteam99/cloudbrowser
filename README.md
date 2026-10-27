@@ -169,7 +169,7 @@ Agent 必须支持远程 Streamable HTTP MCP 及自定义 Authorization 请求�
 
 默认使用完整 Chromium 的新版无头模式。在控制台 **系统设置 → 设备档案** 编辑 JSON 数组，每项包含唯一的 `profile_id`、`enabled`、`is_default` 和完整的 `profile`。首次启动预置 macOS 与 Android 两份示例，可新增、修改、停用或删除；最多 100 份。保存时校验 UA / Client Hints 的版本和系统、屏幕、语言等字段，配置持久化到 `/data/device-profiles.json`，无需重启。
 
-Agent 调用 `list_device_profiles` 查询已启用档案，可传 `{"platform":"Android"}` 或 `{"query":"pixel"}` 筛选。将返回的真实 ID 传给 `get_device_profile` 读取完整 JSON 和启用状态；创建时传 `device_profile_id`。也可把返回的 `profile` 放入内联 `device_profile` 后修改。两者互斥，单独指定的 `user_agent` 优先，并自动重新生成全部 Client Hints；viewport / mobile / locale / timezone 等其他设备参数沿用档案，代理和实例生命周期仍单独设置。
+Agent 调用 `list_device_profiles` 查询已启用档案，支持 iOS 档案（client_hints:null），可传 `{"platform":"Android"}` 或 `{"query":"pixel"}` 筛选。将返回的真实 ID 传给 `get_device_profile` 读取完整 JSON 和启用状态；创建时传 `device_profile_id`。也可把返回的 `profile` 放入内联 `device_profile` 后修改。两者互斥，单独指定的 `user_agent` 优先，并自动重新生成全部 Client Hints；viewport / mobile / locale / timezone 等其他设备参数沿用档案，代理和实例生命周期仍单独设置。
 
 每个实例独立选择档案，没有全局“当前选中档案”。只传 UA 时按操作系统自动匹配启用档案：优先 `is_default:true`，否则按 JSON 顺序取同系统第一份启用档案。每个系统最多一份启用的默认档案；缺省 `is_default:false`，旧配置无需修改即可匹配。没有同系统可用档案时保留 UA 模式并返回说明，不会选择其他系统。已删除或停用的 ID 无法创建新实例；修改档案只影响后续创建，运行中实例和历史记录保留原配置及档案 ID。
 
@@ -186,6 +186,8 @@ Agent 调用 `list_device_profiles` 查询已启用档案，可传 `{"platform":
 实例详情的“设备配置与核验”展示完整配置、差异列表及能力结果，可复制配置档；最新核验报告会随实例历史和录屏元信息保留。核验只在显式调用时运行，不会因刷新控制台而重复操作浏览器。
 
 设备档案可用 `web_observables` 保存网页可见字段与 API 读取行为，包括蓝牙可用性、媒体设备列表、权限、语音、电池、屏幕补充信息等。未配置的值保持原生；模拟对象不会连接真实硬件。配置和限制见 [共用工具参考](docs/mcp-api.md#网页可观察行为模拟)。
+
+iPhone / iOS 档案以 `operating_system:"iOS"` 与 `client_hints:null` 明确关闭网页及请求中的 Client Hints；`device_memory:null` 可隐藏未提供的设备内存信息。请求的 Accept-Language 可与 navigator.languages 分开配置。运行内核仍是 Chromium；原始资料缺失的字段保留为未采集。
 
 ## 公开设备指纹检测
 
@@ -492,10 +494,10 @@ bash scripts/publish-docker.sh
 ## 源码构建及 stdio 接入
 
 ```sh
-docker build -t cloudbrowser:0.19.0 .
+docker build -t cloudbrowser:0.20.0 .
 ```
 
-将一行部署命令最后的镜像名换成 `cloudbrowser:0.19.0` 即可本地使用。
+将一行部署命令最后的镜像名换成 `cloudbrowser:0.20.0` 即可本地使用。
 
 兼容配置见 [本地 stdio](examples/mcp.local.json)、[SSH stdio](examples/mcp.ssh.json)。仍使用 `docker exec -i`，不得使用 `-t`。MCP_PRINCIPAL 是可信 SSH/Docker 接入中的命名空间，不是独立认证。
 

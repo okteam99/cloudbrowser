@@ -134,7 +134,7 @@ export const webObservablesSchema = z
       .optional(),
     navigator: z
       .object({
-        device_memory: finite.min(0.25).max(1024).optional(),
+        device_memory: finite.min(0.25).max(1024).nullable().optional(),
         webdriver: z.boolean().optional(),
         pdf_viewer_enabled: z.boolean().optional(),
         max_touch_points: z.number().int().min(0).max(16).optional(),

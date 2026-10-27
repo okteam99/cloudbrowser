@@ -106,6 +106,10 @@ replaceOnce(
   'await this._client.send("Emulation.setEmulatedMedia", { media, features });',
   'const extra = this._crPage._browserContext._options.cloudbrowserDeviceProfile?.observables?.media; if (extra && extra["color-gamut: p3"] !== undefined) features.push({ name: "color-gamut", value: extra["color-gamut: p3"] ? "p3" : "srgb" });\n        await this._client.send("Emulation.setEmulatedMedia", { media, features });',
 );
+replaceOnce(
+  'this._client.send("Emulation.setTouchEmulationEnabled", { enabled: true })',
+  'this._client.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: options.cloudbrowserDeviceProfile?.observables?.navigator?.max_touch_points || 1 })',
+);
 // Dedicated workers need target-scoped UA/language/CPU settings. Chromium does
 // not apply the platform override to WorkerNavigator on Linux; fill that one
 // declared property before worker scripts start. This is visible script

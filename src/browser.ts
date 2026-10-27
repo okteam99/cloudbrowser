@@ -468,7 +468,9 @@ export class BrowserManager {
               'No enabled profile matches the UA operating system. Using UA-only settings without a device profile.',
             ]
           : []),
-        'Custom Chromium UA Client Hints follow the supplied UA. browser_version is the actual engine; changing UA does not install that engine or create a real mobile device. Verify on the target.',
+        operatingSystem(i.userAgent ?? i.options.user_agent ?? null) === 'iOS'
+          ? 'The iOS identity is simulated by Chromium, not WebKit or an iOS runtime. browser_version reports the actual engine; verify the returned profile and observed behavior.'
+          : 'Custom Chromium UA Client Hints follow the supplied UA. browser_version is the actual engine; changing UA does not install that engine or create a real mobile device. Verify on the target.',
         'Host policy is defense in depth; use trusted upstream proxies and a network firewall for strict egress isolation.',
       ],
     };
@@ -666,9 +668,10 @@ export class BrowserManager {
         viewport: options.viewport,
         screen: profile?.screen,
         cloudbrowserDeviceProfile: profile ? protocolProfile(profile) : undefined,
-        extraHTTPHeaders: profile
-          ? { 'Accept-Language': acceptLanguage(profile.languages) }
-          : undefined,
+        extraHTTPHeaders:
+          profile && !profile.http_accept_language
+            ? { 'Accept-Language': acceptLanguage(profile.languages) }
+            : undefined,
         isMobile: options.mobile?.enabled ?? false,
         hasTouch: options.mobile?.touch ?? false,
         deviceScaleFactor: options.mobile?.device_scale_factor ?? 1,
@@ -697,7 +700,7 @@ export class BrowserManager {
         storageState: storage,
       };
       const context = await browser.newContext(contextOptions);
-      if (profile?.web_observables)
+      if (profile?.web_observables || profile?.client_hints === null)
         await context.addInitScript({ content: webObservablesScript(profile) });
       context.setDefaultTimeout(this.cfg.timeout);
       context.setDefaultNavigationTimeout(this.cfg.timeout);
@@ -1411,7 +1414,7 @@ export class BrowserManager {
     if (name === 'health')
       return {
         status: 'ok',
-        version: '0.19.0',
+        version: '0.20.0',
         base_url: this.cfg.baseUrl,
         public_url_mode: this.cfg.quickTunnel
           ? 'quick_tunnel'
@@ -1540,6 +1543,11 @@ export class BrowserManager {
       if (profile.web_observables?.navigator?.webdriver !== undefined)
         await session.send('Emulation.setAutomationOverride', {
           enabled: profile.web_observables.navigator.webdriver,
+        });
+      if (profile.touch && profile.web_observables?.navigator?.max_touch_points)
+        await session.send('Emulation.setTouchEmulationEnabled', {
+          enabled: true,
+          maxTouchPoints: profile.web_observables.navigator.max_touch_points,
         });
     }
     return session;

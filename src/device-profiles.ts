@@ -6,6 +6,7 @@ import {
   deviceProfileIdSchema,
   deviceProfileSchema,
   listDeviceProfiles,
+  profilePlatform,
 } from './device-profile.js';
 import { ToolError } from './errors.js';
 import { operatingSystem } from './browser-environment.js';
@@ -33,7 +34,7 @@ export const deviceProfileCatalogSchema = z
         });
       seen.add(item.profile_id);
       if (item.enabled && item.is_default) {
-        const platform = item.profile.client_hints.platform;
+        const platform = profilePlatform(item.profile);
         if (defaults.has(platform))
           ctx.addIssue({
             code: 'custom',
@@ -52,7 +53,7 @@ export const updateDeviceProfilesSchema = z
   .strict();
 export const listDeviceProfilesSchema = z
   .object({
-    platform: z.enum(['macOS', 'Windows', 'Linux', 'Android', 'Chrome OS']).optional(),
+    platform: z.enum(['macOS', 'Windows', 'Linux', 'Android', 'Chrome OS', 'iOS']).optional(),
     query: z.string().trim().max(100).optional(),
     enabled_only: z.boolean().default(true),
   })
@@ -95,15 +96,16 @@ export class DeviceProfileStore {
   private entry(record: Entry) {
     return {
       ...structuredClone(record),
+      platform: profilePlatform(record.profile),
       kind: 'configured',
       revision: this.revision(),
       default_for_platform:
-        this.defaultRecord(record.profile.client_hints.platform)?.profile_id === record.profile_id,
+        this.defaultRecord(profilePlatform(record.profile))?.profile_id === record.profile_id,
     };
   }
   private defaultRecord(platform: string) {
     const candidates = this.records.filter(
-      (r) => r.enabled && r.profile.client_hints.platform === platform,
+      (r) => r.enabled && profilePlatform(r.profile) === platform,
     );
     return candidates.find((r) => r.is_default) ?? candidates[0];
   }
@@ -119,7 +121,7 @@ export class DeviceProfileStore {
       .filter(
         (r) =>
           (!filter.enabled_only || r.enabled) &&
-          (!filter.platform || r.profile.client_hints.platform === filter.platform) &&
+          (!filter.platform || profilePlatform(r.profile) === filter.platform) &&
           (!query || `${r.profile_id} ${r.profile.name}`.toLowerCase().includes(query)),
       )
       .map((r) => this.entry(r));

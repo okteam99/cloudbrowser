@@ -85,6 +85,10 @@ export function installWebObservables(config) {
   const secure = globalThis.isSecureContext !== false;
   const navProto = Object.getPrototypeOf(n);
   const ns = config.navigator ?? {};
+  if (ns.user_agent_data === false) {
+    remove(n, 'userAgentData');
+    remove(globalThis, 'NavigatorUAData');
+  }
   const navNames = {
     device_memory: 'deviceMemory',
     webdriver: 'webdriver',
@@ -94,6 +98,10 @@ export function installWebObservables(config) {
     product_sub: 'productSub',
   };
   for (const [key, field] of Object.entries(navNames)) {
+    if (field === 'deviceMemory' && ns[key] === null) {
+      remove(n, field);
+      continue;
+    }
     if (
       ns[key] !== undefined &&
       (page || field === 'deviceMemory') &&

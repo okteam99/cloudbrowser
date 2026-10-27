@@ -262,11 +262,13 @@ export async function verifyDeviceProfile(
       actual: actual ?? null,
       mode,
       status:
-        actual === undefined || actual === null
-          ? 'unavailable'
-          : JSON.stringify(actual) === JSON.stringify(expected)
-            ? 'match'
-            : 'mismatch',
+        expected === null && (actual === undefined || actual === null)
+          ? 'match'
+          : actual === undefined || actual === null
+            ? 'unavailable'
+            : JSON.stringify(actual) === JSON.stringify(expected)
+              ? 'match'
+              : 'mismatch',
     });
   };
   if (profile) {
@@ -298,6 +300,7 @@ export async function verifyDeviceProfile(
       : {};
     for (const scope of ['page', 'worker'] as const) {
       const actual = scope === 'page' ? observed : observed.worker;
+      if (profile.client_hints === null) add(scope, 'client_hints', null, actual?.client_hints);
       for (const [field, expected] of Object.entries(common))
         add(scope, field, expected, actual?.[field]);
       for (const [field, expected] of Object.entries(wantedHints))

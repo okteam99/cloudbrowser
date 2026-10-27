@@ -45,7 +45,7 @@ export const definitions: Record<
   },
   list_device_profiles: {
     description:
-      'List saved device profiles configured as JSON in console System Settings. Filter by platform or query (ID/name); defaults to enabled profiles. Items include profile_id, enabled, is_default, default_for_platform, revision and complete profile. create_instance accepts an explicit profile_id, or automatically selects the default for the supplied UA OS when no profile is specified. No browser is started.',
+      'List saved device profiles configured as JSON in console System Settings. Filter by platform or query (ID/name); defaults to enabled profiles. Items include profile_id, platform (including iOS), enabled, is_default, default_for_platform, revision and complete profile. iOS profiles use client_hints:null. create_instance accepts an explicit profile_id, or automatically selects the default for the supplied UA OS when no profile is specified. No browser is started.',
     schema: listDeviceProfilesSchema,
     readOnly: true,
   },

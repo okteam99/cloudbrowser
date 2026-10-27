@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { userAgentMetadata, type UserAgentMetadata } from './user-agent.js';
 import { webObservablesSchema } from './web-observables.js';
 import { installWebObservables } from './web-observables-runtime.js';
+import { operatingSystem } from './browser-environment.js';
 
 const size = z
   .object({
@@ -26,6 +27,9 @@ export const deviceProfileSchema = z
       .max(1024)
       .regex(/^[\x20-\x7e]+$/),
     navigator_platform: text.min(1),
+    operating_system: z
+      .enum(['macOS', 'Windows', 'Linux', 'Android', 'Chrome OS', 'iOS'])
+      .optional(),
     client_hints: z
       .object({
         full_version: version,
@@ -43,7 +47,8 @@ export const deviceProfileSchema = z
         brands: z.array(brand).min(1).max(8).optional(),
         full_version_list: z.array(brand).min(1).max(8).optional(),
       })
-      .strict(),
+      .strict()
+      .nullable(),
     viewport: size,
     screen: size,
     device_scale_factor: z.number().min(1).max(4).default(1),
@@ -53,13 +58,23 @@ export const deviceProfileSchema = z
       .array(z.string().regex(/^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/))
       .min(1)
       .max(8),
+    http_accept_language: z
+      .string()
+      .min(1)
+      .max(512)
+      .regex(/^[A-Za-z0-9*;,= ._-]+$/)
+      .refine(
+        (value) => !/[\r\n\x00-\x1f\x7f]/.test(value),
+        'Accept-Language must not contain control characters',
+      )
+      .optional(),
     locale: z.string().min(1).max(64),
     timezone: z.string().min(1).max(128),
     hardware_concurrency: z.number().int().min(1).max(256).optional(),
     web_observables: webObservablesSchema.optional(),
     expectations: z
       .object({
-        device_memory: z.number().min(0.25).max(64).optional(),
+        device_memory: z.number().min(0.25).max(1024).nullable().optional(),
         webdriver: z.boolean().optional(),
         pdf_viewer: z.boolean().optional(),
         bluetooth: z.boolean().optional(),
@@ -78,7 +93,14 @@ export const deviceProfileSchema = z
   .superRefine((p, ctx) => {
     const ua = userAgentMetadata({ userAgent: p.user_agent });
     const issue = (message: string) => ctx.addIssue({ code: 'custom', message });
-    if (!ua) issue('device_profile requires a Chromium desktop/Android UA');
+    const os = operatingSystem(p.user_agent);
+    if (p.operating_system && os && p.operating_system !== (os === 'ChromeOS' ? 'Chrome OS' : os))
+      issue('operating_system must match the profile UA');
+    if (p.client_hints === null) {
+      if (ua) issue('A Chromium UA requires coherent Client Hints');
+      if (!os && !p.operating_system)
+        issue('A profile without Client Hints requires a recognizable operating system');
+    } else if (!ua) issue('A non-Chromium/iOS UA must use client_hints:null');
     else {
       if (ua.fullVersion.split('.')[0] !== p.client_hints.full_version.split('.')[0])
         issue('UA and client_hints full_version must have the same Chromium major version');
@@ -89,15 +111,20 @@ export const deviceProfileSchema = z
     }
     if (p.viewport.width > p.screen.width || p.viewport.height > p.screen.height)
       issue('viewport must fit within screen');
+    if (
+      p.web_observables?.navigator?.max_touch_points !== undefined &&
+      p.web_observables.navigator.max_touch_points > 0 !== p.touch
+    )
+      issue('max_touch_points must agree with the profile touch setting');
     if (new Set(p.languages).size !== p.languages.length) issue('languages must be unique');
     try {
       new Intl.DateTimeFormat(p.locale, { timeZone: p.timezone });
     } catch {
       issue('Invalid locale or timezone');
     }
-    if (!!p.client_hints.brands !== !!p.client_hints.full_version_list)
+    if (!!p.client_hints?.brands !== !!p.client_hints?.full_version_list)
       issue('Provide brands and full_version_list together');
-    if (p.client_hints.brands && p.client_hints.full_version_list) {
+    if (p.client_hints?.brands && p.client_hints.full_version_list) {
       const brands = p.client_hints.brands;
       const full = p.client_hints.full_version_list;
       if (
@@ -112,13 +139,13 @@ export const deviceProfileSchema = z
         )
       )
         issue('Brand lists must have matching brands and major versions');
-      if (!full.some((b) => b.brand === 'Chromium' && b.version === p.client_hints.full_version))
+      if (!full.some((b) => b.brand === 'Chromium' && b.version === p.client_hints!.full_version))
         issue('full_version_list must include the declared Chromium full version');
     }
   });
 export type DeviceProfile = z.infer<typeof deviceProfileSchema>;
 // Effective identity may come from an opaque/non-Chromium UA, which has no UA-CH.
-// Saved templates remain strictly validated Chromium profiles.
+// iOS and other non-Chromium declarations explicitly suppress Client Hints.
 export type AppliedDeviceProfile = Omit<DeviceProfile, 'client_hints'> & {
   client_hints: {
     full_version: string;
@@ -157,6 +184,15 @@ export function applyProfileUserAgent(profile: DeviceProfile, ua?: string): Appl
   return effective;
 }
 export const deviceProfileIdSchema = z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$/);
+export function profilePlatform(profile: DeviceProfile) {
+  const os = operatingSystem(profile.user_agent);
+  return (
+    profile.operating_system ??
+    profile.client_hints?.platform ??
+    (os === 'ChromeOS' ? 'Chrome OS' : os) ??
+    'unknown'
+  );
+}
 
 const mac = deviceProfileSchema.parse({
   name: 'macOS ARM · Chrome 155 · desktop example',
@@ -263,13 +299,25 @@ export function protocolProfile(profile: AppliedDeviceProfile) {
     metadata: profileMetadata(profile),
     platform: profile.navigator_platform,
     languages: profile.languages,
+    httpAcceptLanguage: profile.http_accept_language,
+    nativeAcceptLanguages: [profile.languages.join(','), acceptLanguage(profile.languages)],
     hardwareConcurrency: profile.hardware_concurrency,
     observables: profile.web_observables,
-    observablesScript: profile.web_observables ? webObservablesScript(profile) : undefined,
+    observablesScript:
+      profile.web_observables || profile.client_hints === null
+        ? webObservablesScript(profile)
+        : undefined,
   };
 }
 export function webObservablesScript(profile: AppliedDeviceProfile) {
-  return `(${installWebObservables.toString()})(${JSON.stringify(profile.web_observables)})`;
+  const observables =
+    profile.client_hints === null
+      ? {
+          ...profile.web_observables,
+          navigator: { ...profile.web_observables?.navigator, user_agent_data: false },
+        }
+      : profile.web_observables;
+  return `(${installWebObservables.toString()})(${JSON.stringify(observables)})`;
 }
 export function acceptLanguage(languages: string[]) {
   return languages

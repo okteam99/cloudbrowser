@@ -160,7 +160,9 @@ export function FingerprintPage() {
               <Text type="secondary">浏览器声明的版本</Text>
               <strong>
                 {hints?.high?.fullVersionList?.find((b: any) => b.brand === 'Chromium')?.version ||
-                  report.navigator.user_agent.match(/(?:Chrome|Firefox|Version)\/([\d.]+)/)?.[1] ||
+                  report.navigator.user_agent.match(
+                    /(?:Chrome|Chromium|CriOS|FxiOS|Firefox|EdgiOS|Version)\/([\d.]+)/,
+                  )?.[1] ||
                   '未提供'}
               </strong>
               <Text type="secondary">网页可见值，不代表已核验真实内核</Text>

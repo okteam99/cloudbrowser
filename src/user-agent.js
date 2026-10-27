@@ -90,12 +90,20 @@ export function userAgentMetadata(options) {
  * Do not add high-entropy hints without opt-in or hints to insecure requests.
  * @param {Record<string, string>} headers
  * @param {string | undefined} ua
- * @param {{metadata?:UserAgentMetadata} | undefined} [profile]
+ * @param {{metadata?:UserAgentMetadata, httpAcceptLanguage?:string, nativeAcceptLanguages?:string[]} | undefined} [profile]
  */
 export function clientHintHeaders(headers, ua, profile) {
   if (!ua) return headers;
   const hints = userAgentMetadata({ userAgent: ua, cloudbrowserDeviceProfile: profile });
   const next = { ...headers };
+  const languageKey = Object.keys(next).find((key) => key.toLowerCase() === 'accept-language');
+  if (
+    profile?.httpAcceptLanguage &&
+    (!languageKey || profile.nativeAcceptLanguages?.includes(next[languageKey]))
+  ) {
+    if (languageKey) delete next[languageKey];
+    next['Accept-Language'] = profile.httpAcceptLanguage;
+  }
   const serialize = (/** @type {{brand: string, version: string}[]} */ brands) =>
     brands.map((b) => `${JSON.stringify(b.brand)};v=${JSON.stringify(b.version)}`).join(', ');
   /** @type {Record<string, string>} */

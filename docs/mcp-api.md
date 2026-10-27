@@ -1,4 +1,4 @@
-# 共用工具参考 V0.19（MCP & API）
+# 共用工具参考 V0.20（MCP & API）
 
 推荐使用 `BASE_URL/mcp` 的 Streamable HTTP，携带 `Authorization: Bearer <登录网页自动生成的 Token>`。网页登录后可复制完整配置。兼容 MCP stdio，通过 SSH 或 docker exec 接入。HTTP 调用共享 web principal，stdio 仍按 MCP_PRINCIPAL 隔离。
 
@@ -78,7 +78,7 @@
 
 管理员在 **系统设置 → 设备档案** 编辑 JSON 数组；每项为 `{ "profile_id": "自定义唯一ID", "enabled": true, "is_default": false, "profile": { ...完整设备字段... } }`。ID 为 1–100 位英文字母、数字、下划线或连字符，首位为字母/数字。最多 100 份；重复 ID、UA / Client Hints 冲突、无效语言/时区等会被拒绝，并返回具体字段路径。保存后新实例立即可用，重启后保留；空数组表示没有可选档案，不会重新补入示例。
 
-首次初始化提供 macOS 与 Android 两份可编辑测试模板；模板不保证等于当前设备或内核，不应作为日常测试固定 ID。管理员应以目标设备实测信息维护档案。`list_device_profiles` 返回当前配置而非固定枚举，每项包含 `profile_id`、`enabled`、`is_default`、`default_for_platform`（当前系统实际默认项）、`kind=configured`、`revision`、完整 `profile`。默认只返回启用项；传 `enabled_only:false` 可查看停用档案。`platform` 可为 macOS / Windows / Linux / Android / Chrome OS，`query` 按 ID 或名称匹配，不区分大小写。`get_device_profile` 可读取单份启用或停用档案。两个接口均不启动浏览器、不发送外部请求。
+首次初始化提供 macOS 与 Android 两份可编辑测试模板；模板不保证等于当前设备或内核，不应作为日常测试固定 ID。管理员应以目标设备实测信息维护档案。`list_device_profiles` 返回当前配置而非固定枚举，每项包含 `profile_id`、`platform`、`enabled`、`is_default`、`default_for_platform`（当前系统实际默认项）、`kind=configured`、`revision`、完整 `profile`。默认只返回启用项；传 `enabled_only:false` 可查看停用档案。`platform` 可为 macOS / Windows / Linux / Android / Chrome OS / iOS，`query` 按 ID 或名称匹配，不区分大小写。`get_device_profile` 可读取单份启用或停用档案。两个接口均不启动浏览器、不发送外部请求。
 
 Agent 的选择流程（HTTP API 与 MCP 同名同参）：
 
@@ -482,3 +482,14 @@ HTTP 信息来自同源公开 `GET /fingerprint/request`，不含 Cookie、Autho
 配置硬件接口后，requestDevice、requestPort、getUserMedia、设备读写等操作以 NotSupportedError 拒绝，不连接实际硬件。语音仅模拟目录，朗读发出 synthesis-unavailable 错误事件。音频上下文使用静音 sink，默认参数与状态可仿真，音频处理仍由真实内核执行。传感器只保留接口及读取状态，start 不启动硬件。
 
 WebGL/WebGPU 的标识、扩展/功能列表和数值限制按目标档案返回；宿主缺少 GPU 适配器时提供只读元信息对象。缺少的扩展执行或 GPUDevice 创建以 NotSupportedError 拒绝，实际可执行的绘制仍由原生实现完成。声明的能力不等于宿主真实可执行上限。绘制、shader、Canvas 像素及离线音频样本不替换为目标散列。真实设备导出的 SHA-256 仅用于实测对照，不能反推出原始渲染输出。IP 和HTTP出口由实际连接/代理决定，不通过设备档案伪造。参考样本可在 reference 中记录 SHA-256、采集时间和说明，不需要上传原始请求头或网络地址。
+
+
+## iPhone / iOS 声明档案
+
+通过 `list_device_profiles({"platform":"iOS"})` 查询已配置的 iOS 档案，再将真实 profile_id 作为 create_instance.device_profile_id。iOS 档案使用 `operating_system:"iOS"`、`client_hints:null` 和目标设备实测 UA，不生成 Chromium Client Hints，也不暴露 navigator.userAgentData；页面及 Dedicated Worker 都适用。实际运行内核仍为 Chromium，这不等于运行 iOS WebKit。
+
+`web_observables.navigator.device_memory:null` 表示隐藏未开放的 navigator.deviceMemory，区别于返回 0。`max_touch_points` 与 touch 必须一致，支持以原生触控仿真设置触点数量。`http_accept_language` 可单独指定正常默认请求的 Accept-Language，不改变 navigator.languages；网站显式设置的不同请求语言仍保留。该字段禁止控制字符。
+
+例如实测 navigator.languages 只有 en-SG，但请求头含 en-SG,en-GB;q=0.9,en;q=0.8 时，应分别保存到 languages 和 http_accept_language，不强行将两者统一。只传 iPhone UA 时，会按 iOS 查找已启用默认档案；没有 iOS 档案仍返回 ua_unmatched，不借用 macOS 或 Android 档案。
+
+导入资料不完整时，仅保存完整提供的字段，并在 web_observables.reference 中标注缺失范围；未采集的插件、硬件、渲染等不能宣称已经对齐。
