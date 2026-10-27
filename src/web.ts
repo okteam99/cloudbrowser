@@ -170,7 +170,7 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         return;
       }
       if (path === '/healthz') {
-        json(res, { status: 'ok', version: '0.16.0' });
+        json(res, { status: 'ok', version: '0.17.0' });
         return;
       }
       const toolRoute = /^\/api\/tools\/([^/]+)$/.exec(path);

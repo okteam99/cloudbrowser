@@ -24,6 +24,12 @@ export const definitions: Record<
   string,
   { description: string; schema: z.ZodTypeAny; readOnly?: boolean }
 > = {
+  get_instance_details: {
+    description:
+      'Read a complete instance detail document for an owned live, busy, closed or retained historical instance. Same data structure as the authenticated instance details JSON/Markdown: instance state/task/properties/environment, current live summary, pages, recordings, logs, navigation and links. Includes up to 200 recent log events and the first 200 retained navigation events; Use get_logs after_seq=0 to read older logs, logs.next_after_seq for newer events, and list_navigation_events with navigation.next_after_seq when navigation.has_more. Expired diagnostics return logs/navigation=null when recordings remain; older uninstrumented history returns navigation.recorded=false. Links preserve an empty access_token= hint and never embed credentials. Does not probe, navigate, extend lifetime or take the action lock. Use inspect_instance for an optional renderer health probe.',
+    schema: z.object({ instance_id: id }).strict(),
+    readOnly: true,
+  },
   list_navigation_events: {
     description:
       'Read durable top-level URL navigation history for a live or closed instance: full URLs, HTTP redirect targets/statuses, page commits, same-document changes, downloads, external app protocols and failures. No requests are replayed. Filter by page_id; paginate with next_after_seq when has_more. URLs are private and unredacted, capped at 16 KiB with truncation flags; retention follows diagnostic limits. recorded=false means this older instance was not instrumented. A redirect to intent:/market: requires an external handler and is not a successful web landing.',
@@ -198,7 +204,7 @@ export const definitions: Record<
   },
   get_instance: {
     description:
-      'Read live instance configuration without proxy secrets. Closed instances return INSTANCE_NOT_FOUND; use inspect_instance and list_navigation_events for retained history.',
+      'Read live instance configuration without proxy secrets. Closed instances return INSTANCE_NOT_FOUND; use get_instance_details for the aggregate retained detail document, inspect_instance for diagnostics or list_navigation_events for navigation history.',
     schema: z.object(instance),
     readOnly: true,
   },

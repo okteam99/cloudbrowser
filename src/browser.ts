@@ -49,6 +49,7 @@ import {
 import { DeviceProfileStore } from './device-profiles.js';
 import { verifyDeviceProfile, type DeviceVerification } from './device-verification.js';
 import { SystemSettings } from './system-settings.js';
+import { instanceDocument } from './instance-document.js';
 import {
   instanceDetailsUrl,
   type InstanceProperties,
@@ -1041,9 +1042,20 @@ export class BrowserManager {
     });
   }
   async adminInstanceDetails(id: string) {
-    const active = this.instances.get(id);
-    const history = this.logs.adminGet(id);
-    const recordings = (await this.recordings.list()).filter((r) => r.instance_id === id);
+    return this.instanceDetails(id, undefined);
+  }
+  async ownedInstanceDetails(owner: string, id: string) {
+    return this.instanceDetails(id, owner);
+  }
+  private async instanceDetails(id: string, owner: string | undefined) {
+    const candidate = this.instances.get(id);
+    const active =
+      candidate && (owner === undefined || candidate.owner === owner) ? candidate : undefined;
+    const retained = this.logs.adminGet(id);
+    const history = retained && owner !== undefined ? this.logs.get(owner, id) : retained;
+    const recordings = (await this.recordings.list()).filter(
+      (r) => r.instance_id === id && (owner === undefined || r.owner === owner),
+    );
     const latest = recordings[0];
     if (!history && !active && !latest)
       throw new ToolError('INSTANCE_NOT_FOUND', 'Unknown or expired instance history.');
@@ -1157,6 +1169,8 @@ export class BrowserManager {
   ): Promise<any> {
     if (name === 'get_logs') return this.logs.query(owner, a);
     if (name === 'list_navigation_events') return this.logs.navigation(owner, a.instance_id, a);
+    if (name === 'get_instance_details')
+      return instanceDocument(this, a.instance_id, this.cfg.baseUrl ?? '', owner);
     const started = Date.now();
     const own = this.instances.get(a.instance_id);
     let id =
@@ -1376,7 +1390,7 @@ export class BrowserManager {
     if (name === 'health')
       return {
         status: 'ok',
-        version: '0.16.0',
+        version: '0.17.0',
         base_url: this.cfg.baseUrl,
         public_url_mode: this.cfg.quickTunnel
           ? 'quick_tunnel'

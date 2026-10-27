@@ -1,4 +1,4 @@
-# 共用工具参考 V0.14（MCP & API）
+# 共用工具参考 V0.17（MCP & API）
 
 推荐使用 `BASE_URL/mcp` 的 Streamable HTTP，携带 `Authorization: Bearer <登录网页自动生成的 Token>`。网页登录后可复制完整配置。兼容 MCP stdio，通过 SSH 或 docker exec 接入。HTTP 调用共享 web principal，stdio 仍按 MCP_PRINCIPAL 隔离。
 
@@ -31,6 +31,7 @@
 | `verify_device_profile` | instance_id、page_id | 字段对比、实际能力检测及最新报告，保留到实例历史 |
 | `create_instance` | 可选 device_profile / device_profile_id（二选一）、 task_description（1–1000字符）、storage_state_id、UA、viewport、proxy/proxy_id/proxy_ref、mobile、locale、timezone、生命周期 | instance_id、details_url、task_description、pages、实际设备属性、警告 |
 | `get_instance` | instance_id | 配置和页面，隐藏凭据 |
+| `get_instance_details` | instance_id | 一次读取当前或历史详情：instance、current、pages、recordings、logs、navigation、links；支持忙碌和已关闭实例，不占用动作锁 |
 | `list_instances` | `{}` | 同 principal 的实例 |
 | `verify_environment` | instance_id；可选 check_url | 实际设备属性、IP 查询响应；不自动判断国家 |
 | `close_instance` | instance_id | 关闭状态，关闭后 ID 不能执行浏览器操作，保留期内可查日志与历史状态 |
@@ -417,6 +418,19 @@ URL 和 Location 不脱敏，单字段最多 16 KiB，超出时 url_truncated=tr
 `POST /mcp` 只接受 Bearer 鉴权，不使用 Cookie。密码变更并重启后 Token 轮换；不把 Token 放在 URL 中。直播和录屏包含可见业务内容，请仅授权可信使用方。
 
 ## 私有实例详情链接
+
+MCP 调用 `get_instance_details`，或 HTTP 调用 `POST /api/tools/get_instance_details`，参数均为 `{"instance_id":"ins_..."}`。成功结果的 `data` 与详情链接 `format=json` 共用结构：
+
+| 字段 | 内容 |
+| --- | --- |
+| `instance` | 保留的任务、状态、关闭原因、属性和环境信息 |
+| `current` / `pages` | 实时实例摘要（关闭后为 null）及当前或历史标签页 |
+| `recordings` / `links` | 录屏元信息和详情、直播、回放、日志、跳转历史地址；链接保留空 access_token= |
+| `logs` | 最近最多200条原文事件；get_logs 使用 next_after_seq 读后续事件，after_seq=0 从保留起点分页 |
+| `navigation` | 保留范围内最早的最多200条跳转事件及查询游标；继续查询用 list_navigation_events |
+| `logs_available` / `navigation_available` | 是否还有诊断历史、该实例是否启用过跳转采集 |
+
+仅返回当前 principal 的实例。诊断历史过期但录屏仍在时，logs/navigation 为 null，仍可读取录屏及其保存的属性；旧实例未采集跳转时 navigation.recorded=false。全部历史已清理或实例不属于调用方时返回 INSTANCE_NOT_FOUND。该工具不会探测渲染线程、导航、延长实例存活时间或填入真实 Token；需要主动探测时使用 inspect_instance。与其他诊断读取一样，不缓存到最近500个操作结果，也不新增自身的功能日志。
 
 Web 模式下 `create_instance`、`get_instance`、`list_instances`、`inspect_instance` 以及 `list_recordings` 返回 `details_url`，优先采用 `BASE_URL`，格式为：
 

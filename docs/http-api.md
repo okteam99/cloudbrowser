@@ -91,6 +91,8 @@ API 截图的 `data.id` 为原始 PNG，`data.preview.id` 为预览。调用 `ge
 
 ## 详情与媒体的只读 HTTP 接口
 
+一次获取完整详情可用 `POST /api/tools/get_instance_details`，正文 `{"instance_id":"ins_..."}`，附 Bearer Token。它与 MCP 同名工具及详情链接 `format=json` 共用结构，包含实例属性、标签页、录屏、直播地址、日志和跳转历史。普通 `GET /api/instances/{instance_id}` 继续返回基础详情，日志和跳转列表通过下方独立接口读取。
+
 下列已有资源接口用于读取控制台数据，响应结构与工具调用的结果包装不同：
 
 | 方法 | 路径 | 内容 |
@@ -98,6 +100,7 @@ API 截图的 `data.id` 为原始 PNG，`data.preview.id` 为预览。调用 `ge
 | GET | `/api/instances` | 当前实例列表 |
 | GET | `/api/instances/{instance_id}` | 当前及历史详情、页面、录屏 |
 | GET | `/api/instances/{instance_id}/logs` | 该实例功能日志 |
+| GET | `/api/instances/{instance_id}/navigation` | 该实例跳转历史，支持 page_id、after_seq、limit |
 | GET | `/api/instances/{instance_id}/frame` | 当前 JPEG 帧 |
 | GET | `/api/recordings` | 录像列表 |
 | GET / HEAD | `/api/recordings/{recording_id}/video` | WebM 录像，支持 Range |

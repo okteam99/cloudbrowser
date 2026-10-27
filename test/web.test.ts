@@ -325,7 +325,7 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
       await page.getByRole('tab', { name: 'API 文档', exact: true }).click();
       await page.getByLabel('API 地址', { exact: true }).waitFor();
       assert.equal(await page.getByLabel('API 地址', { exact: true }).inputValue(), base + '/api');
-      await page.getByText('接口参考 · 46 项能力', { exact: true }).waitFor();
+      await page.getByText('接口参考 · 47 项能力', { exact: true }).waitFor();
       await page.getByRole('button', { name: '复制 API 接入信息' }).click();
       const apiPrompt = await page.evaluate(() => navigator.clipboard.readText());
       assert.ok(apiPrompt.includes(base + '/docs/agent-guide.md'));
@@ -450,7 +450,7 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
         requestInit: { headers: auth },
       }),
     );
-    assert.equal((await client.listTools()).tools.length, 46);
+    assert.equal((await client.listTools()).tools.length, 47);
     const savedList: any = await client.callTool({
       name: 'list_proxies',
       arguments: { protocol: 'socks5', country: 'US' },

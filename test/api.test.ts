@@ -13,7 +13,7 @@ import { toolOpenApi } from '../src/api-schema.js';
 test('OpenAPI input references resolve within their own tool components', async () => {
   const spec = await toolOpenApi('https://browser.example/prefix');
   assert.equal(spec.openapi, '3.1.1');
-  assert.equal(Object.keys(spec.paths).length, 46);
+  assert.equal(Object.keys(spec.paths).length, 47);
   assert.equal(spec.servers[0].url, 'https://browser.example/prefix');
   let refs = 0;
   const visit = (value: any) => {
@@ -99,6 +99,7 @@ test('HTTP tool API and MCP share instances, validation, idempotent actions, art
       'Idempotency-Key',
       'access_token=',
       'get_network_request',
+      'get_instance_details',
     ])
       assert.ok(markdown.includes(phrase), phrase);
     assert.ok(!markdown.includes(token));
@@ -277,6 +278,32 @@ test('HTTP tool API and MCP share instances, validation, idempotent actions, art
     assert.deepEqual(history.instance.environment.device_profile, effectiveProfile);
     assert.equal(history.instance.environment.device_profile_id, customProfile.profile_id);
     assert.equal(history.instance.environment.device_profile_source, 'ua_default');
+    const detailArgs = { instance_id: profiledId };
+    const aggregate = await request('get_instance_details', detailArgs);
+    assert.equal(aggregate.response.status, 200);
+    assert.equal(aggregate.result.data.current, null);
+    assert.equal(aggregate.result.data.instance.status, 'closed');
+    assert.equal(aggregate.result.data.navigation.recorded, true);
+    assert.ok(aggregate.result.data.logs.entries.some((e: any) => e.code === 'instance_closed'));
+    assert.deepEqual(
+      (await mcpCall('get_instance_details', detailArgs)).data,
+      aggregate.result.data,
+    );
+    const detailDocument = await (
+      await fetch(`${base}/instances/${profiledId}?format=json`, { headers: auth })
+    ).json();
+    assert.deepEqual(aggregate.result.data, detailDocument);
+    assert.ok(!JSON.stringify(detailDocument).includes(token));
+    assert.equal(
+      (await request('get_instance_details', { instance_id: `ins_${randomUUID()}` })).response
+        .status,
+      404,
+    );
+    assert.equal(
+      (await request('get_instance_details', { ...detailArgs, owner: 'another-principal' }))
+        .response.status,
+      400,
+    );
     const unmatched = await request('create_instance', {
       user_agent: customProfile.profile.user_agent,
       viewport: { width: 640, height: 480 },

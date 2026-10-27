@@ -1,12 +1,27 @@
 import type { BrowserManager } from './browser.js';
-export async function instanceDocument(manager: BrowserManager, id: string, base: string) {
-  const details = await manager.adminInstanceDetails(id);
+export async function instanceDocument(
+  manager: BrowserManager,
+  id: string,
+  base: string,
+  owner?: string,
+) {
+  const details =
+    owner === undefined
+      ? await manager.adminInstanceDetails(id)
+      : await manager.ownedInstanceDetails(owner, id);
   const logs = details.logs_available
-    ? await manager.logs.adminInstanceLogs(id, { limit: 200 })
+    ? owner === undefined
+      ? await manager.logs.adminInstanceLogs(id, { limit: 200 })
+      : {
+          instance: manager.logs.get(owner, id),
+          ...(await manager.logs.query(owner, { instance_id: id, limit: 200 })),
+        }
     : null;
   const root = base.replace(/\/$/, '');
   const navigation = details.logs_available
-    ? await manager.logs.adminNavigation(id, { limit: 200 })
+    ? owner === undefined
+      ? await manager.logs.adminNavigation(id, { limit: 200 })
+      : await manager.logs.navigation(owner, id, { limit: 200 })
     : null;
   return {
     ...details,

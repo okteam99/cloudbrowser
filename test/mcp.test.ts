@@ -50,7 +50,7 @@ test('MCP stdio discovery, operation lookup, artifact transfer, reconnect and pr
     assert.ok(ready, logs);
     a = await connect('alice');
     const tools = await a.listTools();
-    assert.equal(tools.tools.length, 46);
+    assert.equal(tools.tools.length, 47);
     for (const [name, required] of [
       ['create_instance', ['proxy_id', 'user_agent', 'viewport', 'task_description']],
       ['proxy_curl', ['proxy_id', 'url', 'headers', 'body', 'timeout_ms']],
@@ -59,6 +59,7 @@ test('MCP stdio discovery, operation lookup, artifact transfer, reconnect and pr
       ['pointer', ['action', 'x', 'y', 'to_x', 'to_y', 'modifiers']],
       ['create_instance', ['storage_state_id']],
       ['get_network_request', ['instance_id', 'page_id', 'request_id', 'include_body']],
+      ['get_instance_details', ['instance_id']],
     ] as const) {
       const schema = tools.tools.find((t) => t.name === name)!.inputSchema;
       for (const key of required)
@@ -75,6 +76,13 @@ test('MCP stdio discovery, operation lookup, artifact transfer, reconnect and pr
     const created = await call(a, 'create_instance', { viewport: { width: 390, height: 844 } });
     assert.equal(created.status, 'succeeded');
     const i = created.data.instance_id;
+    const detailTool = tools.tools.find((t) => t.name === 'get_instance_details')!;
+    assert.equal(detailTool.annotations?.readOnlyHint, true);
+    const details = await call(a, 'get_instance_details', { instance_id: i });
+    assert.equal(details.status, 'succeeded');
+    assert.equal(details.data.current.instance_id, i);
+    assert.equal(details.data.navigation.recorded, true);
+    assert.ok(details.data.logs.entries.some((e: any) => e.code === 'instance_created'));
     const screenshotResponse: any = await a.callTool({
       name: 'screenshot',
       arguments: { instance_id: i, page_id: created.data.pages[0].page_id },
@@ -107,6 +115,10 @@ test('MCP stdio discovery, operation lookup, artifact transfer, reconnect and pr
     a = await connect('alice');
     assert.equal((await call(a, 'list_instances')).data[0].instance_id, i);
     b = await connect('bob');
+    assert.equal(
+      (await call(b, 'get_instance_details', { instance_id: i })).error.code,
+      'INSTANCE_NOT_FOUND',
+    );
     assert.deepEqual((await call(b, 'list_instances')).data, []);
     assert.equal(
       (await call(b, 'get_artifact', { artifact_id: put.data.id })).error.code,
@@ -117,6 +129,14 @@ test('MCP stdio discovery, operation lookup, artifact transfer, reconnect and pr
       'OPERATION_NOT_FOUND',
     );
     assert.equal((await call(a, 'close_instance', { instance_id: i })).status, 'succeeded');
+    const closedDetails = await call(a, 'get_instance_details', { instance_id: i });
+    assert.equal(closedDetails.data.current, null);
+    assert.equal(closedDetails.data.instance.status, 'closed');
+    assert.equal(closedDetails.data.links.live, null);
+    assert.equal(
+      (await call(b, 'get_instance_details', { instance_id: i })).error.code,
+      'INSTANCE_NOT_FOUND',
+    );
     assert.equal(
       (await call(a, 'inspect_instance', { instance_id: i, probe: false })).data.instance
         .close_reason,

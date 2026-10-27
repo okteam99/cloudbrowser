@@ -15,6 +15,10 @@
 
 ## 实例详情与 AI 读取
 
+优先调用 `get_instance_details({"instance_id":"ins_..."})` 一次获取完整详情；HTTP 等价入口是 `POST /api/tools/get_instance_details`，使用相同 Bearer Token。返回 `data` 与详情链接的 JSON 内容共用结构，包括 instance、current、pages、recordings、logs、navigation、links。不需要再次打开网页，也不会探测或操作实例。
+
+`logs` 包含最近最多200条事件，`navigation` 包含保留范围内最早的最多200条跳转事件。跳转记录用 `list_navigation_events` 和 navigation.next_after_seq 继续分页；日志用 logs.next_after_seq 读取后续事件，如需更早日志则从 `get_logs(after_seq=0)` 开始分页。诊断数据已过期但仍有录屏时，两字段为 null；旧实例未采集跳转时 navigation.recorded=false；全部数据过期或不属于当前 principal 时返回 INSTANCE_NOT_FOUND。需要主动检测渲染线程时再用 inspect_instance。
+
 报告结果或异常时附上 `details_url`，用户可从同一地址查看直播、录屏、状态、属性和调用日志；实例结束后仍可回溯保留期内的数据。链接默认带空参数 `?access_token=`，不要自动把真实 Token 填进默认返回链接。
 
 普通用户打开链接后登录；AI 若需要直接读取，可填入现有 MCP Bearer Token，并追加 `&format=json` 或 `&format=markdown`。也可保持空查询参数，通过 `Authorization: Bearer <TOKEN>` 请求头读取。接口返回当前/历史状态、标签页、媒体与日志地址，以及最近200条原文日志；返回的媒体/日志地址同样保留空 Token 提示，需要时由调用方填入。访问详情不会执行浏览器操作或延长实例存活时间。Token 无效/失效时返回 401，全部历史数据过期时返回 404。
@@ -45,7 +49,7 @@
 
 优先查询 `list_navigation_events`，按 instance_id / page_id 分页，找到最后一个 HTTP 响应、Location 和是否提交了新文档。不要只看 navigate 最初的 URL。EXTERNAL_PROTOCOL 表示目标需要 App／商店等外部处理；NAVIGATION_DOWNLOAD 要结合 list_downloads；NAVIGATION_ABORTED 仍需检查取消、无内容响应或其他原因，不能直接判为服务故障。记录缺失或旧实例 recorded=false 时明确证据不足，不编造跳转链。
 
-get_instance/list_pages 面向活跃实例；实例已关闭时使用 inspect_instance、list_navigation_events 和详情链接读取历史，避免把 INSTANCE_NOT_FOUND 误报为新增故障。
+get_instance/list_pages 面向活跃实例；实例已关闭时使用 get_instance_details、inspect_instance、list_navigation_events 和详情链接读取历史，避免把 INSTANCE_NOT_FOUND 误报为新增故障。
 
 ## 实例退出或疑似卡死
 

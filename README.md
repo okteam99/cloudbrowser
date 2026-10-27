@@ -200,6 +200,8 @@ Agent 调用 `list_device_profiles` 查询已启用档案，可传 `{"platform":
 
 ## 实例详情与问题回溯
 
+Agent 可调用 MCP `get_instance_details({"instance_id":"ins_..."})` 一次获取完整详情，HTTP 对应 `POST /api/tools/get_instance_details`。返回的 `data` 与详情 JSON 共用结构，包含状态、任务、属性、环境、标签页、录屏、直播链接、最近最多200条日志和最早的最多200条保留跳转记录，支持运行中、忙碌及已关闭实例。跳转历史通过 `list_navigation_events` 的游标继续读取，日志游标用于增量读取，较早日志用 `get_logs(after_seq=0)` 开始分页；过期数据标记不可用，链接不填入真实 Token。
+
 `create_instance` 返回 `details_url`，`get_instance`、`list_instances`、`inspect_instance` 和 `list_recordings` 也会提供对应地址。例如：
 
 ```text
@@ -236,7 +238,7 @@ https://your-domain.example/instances/ins_12345678-1234-4234-8234-123456789abc?a
 | 方式 | 返回内容 |
 | --- | --- |
 | 默认 / `format=html` | 可交互的详情页；已鉴权的初始 HTML 也包含可直接阅读的状态、属性、媒体地址与最近日志 |
-| `format=json` 或 `Accept: application/json` | 结构化详情、标签页、录屏与直播地址、最近200条原文日志 |
+| `format=json` 或 `Accept: application/json` | 结构化详情、标签页、录屏与直播地址、最多200条最近原文日志及200条保留跳转记录 |
 | `format=markdown` 或 `Accept: text/markdown` | 同一份内容的 Markdown 文本 |
 
 也可保留空查询参数并通过 `Authorization: Bearer <TOKEN>` 请求头读取。JSON 和 Markdown 未鉴权时返回 401。查询参数 Token 只在实例详情、相关只读实例接口和录屏媒体接口生效；MCP、代理配置和系统设置等接口仍按原有方式鉴权。返回的 `links` 保留空 Token 提示，AI 读取媒体或日志时可填入相同 Token。页面不建立长期登录 Cookie，采用 `no-store` 与 `no-referrer`。
@@ -394,7 +396,7 @@ Agent 调用 `list_proxies` 查询列表，可传 `country: "US"`、`protocol: "
 
 ## 浏览器操作与分析
 
-当前提供 **46 个 MCP 工具**。除了多实例、多标签页、点击输入、iframe、上传下载，还支持：
+当前提供 **47 个 MCP 工具**。除了多实例、多标签页、点击输入、iframe、上传下载，还支持：
 
 | 能力 | MCP 工具 |
 | --- | --- |
@@ -487,10 +489,10 @@ bash scripts/publish-docker.sh
 ## 源码构建及 stdio 接入
 
 ```sh
-docker build -t cloudbrowser:0.16.0 .
+docker build -t cloudbrowser:0.17.0 .
 ```
 
-将一行部署命令最后的镜像名换成 `cloudbrowser:0.16.0` 即可本地使用。
+将一行部署命令最后的镜像名换成 `cloudbrowser:0.17.0` 即可本地使用。
 
 兼容配置见 [本地 stdio](examples/mcp.local.json)、[SSH stdio](examples/mcp.ssh.json)。仍使用 `docker exec -i`，不得使用 `-t`。MCP_PRINCIPAL 是可信 SSH/Docker 接入中的命名空间，不是独立认证。
 
