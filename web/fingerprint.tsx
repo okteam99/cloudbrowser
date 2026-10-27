@@ -186,7 +186,7 @@ export function FingerprintPage() {
                 <ul>
                   {(findings.length
                     ? findings
-                    : ['已检查 HTTP UA、页面与 Worker 声明；本次未发现这些字段的直接差异。']
+                    : ['本次可读取的字段中未发现直接差异；未提供或无法读取的字段不能视为一致。']
                   ).map((text) => (
                     <li key={text}>{text}</li>
                   ))}
@@ -214,6 +214,16 @@ export function FingerprintPage() {
             <DataCard title="音频指纹（离线计算）" value={report.audio} />
             <DataCard title="WebGL / GPU" value={report.webgl} />
             <DataCard title="WebGL 2" value={report.webgl2} />
+            <DataCard title="蓝牙" value={report.hardware.bluetooth} />
+            <DataCard title="摄像头、麦克风与扬声器" value={report.hardware.media_devices} />
+            <DataCard title="USB（已授权设备）" value={report.hardware.usb} />
+            <DataCard title="HID（已授权设备）" value={report.hardware.hid} />
+            <DataCard title="串口（已授权端口）" value={report.hardware.serial} />
+            <DataCard title="游戏手柄" value={report.hardware.gamepads} />
+            <DataCard title="音频输出参数" value={report.hardware.audio_output} />
+            <DataCard title="WebGPU 适配器" value={report.hardware.webgpu} />
+            <DataCard title="传感器与硬件接口" value={report.hardware.sensors} />
+            <DataCard title="当前网站权限状态" value={report.hardware.permissions} />
             <DataCard
               title="浏览器能力与 WebRTC"
               value={{ ...report.capabilities, webrtc_test: report.webrtc }}

@@ -193,6 +193,12 @@ Agent 调用 `list_device_profiles` 查询已启用档案，可传 `{"platform":
 
 正常 Chrome 的 UA 字符串通常将版本缩减为 `主版本.0.0.0`，Android 默认字符串还会显示 `Android 10; K`；真实系统、机型及完整构建版本从 Client Hints 实测获取。**不要将缩减 UA 的零当作完整构建号，也不要随机补数字。** 管理员维护档案时应依据目标设备实测，并核对 `browser_version` 与声明版本的差异。检测页报告可观察值和差异，不作真人／机器人判断，也不能证明物理设备或真实内核。
 
+
+
+硬件信息会单独展示蓝牙 API/可用状态及本站已授权设备、USB/HID/串口授权列表、摄像头/麦克风/扬声器枚举、游戏手柄描述、AudioContext 输出参数、WebGPU 适配器、传感器 API 和网站权限状态。数据在导出 JSON 的 `hardware` 中，报告 `schema_version=2`；原有字段保持兼容。
+
+页面只做被动读取，不调用 requestDevice、requestPort、getUserMedia、传感器启动或设备连接。返回 reported / unsupported / blocked / timeout / unavailable 状态；权限未授予时媒体名称或 ID 可能为空，已授权列表为空也不能证明没有硬件。蓝牙可用状态只是浏览器报告，不读取蓝牙 MAC 或扫描周边。设备 ID 常按网站/会话隔离，用同一域名采集对照；不把 ID 差异当作硬件差异。音频仅读取处理参数并关闭上下文，不播放声音。
+
 ## 实例详情与问题回溯
 
 Agent 可调用 MCP `get_instance_details({"instance_id":"ins_..."})` 一次获取完整详情，HTTP 对应 `POST /api/tools/get_instance_details`。返回的 `data` 与详情 JSON 共用结构，包含状态、任务、属性、环境、标签页、录屏、直播链接、最近最多200条日志和最早的最多200条保留跳转记录，支持运行中、忙碌及已关闭实例。跳转历史通过 `list_navigation_events` 的游标继续读取，日志游标用于增量读取，较早日志用 `get_logs(after_seq=0)` 开始分页；过期数据标记不可用，链接不填入真实 Token。
@@ -484,10 +490,10 @@ bash scripts/publish-docker.sh
 ## 源码构建及 stdio 接入
 
 ```sh
-docker build -t cloudbrowser:0.18.0 .
+docker build -t cloudbrowser:0.18.1 .
 ```
 
-将一行部署命令最后的镜像名换成 `cloudbrowser:0.18.0` 即可本地使用。
+将一行部署命令最后的镜像名换成 `cloudbrowser:0.18.1` 即可本地使用。
 
 兼容配置见 [本地 stdio](examples/mcp.local.json)、[SSH stdio](examples/mcp.ssh.json)。仍使用 `docker exec -i`，不得使用 `-t`。MCP_PRINCIPAL 是可信 SSH/Docker 接入中的命名空间，不是独立认证。
 

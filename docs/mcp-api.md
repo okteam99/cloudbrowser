@@ -440,3 +440,8 @@ AI 可填写 MCP Bearer Token：`?access_token=<TOKEN>&format=json` 或 `&format
 HTTP 信息来自同源公开 `GET /fingerprint/request`，不含 Cookie、Authorization、查询参数或部署配置。客户端指纹在页面内计算，不上传或保存，不使用第三方检测服务，不申请权限或播放声音。HTTP 来源 IP 与 WebRTC 出口不同；本页不执行 STUN/TURN 检测。返回的是网站可观察到的声明和能力，不是实际内核证明或真人／机器人评分。
 
 正常 Chrome UA 的缩减规范参考 [Chromium User-Agent Reduction](https://www.chromium.org/updates/ua-reduction/)，完整版本等提示参考 [Chrome Client Hints](https://developer.chrome.com/docs/privacy-security/user-agent-client-hints)。
+
+
+硬件信息会单独展示蓝牙 API/可用状态及本站已授权设备、USB/HID/串口授权列表、摄像头/麦克风/扬声器枚举、游戏手柄描述、AudioContext 输出参数、WebGPU 适配器、传感器 API 和网站权限状态。数据在导出 JSON 的 `hardware` 中，报告 `schema_version=2`；原有字段保持兼容。
+
+页面只做被动读取，不调用 requestDevice、requestPort、getUserMedia、传感器启动或设备连接。返回 reported / unsupported / blocked / timeout / unavailable 状态；权限未授予时媒体名称或 ID 可能为空，已授权列表为空也不能证明没有硬件。蓝牙可用状态只是浏览器报告，不读取蓝牙 MAC 或扫描周边。设备 ID 常按网站/会话隔离，用同一域名采集对照；不把 ID 差异当作硬件差异。音频仅读取处理参数并关闭上下文，不播放声音。

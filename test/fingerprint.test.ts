@@ -114,6 +114,32 @@ test('public fingerprint works without login, stays same-origin, exports JSON an
     assert.match(report.canvas.value.hash, /^[a-f0-9]{64}$/);
     assert.match(report.audio.value.hash, /^[a-f0-9]{64}$/);
     assert.equal(report.webrtc.tested, false);
+    assert.equal(report.schema_version, 2);
+    assert.equal(report.hardware.collection_mode, 'passive_no_permission_prompts');
+    assert.equal(
+      report.hardware.bluetooth.api_supported,
+      await page.evaluate(() => 'bluetooth' in navigator),
+    );
+    assert.ok(
+      ['reported', 'blocked', 'unsupported', 'unavailable', 'timeout'].includes(
+        report.hardware.bluetooth.availability.status,
+      ),
+    );
+    assert.equal(report.hardware.media_devices.enumeration.status, 'reported');
+    assert.ok(
+      report.hardware.media_devices.enumeration.value.devices.every(
+        (d: any) => typeof d.kind === 'string',
+      ),
+    );
+    assert.ok(report.hardware.usb.granted_devices.status);
+    assert.ok(report.hardware.webgpu.adapter.status);
+    await page.getByText('蓝牙', { exact: true }).waitFor();
+    if (process.env.FINGERPRINT_SCREENSHOT_DIR) {
+      await mkdir(process.env.FINGERPRINT_SCREENSHOT_DIR, { recursive: true });
+      await page.getByText('蓝牙', { exact: true }).scrollIntoViewIfNeeded();
+      await page.screenshot({ path: join(process.env.FINGERPRINT_SCREENSHOT_DIR, 'hardware.png') });
+      await page.evaluate(() => scrollTo(0, 0));
+    }
     assert.ok(!JSON.stringify(report).includes('should-not-be-sent'));
     const downloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: '下载 JSON' }).click();

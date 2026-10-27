@@ -1,3 +1,5 @@
+import { collectHardware } from './hardware-probes.js';
+
 export async function bounded<T>(promise: Promise<T>, ms = 2500): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -153,7 +155,8 @@ async function workerInfo(base: string) {
   try {
     return await bounded(
       new Promise((resolve, reject) => {
-        worker.onmessage = (e) => resolve(e.data);
+        worker.onmessage = (e) =>
+          e.data?.error ? reject(new Error(e.data.error)) : resolve(e.data);
         worker.onerror = () => reject(new Error('Worker 不可用'));
       }),
     );
@@ -163,36 +166,38 @@ async function workerInfo(base: string) {
 }
 export async function collectFingerprint(base: string) {
   const n = navigator as any;
-  const [identity, request, canvas, webgl, webgl2, audio, worker, battery] = await Promise.all([
-    navigatorInfo(n),
-    probe(async () => {
-      const r = await fetch(`${base}/fingerprint/request`, {
-        credentials: 'omit',
-        cache: 'no-store',
-        signal: AbortSignal.timeout(4000),
-      });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.json();
-    }),
-    probe(canvasInfo),
-    probe(() => graphicsInfo('webgl')),
-    probe(() => graphicsInfo('webgl2')),
-    probe(audioInfo),
-    probe(() => workerInfo(base)),
-    probe(async () => {
-      if (!n.getBattery) throw new Error('Battery API 不支持');
-      const b = await n.getBattery();
-      return {
-        charging: b.charging,
-        level: b.level,
-        charging_time: Number.isFinite(b.chargingTime) ? b.chargingTime : null,
-        discharging_time: Number.isFinite(b.dischargingTime) ? b.dischargingTime : null,
-      };
-    }),
-  ]);
+  const [identity, request, canvas, webgl, webgl2, audio, worker, battery, hardware] =
+    await Promise.all([
+      navigatorInfo(n),
+      probe(async () => {
+        const r = await fetch(`${base}/fingerprint/request`, {
+          credentials: 'omit',
+          cache: 'no-store',
+          signal: AbortSignal.timeout(4000),
+        });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      }),
+      probe(canvasInfo),
+      probe(() => graphicsInfo('webgl')),
+      probe(() => graphicsInfo('webgl2')),
+      probe(audioInfo),
+      probe(() => workerInfo(base)),
+      probe(async () => {
+        if (!n.getBattery) throw new Error('Battery API 不支持');
+        const b = await n.getBattery();
+        return {
+          charging: b.charging,
+          level: b.level,
+          charging_time: Number.isFinite(b.chargingTime) ? b.chargingTime : null,
+          discharging_time: Number.isFinite(b.dischargingTime) ? b.dischargingTime : null,
+        };
+      }),
+      collectHardware(),
+    ]);
   const connection = n.connection ?? n.mozConnection ?? n.webkitConnection;
   return {
-    schema_version: 1,
+    schema_version: 2,
     collected_at: new Date().toISOString(),
     navigator: identity,
     request,
@@ -284,6 +289,7 @@ export async function collectFingerprint(base: string) {
     webgl2,
     worker,
     battery,
+    hardware,
     webrtc: {
       tested: false,
       note: '仅检查 API 可用性；未连接 STUN/TURN，未检测 WebRTC 公网出口。HTTP 来源 IP 不能替代 WebRTC 出口检测。',
