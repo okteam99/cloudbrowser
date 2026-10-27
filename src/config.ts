@@ -55,7 +55,7 @@ export const createSchema = z
       .min(1)
       .max(1024)
       .describe(
-        'Highest-priority UA. Regenerates Client Hints from this UA even with a profile. If no profile is specified, selects the enabled default profile for the same OS (is_default first, otherwise first enabled match); no match uses UA-only settings. No UA and no profile preserves native browser defaults. Does not change the actual engine.',
+        'Optional highest-priority UA for an explicitly requested identity test. Prefer discovered device profiles for ordinary device tests; do not invent or copy old UA versions. Reduced UA cannot recover a real full build number. Regenerates Client Hints from this UA even with a profile. If no profile is specified, selects the enabled default profile for the same OS (is_default first, otherwise first enabled match); no match uses UA-only settings. No UA and no profile preserves native browser defaults. Does not change the actual engine.',
       )
       .optional(),
     viewport: z

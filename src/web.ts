@@ -10,7 +10,8 @@ import { createMcpServer, type Dispatch } from './mcp.js';
 import { definitions } from './tools.js';
 import { invokeTool, failedCall, toolHttpStatus } from './tool-api.js';
 import { toolCatalog, toolOpenApi } from './api-schema.js';
-import { dashboard, loginPage, sharePage } from './web-ui.js';
+import { dashboard, loginPage, sharePage, fingerprintPage } from './web-ui.js';
+import { fingerprintAcceptCH, fingerprintRequest } from './fingerprint.js';
 import { publicError } from './errors.js';
 import { frameMedia, liveMedia, videoMedia } from './media.js';
 import { ZodError } from 'zod';
@@ -146,10 +147,28 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         json(res, { error: 'Origin not allowed' }, 403);
         return;
       }
+      if (path === '/fingerprint' || path === '/fingerprint/request') {
+        if (!['GET', 'HEAD'].includes(req.method ?? '')) {
+          res.setHeader('allow', 'GET, HEAD');
+          json(res, { error: 'Use GET or HEAD.' }, 405);
+          return;
+        }
+        res.setHeader('referrer-policy', 'no-referrer');
+        res.setHeader('accept-ch', fingerprintAcceptCH);
+        if (path === '/fingerprint') {
+          res.setHeader('content-type', 'text/html; charset=utf-8');
+          res.end(req.method === 'HEAD' ? undefined : fingerprintPage(prefix));
+        } else {
+          res.setHeader('content-type', 'application/json; charset=utf-8');
+          res.end(req.method === 'HEAD' ? undefined : JSON.stringify(fingerprintRequest(req, cfg)));
+        }
+        return;
+      }
       if (path.startsWith('/assets/') && req.method === 'GET') {
         const files: Record<string, string> = {
           '/assets/app.js': 'application/javascript; charset=utf-8',
           '/assets/app.css': 'text/css; charset=utf-8',
+          '/assets/fingerprint-worker.js': 'application/javascript; charset=utf-8',
           '/assets/getting-started.svg': 'image/svg+xml',
         };
         const mime = Object.hasOwn(files, path) ? files[path] : undefined;
@@ -170,7 +189,7 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         return;
       }
       if (path === '/healthz') {
-        json(res, { status: 'ok', version: '0.17.0' });
+        json(res, { status: 'ok', version: '0.18.0' });
         return;
       }
       const toolRoute = /^\/api\/tools\/([^/]+)$/.exec(path);

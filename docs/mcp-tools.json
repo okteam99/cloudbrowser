@@ -664,7 +664,7 @@
     },
     {
       "name": "create_instance",
-      "description": "Create an isolated Chromium instance. Explicit user_agent takes precedence over any selected profile and regenerates Client Hints; other device settings come from that profile. Choose device_profile_id or inline device_profile (mutually exclusive); if omitted with a UA, auto-select the enabled default for the same OS (is_default first, otherwise first enabled match). No match uses UA-only settings and returns a warning. Without UA/profile keep native defaults. Returns frozen effective device_profile, device_profile_id, device_profile_source, actual browser_version, user_agent_metadata and details_url (empty access_token= hint). Optional task_description is shown in console/history. Proxy: use proxy_id, inline proxy, or proxy_ref (mutually exclusive). No direct fallback. No proxy means direct mode.",
+      "description": "Create an isolated Chromium instance. For ordinary device tests discover saved profiles and use a returned device_profile_id, usually omitting user_agent. Never invent or copy a fixed browser version from examples; only override UA when the user supplies one or requests a specific declared identity test. Explicit user_agent takes precedence over any selected profile and regenerates Client Hints; other device settings come from that profile. Choose device_profile_id or inline device_profile (mutually exclusive); if omitted with a UA, auto-select the enabled default for the same OS (is_default first, otherwise first enabled match). No match uses UA-only settings and returns a warning. Without UA/profile keep native defaults. Returns frozen effective device_profile, device_profile_id, device_profile_source, actual browser_version, user_agent_metadata and details_url (empty access_token= hint). Optional task_description is shown in console/history. Proxy: use proxy_id, inline proxy, or proxy_ref (mutually exclusive). No direct fallback. No proxy means direct mode.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -934,7 +934,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 1024,
-            "description": "Highest-priority UA. Regenerates Client Hints from this UA even with a profile. If no profile is specified, selects the enabled default profile for the same OS (is_default first, otherwise first enabled match); no match uses UA-only settings. No UA and no profile preserves native browser defaults. Does not change the actual engine."
+            "description": "Optional highest-priority UA for an explicitly requested identity test. Prefer discovered device profiles for ordinary device tests; do not invent or copy old UA versions. Reduced UA cannot recover a real full build number. Regenerates Client Hints from this UA even with a profile. If no profile is specified, selects the enabled default profile for the same OS (is_default first, otherwise first enabled match); no match uses UA-only settings. No UA and no profile preserves native browser defaults. Does not change the actual engine."
           },
           "viewport": {
             "type": "object",

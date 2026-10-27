@@ -122,6 +122,9 @@ export function ApiDocs({
               <Button href={connection.openapi_url} target="_blank">
                 OpenAPI JSON
               </Button>
+              <Button href={`${connection.base_url}/fingerprint`} target="_blank">
+                设备指纹检测
+              </Button>
             </Space>
           </Card>
         </Col>

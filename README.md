@@ -136,30 +136,28 @@ Agent 必须支持远程 Streamable HTTP MCP 及自定义 Authorization 请求�
 
 ## 创建指定环境
 
-`create_instance` arguments 示例：
+日常移动端测试先发现设备档案，使用管理员维护的整套配置。不要从文档复制固定的浏览器版本或自己编造 UA。
+
+1. 调用 `list_device_profiles({"platform":"Android"})`，从返回项中选择符合目标设备的启用档案；可用 `default_for_platform` 找到当前默认项。
+2. 用返回的真实 `profile_id` 调用 `get_device_profile`，核对 UA、完整 Client Hints、屏幕、触控、语言与时区。
+3. 调用 `create_instance`，传 `device_profile_id`、任务描述和从 `list_proxies` 获取的代理 ID。通常省略 `user_agent`，保持档案内完整配置。
 
 ```json
 {
-  "task_description": "验证移动端商品页、购物车和下载流程",
-  "user_agent": "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
-  "viewport": { "width": 412, "height": 915 },
-  "mobile": { "enabled": true, "touch": true, "device_scale_factor": 2 },
-  "locale": "en-US",
-  "timezone": "America/New_York",
-  "proxy": {
-    "server": "socks5://proxy.example.com:1080",
-    "username": "your-user",
-    "password": "your-password"
-  }
+  "task_description": "检查 Android 移动端商品页和下载流程",
+  "device_profile_id": "<上一步返回的profile_id>",
+  "proxy_id": "<list_proxies返回的proxy_id>"
 }
 ```
+
+尖括号内容必须替换为接口实际返回的 ID。没有合适档案时先报告缺失，由管理员根据目标设备实测补齐，不把任意示例当作正常用户设备。无需模拟特定设备时，可以省略 UA 和档案，保留运行中浏览器的原生声明。
 
 - 每个实例独立浏览器进程和会话；新标签页继承同一代理和设备环境。
 - 支持 `http://`、`https://` 上游与 `socks5://`，凭据通过独立字段传入。
 - 省略 proxy 是明确的直连模式；指定代理失败不会回退直连。
 - WebRTC 使用完整 Chromium 的原生 `disable_non_proxied_udp` 策略，阻止绕过代理的 UDP / STUN 出口。浏览器通过本机 HTTP CONNECT 网关使用上游 HTTP/SOCKS5；无法转发的 WebRTC 连接会受限，检测页可能显示 `n/a`，不会伪造代理 IP 或替换网页的 WebRTC API。普通网页仍使用所选代理。策略在启动时设置，升级后需新建实例。
 - 环境参数创建后固定，切换环境需新建实例。
-- 传入 Chromium UA 后，自动按 UA 生成 Client Hints 的品牌、主/完整版本、平台、机型和移动标记；无需额外参数。例如 Chrome/130.0.0.0 对应版本提示 130 / 130.0.0.0。
+- 传入 Chromium UA 后，自动按 UA 生成 Client Hints 的品牌、主/完整版本、平台、机型和移动标记；无需额外参数。这只表示解析声明，不会还原缩减 UA 隐藏的完整构建号；默认设备测试使用档案，不另传 UA。
 - `browser_version` 返回实际运行的 Chromium 内核版本，`user_agent_metadata` 返回自动生成的声明；UA 配置不会安装或切换内核。`verify_environment.actual.client_hints` 可核对目标页面实际读到的提示。
 - 未指定 UA 和档案时保留原生 UA 和 Client Hints。无法从 UA 判断的机型、系统版本或 CPU 信息留空；Safari、Firefox、iOS 和无法识别的自定义 UA 不附带 Chromium 版本提示。移动布局与触摸使用所选档案；无档案时由 viewport/mobile 控制。
 - viewport 是 CSS 像素的设备视口；移动页面没有 viewport meta 时，layout_viewport 可能约为 980px。
@@ -171,32 +169,29 @@ Agent 必须支持远程 Streamable HTTP MCP 及自定义 Authorization 请求�
 
 默认使用完整 Chromium 的新版无头模式。在控制台 **系统设置 → 设备档案** 编辑 JSON 数组，每项包含唯一的 `profile_id`、`enabled`、`is_default` 和完整的 `profile`。首次启动预置 macOS 与 Android 两份示例，可新增、修改、停用或删除；最多 100 份。保存时校验 UA / Client Hints 的版本和系统、屏幕、语言等字段，配置持久化到 `/data/device-profiles.json`，无需重启。
 
-Agent 调用 `list_device_profiles` 查询已启用档案，可传 `{"platform":"Android"}` 或 `{"query":"pixel"}` 筛选。`get_device_profile({"profile_id":"android-pixel8-chrome155"})` 读取完整 JSON 和启用状态；创建时传 `device_profile_id`。也可把返回的 `profile` 放入内联 `device_profile` 后修改。两者互斥，单独指定的 `user_agent` 优先，并自动重新生成全部 Client Hints；viewport / mobile / locale / timezone 等其他设备参数沿用档案，代理和实例生命周期仍单独设置。
+Agent 调用 `list_device_profiles` 查询已启用档案，可传 `{"platform":"Android"}` 或 `{"query":"pixel"}` 筛选。将返回的真实 ID 传给 `get_device_profile` 读取完整 JSON 和启用状态；创建时传 `device_profile_id`。也可把返回的 `profile` 放入内联 `device_profile` 后修改。两者互斥，单独指定的 `user_agent` 优先，并自动重新生成全部 Client Hints；viewport / mobile / locale / timezone 等其他设备参数沿用档案，代理和实例生命周期仍单独设置。
 
 每个实例独立选择档案，没有全局“当前选中档案”。只传 UA 时按操作系统自动匹配启用档案：优先 `is_default:true`，否则按 JSON 顺序取同系统第一份启用档案。每个系统最多一份启用的默认档案；缺省 `is_default:false`，旧配置无需修改即可匹配。没有同系统可用档案时保留 UA 模式并返回说明，不会选择其他系统。已删除或停用的 ID 无法创建新实例；修改档案只影响后续创建，运行中实例和历史记录保留原配置及档案 ID。
 
-例如只传 Android UA，自动沿用后台 Android 默认档案的屏幕、触控、语言、时区及 CPU：
-
-```json
-{
-  "user_agent": "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.58 Mobile Safari/537.36"
-}
-```
+只传目标设备实测 UA 时，会自动沿用后台同操作系统默认档案的屏幕、触控、语言、时区及 CPU。这是显式兼容性测试路径，按系统匹配不等于匹配手机型号；只有用户明确提供 UA 或指定这类测试时才使用。
 
 明确指定档案时也可追加 `user_agent` 覆盖其 UA 和 Client Hints。UA 无法判断的 Client Hints 字段留空，不沿用档案中的旧品牌、版本、机型或架构；其余档案属性不变。返回 `device_profile_source`（explicit_id / inline / ua_default / ua_unmatched / none）说明选择来源，`device_profile` 是创建时实际生效的快照，不会修改后台模板。
 
-```json
-{
-  "task_description": "核验桌面设备属性和网页功能",
-  "device_profile_id": "macos-arm-chrome155"
-}
-```
+桌面测试同样先调用 `list_device_profiles`（例如 platform=macOS），再使用返回的真实 ID；无需指定桌面型号时可直接创建原生默认实例。
 
 配置档明确保存完整浏览器版本、Client Hints、navigator.platform、屏幕/视口、缩放、语言列表、Intl 区域、时区、触控及逻辑核心数，避免从冻结的 Mac UA 猜测真实架构和系统版本。示例是可修改的测试声明，不是实际 Mac/手机，也不会安装对应版本的内核。Worker 的 platform 在原生覆盖未生效时通过启动脚本补齐；字段一致不代表原型或底层实现与真机相同。
 
 打开测试页面后调用 `verify_device_profile`，传 `instance_id`、`page_id`：逐字段比较目标值与页面/Worker 实测值，实际执行 Canvas/WebGL 绘制、音频处理、Worker 与隔离页面中的本地 PDF 渲染，另外报告蓝牙、系统语音及分享接口可用性。报告区分一致、差异、无法读取、执行通过和仅报告可用性。不会伪造 webdriver、设备内存、蓝牙硬件、语音库或 GPU 能力。
 
 实例详情的“设备配置与核验”展示完整配置、差异列表及能力结果，可复制配置档；最新核验报告会随实例历史和录屏元信息保留。核验只在显式调用时运行，不会因刷新控制台而重复操作浏览器。
+
+## 公开设备指纹检测
+
+访问 `BASE_URL/fingerprint`，无需登录。普通浏览器和云浏览器打开同一页面即可对比网页可见的 UA、Client Hints、Navigator、Worker、屏幕/视口、语言/时区、WebGL/GPU、Canvas/离线音频 SHA-256、插件及能力声明。支持复制和下载 JSON；Agent 可用 `evaluate` 读取 `JSON.parse(document.querySelector('#fingerprint-report').textContent)`，先等待该元素出现。
+
+`GET /fingerprint/request` 只回显当前请求的精选 UA/CH/语言头和 HTTP 来源 IP，不返回 Cookie、Authorization、URL 查询参数或平台配置。Cloudflare 本机隧道场景使用转发的连接 IP，其他部署报告连接对端并注明来源；不把该值当作 WebRTC 出口。页面不上传或持久化客户端指纹，不调用第三方服务、不申请设备权限、不播放声音。WebRTC 仅显示 API 是否支持，未执行 STUN/TURN 公网出口检测。
+
+正常 Chrome 的 UA 字符串通常将版本缩减为 `主版本.0.0.0`，Android 默认字符串还会显示 `Android 10; K`；真实系统、机型及完整构建版本从 Client Hints 实测获取。**不要将缩减 UA 的零当作完整构建号，也不要随机补数字。** 管理员维护档案时应依据目标设备实测，并核对 `browser_version` 与声明版本的差异。检测页报告可观察值和差异，不作真人／机器人判断，也不能证明物理设备或真实内核。
 
 ## 实例详情与问题回溯
 
@@ -489,10 +484,10 @@ bash scripts/publish-docker.sh
 ## 源码构建及 stdio 接入
 
 ```sh
-docker build -t cloudbrowser:0.17.0 .
+docker build -t cloudbrowser:0.18.0 .
 ```
 
-将一行部署命令最后的镜像名换成 `cloudbrowser:0.17.0` 即可本地使用。
+将一行部署命令最后的镜像名换成 `cloudbrowser:0.18.0` 即可本地使用。
 
 兼容配置见 [本地 stdio](examples/mcp.local.json)、[SSH stdio](examples/mcp.ssh.json)。仍使用 `docker exec -i`，不得使用 `-t`。MCP_PRINCIPAL 是可信 SSH/Docker 接入中的命名空间，不是独立认证。
 

@@ -1683,3 +1683,163 @@ input {
     monospace;
   margin: 0;
 }
+.fingerprint-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 26px 32px 48px;
+}
+.fingerprint-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.fingerprint-brand {
+  font-size: 22px;
+  font-weight: 750;
+  color: #16233d;
+  letter-spacing: -0.7px;
+}
+.fingerprint-intro {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  margin-top: 32px;
+}
+.fingerprint-intro h1.ant-typography {
+  font-size: 30px;
+  margin-bottom: 10px;
+}
+.fingerprint-privacy {
+  color: #64748b;
+  font-size: 13px;
+  margin: 4px 0 24px;
+}
+.fingerprint-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+.fingerprint-summary .ant-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px;
+}
+.fingerprint-summary strong {
+  font-size: 22px;
+  letter-spacing: -0.5px;
+  overflow-wrap: anywhere;
+}
+.fingerprint-summary .ant-typography {
+  font-size: 12px;
+}
+.fingerprint-findings {
+  margin-bottom: 24px;
+}
+.fingerprint-findings ul {
+  padding-left: 20px;
+  margin: 0 0 8px;
+}
+.fingerprint-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 20px;
+}
+.fingerprint-data-card .ant-card-head {
+  min-height: 52px;
+}
+.fingerprint-data-card .ant-card-body {
+  padding: 20px;
+}
+.fingerprint-data-card .ant-descriptions-item-label {
+  min-width: 145px;
+  max-width: 180px;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.fingerprint-data-card .ant-descriptions-item-content {
+  min-width: 0;
+}
+.fingerprint-value {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  font:
+    12px/1.7 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+.fingerprint-raw {
+  margin-top: 24px;
+}
+.fingerprint-raw pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 600px;
+  overflow: auto;
+  font-size: 12px;
+}
+.fingerprint-footer {
+  margin-top: 26px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.fingerprint-footer p {
+  margin: 6px 0;
+}
+.fingerprint-loading {
+  text-align: center;
+  padding: 100px 0;
+  color: #64748b;
+}
+@media (max-width: 900px) {
+  .fingerprint-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .fingerprint-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .fingerprint-intro {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+@media (max-width: 520px) {
+  .fingerprint-page {
+    padding: 18px 14px 32px;
+  }
+  .fingerprint-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    padding-bottom: 18px;
+  }
+  .fingerprint-intro {
+    margin-top: 24px;
+  }
+  .fingerprint-summary {
+    gap: 10px;
+  }
+  .fingerprint-summary .ant-card-body {
+    padding: 14px;
+  }
+  .fingerprint-summary strong {
+    font-size: 18px;
+  }
+  .fingerprint-data-card .ant-card-body {
+    padding: 14px;
+  }
+  .fingerprint-data-card .ant-descriptions-item-label {
+    min-width: 110px;
+    max-width: 125px;
+  }
+}

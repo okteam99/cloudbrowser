@@ -1,6 +1,6 @@
 export type Bootstrap = {
   base: string;
-  screen: 'login' | 'dashboard' | 'share';
+  screen: 'login' | 'dashboard' | 'share' | 'fingerprint';
   share?: {
     kind: 'live' | 'recording';
     state: 'live' | 'ready' | 'ended' | 'unavailable';

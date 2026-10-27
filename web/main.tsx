@@ -83,6 +83,7 @@ import { InstanceLogDrawer } from './instance-logs';
 import { SettingsPage } from './settings';
 import { InstanceDetailsPage } from './instance-details';
 import { LiveImage } from './live-image';
+import { FingerprintPage } from './fingerprint';
 
 const { Title, Text, Paragraph } = Typography;
 type Section = 'overview' | 'instances' | 'history' | 'proxies' | 'connect' | 'docs' | 'settings';
@@ -197,6 +198,9 @@ function Login() {
         <Text type="secondary" className="login-footer">
           cloudbrowser · 你的远程浏览器工作台
         </Text>
+        <a href={`${bootstrap.base}/fingerprint`} target="_blank" rel="noreferrer">
+          公开设备指纹检测
+        </a>
       </section>
     </main>
   );
@@ -339,7 +343,7 @@ function Dashboard() {
                 <span className="status-dot" />
                 远程浏览器服务
               </div>
-              <Text>cloudbrowser · v0.17.0</Text>
+              <Text>cloudbrowser · v0.18.0</Text>
             </div>
           </Layout.Sider>
         )}
@@ -1870,6 +1874,8 @@ createRoot(document.getElementById('root')!).render(
     <App>
       {bootstrap.screen === 'login' ? (
         <Login />
+      ) : bootstrap.screen === 'fingerprint' ? (
+        <FingerprintPage />
       ) : bootstrap.screen === 'share' ? (
         <PublicViewer />
       ) : (
