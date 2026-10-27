@@ -262,7 +262,7 @@ export async function verifyDeviceProfile(
       actual: actual ?? null,
       mode,
       status:
-        expected === null && (actual === undefined || actual === null)
+        expected === null && actual === null
           ? 'match'
           : actual === undefined || actual === null
             ? 'unavailable'

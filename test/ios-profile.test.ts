@@ -77,6 +77,7 @@ test('iPhone identity suppresses UA-CH in page, worker and HTTP while preserving
   const requests: { url: string; headers: http.IncomingHttpHeaders }[] = [];
   const server = http.createServer((req, res) => {
     requests.push({ url: req.url!, headers: req.headers });
+    if (req.url === '/no-worker') res.setHeader('Content-Security-Policy', "worker-src 'none'");
     res.setHeader('Accept-CH', 'Sec-CH-UA, Sec-CH-UA-Platform, Sec-CH-UA-Full-Version-List');
     if (req.url === '/worker.js') {
       res.setHeader('Content-Type', 'text/javascript');
@@ -161,6 +162,16 @@ test('iPhone identity suppresses UA-CH in page, worker and HTTP while preserving
       );
       await manager.execute('alice', 'navigate', { ...ids, action: 'reload' });
       assert.equal(await page.evaluate(() => navigator.maxTouchPoints), 5);
+      if (mode === 'explicit') {
+        await manager.execute('alice', 'navigate', { ...ids, url: base + '/no-worker' });
+        const report = await manager.execute('alice', 'verify_device_profile', ids);
+        assert.equal(
+          report.fields.find(
+            (field: any) => field.scope === 'worker' && field.field === 'client_hints',
+          ).status,
+          'unavailable',
+        );
+      }
       await manager.execute('alice', 'close_instance', { instance_id: i.instance_id });
       const history = await manager.execute('alice', 'get_instance_details', {
         instance_id: i.instance_id,
