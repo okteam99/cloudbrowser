@@ -512,14 +512,13 @@ export function installWebObservables(config) {
     const original = proto.getParameter;
     const extensions = proto.getSupportedExtensions;
     const extension = proto.getExtension;
+    const virtual = new WeakMap();
     Object.defineProperty(proto, 'getSupportedExtensions', {
       configurable: true,
       writable: true,
       value: function getSupportedExtensions() {
         const available = extensions.call(this);
-        return available === null
-          ? null
-          : declaration.extensions.filter((name) => available.includes(name));
+        return available === null ? null : [...declaration.extensions];
       },
     });
     Object.defineProperty(proto, 'getExtension', {
@@ -531,13 +530,42 @@ export function installWebObservables(config) {
           !declaration.extensions.some((value) => value.toLowerCase() === requested.toLowerCase())
         )
           return null;
-        return extension.call(this, requested);
+        const native = extension.call(this, requested);
+        if (native || this.isContextLost()) return native;
+        const canonical = declaration.extensions.find(
+          (value) => value.toLowerCase() === requested.toLowerCase(),
+        );
+        let entries = virtual.get(this);
+        if (!entries) virtual.set(this, (entries = new Map()));
+        if (!entries.has(canonical)) {
+          const prototype = globalThis[canonical]?.prototype ?? Object.prototype;
+          const facade = Object.create(prototype);
+          Object.defineProperty(facade, Symbol.toStringTag, { value: canonical });
+          for (const key of Object.getOwnPropertyNames(prototype))
+            if (key !== 'constructor' && typeof prototype[key] === 'function')
+              Object.defineProperty(facade, key, {
+                value() {
+                  throw error(
+                    'NotSupportedError',
+                    'GPU execution is unavailable for this simulated extension.',
+                  );
+                },
+                configurable: true,
+              });
+          entries.set(canonical, facade);
+        }
+        return entries.get(canonical);
       },
     });
     Object.defineProperty(proto, 'getParameter', {
       configurable: true,
       writable: true,
       value: function getParameter(parameter) {
+        if (
+          (parameter === 37445 || parameter === 37446) &&
+          virtual.get(this)?.has('WEBGL_debug_renderer_info')
+        )
+          return parameter === 37445 ? declaration.unmasked_vendor : declaration.unmasked_renderer;
         const value = original.call(this, parameter);
         const map = {
           7936: 'vendor',
@@ -547,57 +575,67 @@ export function installWebObservables(config) {
           37445: 'unmasked_vendor',
           37446: 'unmasked_renderer',
         };
-        if (parameter === 3379 && typeof value === 'number')
-          return Math.min(value, declaration.max_texture_size);
+        if (parameter === 3379 && typeof value === 'number') return declaration.max_texture_size;
         if (parameter === 34024 && typeof value === 'number')
-          return Math.min(value, declaration.max_renderbuffer_size);
+          return declaration.max_renderbuffer_size;
         if ((parameter === 37445 || parameter === 37446) && value === null) return null;
         return map[parameter] && declaration[map[parameter]] !== null
           ? declaration[map[parameter]]
           : value;
       },
     });
-    // Expose only native-supported target extensions/limits. Rendering and
-    // extension objects stay native; never fabricate a successful GPU operation.
+    // Metadata follows the declared target. Native drawing remains native;
+    // unavailable extension operations reject instead of faking rendered output.
   }
-  if (hw.webgpu?.adapter && n.gpu) {
-    const original = n.gpu.requestAdapter.bind(n.gpu),
-      entry = hw.webgpu.adapter;
-    fn(n.gpu, 'requestAdapter', async (options) => {
+  if (hw.webgpu?.adapter && secure && (page || 'gpu' in n)) {
+    const entry = hw.webgpu.adapter;
+    if (entry.status === 'unsupported') {
+      remove(n, 'gpu');
+      return;
+    }
+    const gpu = n.gpu ?? Object.create(globalThis.GPU?.prototype ?? Object.prototype);
+    const original = typeof gpu.requestAdapter === 'function' ? gpu.requestAdapter.bind(gpu) : null;
+    getter(navProto, 'gpu', gpu);
+    fn(gpu, 'requestAdapter', async (options) => {
       if (!['reported', 'measured'].includes(entry.status)) return result(entry);
       if (entry.value.adapter_available === false) return null;
-      const adapter = await original(options);
-      if (!adapter) return null;
-      const v = entry.value,
-        info =
-          adapter.info ?? Object.create(globalThis.GPUAdapterInfo?.prototype ?? Object.prototype);
+      if (options?.forceFallbackAdapter) return original ? original(options) : null;
+      const native = original ? await original(options) : null;
+      const adapter = native ?? Object.create(globalThis.GPUAdapter?.prototype ?? Object.prototype);
+      const v = entry.value;
+      const info =
+        native?.info ?? Object.create(globalThis.GPUAdapterInfo?.prototype ?? Object.prototype);
       for (const key of ['vendor', 'architecture', 'device', 'description'])
         getter(info, key, v[key] ?? '');
-      if (v.fallback_adapter !== undefined) getter(info, 'isFallbackAdapter', v.fallback_adapter);
+      getter(info, 'isFallbackAdapter', v.fallback_adapter ?? false);
       getter(adapter, 'info', info);
-      if (Array.isArray(v.features)) {
-        const native = adapter.features;
-        const selected = new Set(v.features.filter((name) => native.has(name)));
-        const features = Object.create(Object.getPrototypeOf(native));
-        getter(features, 'size', () => selected.size);
-        fn(features, 'has', (name) => selected.has(name));
-        fn(features, 'keys', () => selected.keys());
-        fn(features, 'values', () => selected.values());
-        fn(features, 'entries', () => selected.entries());
-        fn(features, 'forEach', (callback, thisArg) =>
-          selected.forEach((value) => callback.call(thisArg, value, value, features)),
-        );
-        Object.defineProperty(features, Symbol.iterator, {
-          configurable: true,
-          value: () => selected.values(),
-        });
-        getter(adapter, 'features', features);
-      }
-      if (v.limits)
-        for (const [key, maximum] of Object.entries(v.limits)) {
-          if (typeof adapter.limits[key] === 'number' && typeof maximum === 'number')
-            getter(adapter.limits, key, Math.min(adapter.limits[key], maximum));
-        }
+      getter(adapter, 'isFallbackAdapter', v.fallback_adapter ?? false);
+      const selected = new Set(v.features ?? []);
+      const features = Object.create(
+        globalThis.GPUSupportedFeatures?.prototype ?? Object.prototype,
+      );
+      getter(features, 'size', () => selected.size);
+      fn(features, 'has', (name) => selected.has(name));
+      fn(features, 'keys', () => selected.keys());
+      fn(features, 'values', () => selected.values());
+      fn(features, 'entries', () => selected.entries());
+      fn(features, 'forEach', (callback, thisArg) =>
+        selected.forEach((value) => callback.call(thisArg, value, value, features)),
+      );
+      Object.defineProperty(features, Symbol.iterator, {
+        value() {
+          if (this !== features) throw new TypeError('Illegal invocation');
+          return selected.values();
+        },
+        configurable: true,
+      });
+      getter(adapter, 'features', features);
+      const limits =
+        native?.limits ??
+        Object.create(globalThis.GPUSupportedLimits?.prototype ?? Object.prototype);
+      for (const [key, maximum] of Object.entries(v.limits ?? {})) getter(limits, key, maximum);
+      getter(adapter, 'limits', limits);
+      if (!native) fn(adapter, 'requestDevice', ioError);
       return adapter;
     });
   }

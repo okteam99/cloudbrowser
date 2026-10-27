@@ -481,4 +481,4 @@ HTTP 信息来自同源公开 `GET /fingerprint/request`，不含 Cookie、Autho
 
 配置硬件接口后，requestDevice、requestPort、getUserMedia、设备读写等操作以 NotSupportedError 拒绝，不连接实际硬件。语音仅模拟目录，朗读发出 synthesis-unavailable 错误事件。音频上下文使用静音 sink，默认参数与状态可仿真，音频处理仍由真实内核执行。传感器只保留接口及读取状态，start 不启动硬件。
 
-WebGL/WebGPU 可映射标识并隐藏目标档案没有的能力；扩展列表和数值限制只暴露真实实现支持的交集。绘制、shader、Canvas 像素及离线音频样本不替换为目标散列。真实设备导出的 SHA-256 仅用于实测对照，不能反推出原始渲染输出。IP 和HTTP出口由实际连接/代理决定，不通过设备档案伪造。参考样本可在 reference 中记录 SHA-256、采集时间和说明，不需要上传原始请求头或网络地址。
+WebGL/WebGPU 的标识、扩展/功能列表和数值限制按目标档案返回；宿主缺少 GPU 适配器时提供只读元信息对象。缺少的扩展执行或 GPUDevice 创建以 NotSupportedError 拒绝，实际可执行的绘制仍由原生实现完成。声明的能力不等于宿主真实可执行上限。绘制、shader、Canvas 像素及离线音频样本不替换为目标散列。真实设备导出的 SHA-256 仅用于实测对照，不能反推出原始渲染输出。IP 和HTTP出口由实际连接/代理决定，不通过设备档案伪造。参考样本可在 reference 中记录 SHA-256、采集时间和说明，不需要上传原始请求头或网络地址。

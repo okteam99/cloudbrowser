@@ -365,7 +365,7 @@ export async function verifyDeviceProfile(
     notes: [
       ...(profile?.web_observables
         ? [
-            'This profile explicitly simulates selected web-visible metadata and read API results. Read availability is not evidence of physical hardware; device I/O is disabled for configured hardware interfaces. GPU rendering and extension implementations remain native.',
+            'This profile explicitly simulates selected web-visible metadata and read API results. Read availability is not evidence of physical hardware; device I/O is disabled for configured hardware interfaces. GPU metadata may be simulated; native rendering is measured and unsupported execution does not report success.',
           ]
         : []),
       'Field matches measure declared values, not physical hardware or human behavior. browser_version is the actual engine.',

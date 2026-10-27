@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { BrowserManager } from '../src/browser.js';
 import { config } from '../src/config.js';
 import { deviceProfileSchema, listDeviceProfiles } from '../src/device-profile.js';
+import { installWebObservables } from '../src/web-observables-runtime.js';
 
 const observables = {
   navigator: { device_memory: 16, webdriver: false, pdf_viewer_enabled: true, max_touch_points: 0 },
@@ -270,6 +271,83 @@ test('web-visible simulation is installed before page/frame/popup/worker code an
     assert.deepEqual(worker, { memory: 16, platform: profile.navigator_platform, rtt: 300 });
     await manager.execute('alice', 'navigate', { ...ids, action: 'reload' });
     assert.equal((await inspect()).bluetooth, true);
+    await page.evaluate(
+      "Object.defineProperty(navigator, 'gpu', {configurable:true,value:{requestAdapter:async()=>null}})",
+    );
+    await page.evaluate(installWebObservables, {
+      webgl: {
+        vendor: 'Reference vendor',
+        renderer: 'Reference renderer',
+        version: 'Reference WebGL',
+        shading_language_version: 'Reference GLSL',
+        unmasked_vendor: 'Reference GPU',
+        unmasked_renderer: 'Reference renderer',
+        max_texture_size: 32768,
+        max_renderbuffer_size: 32768,
+        extensions: [
+          'WEBGL_debug_renderer_info',
+          'WEBGL_lose_context',
+          'WEBGL_fixture_unavailable',
+        ],
+      },
+      hardware: {
+        webgpu: {
+          adapter: {
+            status: 'reported',
+            value: {
+              adapter_available: true,
+              vendor: 'reference',
+              architecture: 'reference-arch',
+              device: '',
+              description: '',
+              fallback_adapter: false,
+              features: ['shader-f16'],
+              limits: { maxTextureDimension2D: 16384 },
+            },
+          },
+        },
+      },
+    });
+    const gpu = await page.evaluate(async () => {
+      const a = await (navigator as any).gpu.requestAdapter();
+      let rejection = '';
+      try {
+        await a.requestDevice();
+      } catch (e: any) {
+        rejection = e.name;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 1;
+      const gl = canvas.getContext('webgl')!;
+      const declared = gl.getSupportedExtensions();
+      const facade = gl.getExtension('WEBGL_fixture_unavailable');
+      gl.clearColor(1, 0, 0, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      const pixels = new Uint8Array(4);
+      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      return {
+        vendor: a.info.vendor,
+        features: [...a.features],
+        limit: a.limits.maxTextureDimension2D,
+        has: a.features.has('shader-f16'),
+        rejection,
+        declared,
+        facade: !!facade,
+        maxTexture: gl.getParameter(gl.MAX_TEXTURE_SIZE),
+        pixels: [...pixels],
+      };
+    });
+    assert.deepEqual(gpu, {
+      vendor: 'reference',
+      features: ['shader-f16'],
+      limit: 16384,
+      has: true,
+      rejection: 'NotSupportedError',
+      declared: ['WEBGL_debug_renderer_info', 'WEBGL_lose_context', 'WEBGL_fixture_unavailable'],
+      facade: true,
+      maxTexture: 32768,
+      pixels: [255, 0, 0, 255],
+    });
     const native = await manager.execute('bob', 'create_instance', {});
     const nativePage = manager.instances.get(native.instance_id)!.pages.values().next().value!.page;
     assert.equal(await nativePage.evaluate(() => navigator.webdriver), true);
