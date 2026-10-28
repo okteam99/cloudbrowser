@@ -37,12 +37,12 @@ export const createSchema = z
     device_profile_id: deviceProfileIdSchema
       .optional()
       .describe(
-        'Enabled saved profile from list_device_profiles/get_device_profile. Explicit user_agent overrides the profile UA and regenerates all Client Hints; other device values come from the profile. The effective configuration is frozen at creation.',
+        'Enabled saved profile from list_device_profiles/get_device_profile. Explicit user_agent overrides the profile UA and regenerates all Client Hints; explicit locale/timezone also override the profile. Other device values come from the profile. The effective configuration is frozen at creation.',
       ),
     device_profile: deviceProfileSchema
       .optional()
       .describe(
-        'Complete inline device profile. Mutually exclusive with device_profile_id. Explicit user_agent overrides its UA and regenerates Client Hints, retaining all other profile settings.',
+        'Complete inline device profile. Mutually exclusive with device_profile_id. Explicit user_agent overrides its UA and regenerates Client Hints, explicit locale/timezone can also override the profile; remaining device settings are retained.',
       ),
     storage_state_id: z
       .string()
@@ -74,8 +74,24 @@ export const createSchema = z
         device_scale_factor: z.number().min(1).max(4).default(1),
       })
       .optional(),
-    locale: z.string().max(64).default('en-US'),
-    timezone: z.string().max(128).default('UTC'),
+    locale: z
+      .string()
+      .trim()
+      .min(1)
+      .max(64)
+      .optional()
+      .describe(
+        'Explicit language/Intl locale override. Takes priority over a selected or automatically matched profile and resets its languages and default Accept-Language to this locale. Omit to inherit the profile; without a profile defaults to en-US.',
+      ),
+    timezone: z
+      .string()
+      .trim()
+      .min(1)
+      .max(128)
+      .optional()
+      .describe(
+        'Explicit IANA timezone override. Takes priority over a selected or automatically matched profile. Omit to inherit the profile; without a profile defaults to UTC.',
+      ),
     idle_timeout_seconds: z.number().int().min(30).max(3600).default(600),
     max_lifetime_seconds: z.number().int().min(60).max(14400).default(3600),
   })
@@ -87,7 +103,21 @@ export const createSchema = z
   .refine(
     (v) => [v.proxy, v.proxy_id, v.proxy_ref].filter((x) => x !== undefined).length <= 1,
     'Specify at most one proxy, proxy_id or proxy_ref',
-  );
+  )
+  .superRefine((v, ctx) => {
+    if (v.locale !== undefined)
+      try {
+        new Intl.DateTimeFormat(v.locale);
+      } catch {
+        ctx.addIssue({ code: 'custom', path: ['locale'], message: 'Invalid locale' });
+      }
+    if (v.timezone !== undefined)
+      try {
+        new Intl.DateTimeFormat('en-US', { timeZone: v.timezone });
+      } catch {
+        ctx.addIssue({ code: 'custom', path: ['timezone'], message: 'Invalid IANA timezone' });
+      }
+  });
 export type Proxy = z.infer<typeof proxySchema>;
 export type InstanceOptions = z.infer<typeof createSchema>;
 const integer = (name: string, fallback: number, min: number, max: number) => {

@@ -234,11 +234,17 @@ test('HTTP tool API and MCP share instances, validation, idempotent actions, art
     );
     const profiled = await request('create_instance', {
       user_agent: customProfile.profile.user_agent.replace('155.0.0.0', '130.0.6723.58'),
+      locale: 'pt-BR',
+      timezone: 'America/Sao_Paulo',
     });
     assert.equal(profiled.response.status, 200, JSON.stringify(profiled.result));
     const profiledId = profiled.result.data.instance_id;
     assert.equal(profiled.result.data.device_profile_id, customProfile.profile_id);
     assert.equal(profiled.result.data.device_profile_source, 'ua_default');
+    assert.equal(profiled.result.data.locale, 'pt-BR');
+    assert.equal(profiled.result.data.timezone, 'America/Sao_Paulo');
+    assert.equal(profiled.result.data.configuration_sources.locale, 'request');
+    assert.equal(profiled.result.data.locale_observation.language, 'pt-BR');
     assert.equal(profiled.result.data.user_agent_metadata.fullVersion, '130.0.6723.58');
     const effectiveProfile = profiled.result.data.device_profile;
     const measured = await mcpCall('evaluate', {

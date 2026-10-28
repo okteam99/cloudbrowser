@@ -90,9 +90,9 @@ Agent 的选择流程（HTTP API 与 MCP 同名同参）：
 
 如需内联档案，把 `get_device_profile` 返回的完整 `profile` 放入 `create_instance.device_profile`，再按目标设备实测修改。避免分别复制不同设备的 UA、CPU、屏幕、时区，或将示例中的版本常量当作当前真实版本。
 
-`device_profile` 与 `device_profile_id` 互斥。单独传入的 `user_agent` 优先于档案内的 UA，并从该 UA 重新生成全部 Client Hints（品牌、版本、系统、机型、移动标记等）；无法推断的提示字段留空，Safari/Firefox/iOS/不透明 UA 不生成 Chromium 提示，此时生效快照 `client_hints:null`。其余设备参数（包含 navigator_platform、屏幕、触控、语言、时区、CPU）沿用所选档案。跨系统明确指定档案时也不会暗中更换其他配置，调用方应选择所需的系统环境。`proxy` / `proxy_id` / `proxy_ref`、任务描述、登录态和生命周期不受影响。创建时复制档案，再应用 UA 覆盖，不修改后台模板。`device_profile_source` 为 explicit_id / inline / ua_default / ua_unmatched / none，历史也记录该来源。随后修改、停用、删除该 ID，不影响运行中实例或已保存历史。`get_instance` / `list_instances` 返回完整生效配置和 `device_profile_id`，历史保存在 `environment.device_profile` / `environment.device_profile_id`。仅传实测 Android UA 时，会匹配后台 Android 默认档案，匹配系统不代表匹配具体型号。未知 ID 返回 `DEVICE_PROFILE_NOT_FOUND`，停用 ID 返回 `DEVICE_PROFILE_DISABLED`，均不会回退为默认环境。配置变更需创建新实例。
+`device_profile` 与 `device_profile_id` 互斥。单独传入的 `user_agent` 优先于档案内的 UA，并从该 UA 重新生成全部 Client Hints（品牌、版本、系统、机型、移动标记等）；无法推断的提示字段留空，Safari/Firefox/iOS/不透明 UA 不生成 Chromium 提示，此时生效快照 `client_hints:null`。显式 locale/timezone 同样优先于档案；未传时继承。locale 覆盖会同步 languages 和默认 Accept-Language。其余设备参数（包含 navigator_platform、屏幕、触控、CPU）沿用所选档案。跨系统明确指定档案时也不会暗中更换其他配置，调用方应选择所需的系统环境。`proxy` / `proxy_id` / `proxy_ref`、任务描述、登录态和生命周期不受影响。创建时复制档案，再应用 UA 覆盖，不修改后台模板。`device_profile_source` 为 explicit_id / inline / ua_default / ua_unmatched / none，历史也记录该来源。随后修改、停用、删除该 ID，不影响运行中实例或已保存历史。`get_instance` / `list_instances` 返回完整生效配置和 `device_profile_id`，历史保存在 `environment.device_profile` / `environment.device_profile_id`。仅传实测 Android UA 时，会匹配后台 Android 默认档案，匹配系统不代表匹配具体型号。未知 ID 返回 `DEVICE_PROFILE_NOT_FOUND`，停用 ID 返回 `DEVICE_PROFILE_DISABLED`，均不会回退为默认环境。配置变更需创建新实例。
 
-`client_hints.brands` 和 `full_version_list` 可选，但必须同时提供，格式与浏览器 `brands` / `fullVersionList` 相同；省略时按 UA 品牌和明确的 full_version 生成。UA 与 Client Hints 必须保持 Chromium 主版本、平台和移动标记一致。viewport 必须放得进 screen。语言列表最多8项且不得重复；locale 用于 Intl 格式，languages 用于 navigator.language/languages 和 Accept-Language，两者可以不同。
+`client_hints.brands` 和 `full_version_list` 可选，但必须同时提供，格式与浏览器 `brands` / `fullVersionList` 相同；省略时按 UA 品牌和明确的 full_version 生成。UA 与 Client Hints 必须保持 Chromium 主版本、平台和移动标记一致。viewport 必须放得进 screen。档案语言列表最多8项且不得重复；档案内 locale 用于 Intl 格式，languages 用于 navigator.language/languages，两者可以不同。若在 create_instance 顶层显式传 locale，则三种语言声明同步覆盖；省略顶层 locale 才保留档案中的自定义组合。
 
 `expectations` 是要比较的真实能力，不会覆盖浏览器返回值。支持 device_memory、webdriver、pdf_viewer、bluetooth、web_share、audio_sample_rate、speech_voices_min、webgl。未配置的期望不参与差异判定。设备档案只模拟声明；实际操作系统、浏览器内核、硬件和网络不因此改变。Chromium 在 Linux 上未将平台覆盖应用到 WorkerNavigator，服务在 Worker 脚本执行前补齐 platform getter；这属于可观测的脚本模拟，不保证原型或函数行为与真机一致。
 
@@ -493,3 +493,18 @@ WebGL/WebGPU 的标识、扩展/功能列表和数值限制按目标档案返回
 例如实测 navigator.languages 只有 en-SG，但请求头含 en-SG,en-GB;q=0.9,en;q=0.8 时，应分别保存到 languages 和 http_accept_language，不强行将两者统一。只传 iPhone UA 时，会按 iOS 查找已启用默认档案；没有 iOS 档案仍返回 ua_unmatched，不借用 macOS 或 Android 档案。
 
 导入资料不完整时，仅保存完整提供的字段，并在 web_observables.reference 中标注缺失范围；未采集的插件、硬件、渲染等不能宣称已经对齐。
+
+
+## 创建参数与语言、时区来源
+
+`locale` 和 `timezone` 是显式覆盖项，不被 device_profile_id、内联 device_profile 或 UA 自动匹配档案覆盖。服务在参数校验时保留“未传”和“显式 en-US / UTC”的区别，最后才解析默认值：请求 → 档案 → en-US / UTC。
+
+```json
+{"device_profile_id":"<查询得到的ID>","locale":"pt-BR","timezone":"America/Sao_Paulo"}
+```
+
+上述实例的 Intl locale、navigator.language 为 pt-BR，navigator.languages 为 ["pt-BR"]，默认 Accept-Language 为 pt-BR，时区按 America/Sao_Paulo 生效；页面与 Dedicated Worker 同步。仅覆盖 timezone 不改变语言。只选档案时不主动填写 locale/timezone，占位默认值会被视为显式请求。
+
+`configuration_sources` 分别记录 locale、timezone、languages 的来源；`locale_observation` 返回创建时实测的 language、languages、intl_locale、number_locale、timezone、checked_at。历史通过 get_instance_details.instance.properties 读取。Intl 区域数据可能回退，时区可能使用别名；例如当前 Chromium 将 Asia/Kolkata 报告为 Asia/Calcutta。可用同一浏览器的 Intl.DateTimeFormat("en", {timeZone:配置值}).resolvedOptions().timeZone 规范化后比较，并核对日期偏移，不能仅凭别名字符串不同判为时区未生效。
+
+已有实例保留创建时快照，修复或修改配置后需新建实例。排查时同时保存 create_instance 参数、返回的配置来源和网页实测值，避免将控制台查看者的本地显示时间当作实例时区。

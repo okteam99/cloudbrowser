@@ -69,7 +69,14 @@ type PageEntry = {
   navigation: NavigationRecorder;
   navigationReady: Promise<void>;
 };
-type EffectiveInstanceOptions = Omit<InstanceOptions, 'device_profile'> & {
+type EffectiveInstanceOptions = Omit<InstanceOptions, 'device_profile' | 'locale' | 'timezone'> & {
+  locale: string;
+  timezone: string;
+  configuration_sources: {
+    locale: 'request' | 'profile' | 'default';
+    timezone: 'request' | 'profile' | 'default';
+    languages: 'request_locale' | 'profile' | 'default_locale';
+  };
   device_profile?: AppliedDeviceProfile;
   device_profile_source: 'explicit_id' | 'inline' | 'ua_default' | 'ua_unmatched' | 'none';
 };
@@ -91,6 +98,7 @@ type Instance = {
   options: EffectiveInstanceOptions;
   proxy?: Proxy;
   userAgent?: string;
+  localeObservation?: InstanceProperties['locale_observation'];
   proxyCountry?: string;
   environment?: BrowserEnvironment;
   deviceVerification?: DeviceVerification;
@@ -451,6 +459,8 @@ export class BrowserManager {
       egress,
       locale: i.options.locale,
       timezone: i.options.timezone,
+      configuration_sources: { ...i.options.configuration_sources },
+      locale_observation: i.localeObservation ?? null,
       mobile: i.options.mobile,
       proxy: i.proxy
         ? {
@@ -466,6 +476,11 @@ export class BrowserManager {
         ...(i.options.device_profile_source === 'ua_unmatched'
           ? [
               'No enabled profile matches the UA operating system. Using UA-only settings without a device profile.',
+            ]
+          : []),
+        ...(i.localeObservation && i.localeObservation.intl_locale !== i.options.locale
+          ? [
+              `Intl resolved locale ${i.localeObservation.intl_locale} from configured ${i.options.locale}; the browser may fall back when regional formatting data is unavailable. navigator.language and the configured timezone are reported separately.`,
             ]
           : []),
         operatingSystem(i.userAgent ?? i.options.user_agent ?? null) === 'iOS'
@@ -499,6 +514,8 @@ export class BrowserManager {
       viewport: current.viewport,
       locale: current.locale,
       timezone: current.timezone,
+      configuration_sources: current.configuration_sources,
+      ...(i.localeObservation ? { locale_observation: i.localeObservation } : {}),
       mobile: current.mobile,
       proxy: current.proxy,
       idle_timeout_seconds: current.idle_timeout_seconds,
@@ -557,8 +574,33 @@ export class BrowserManager {
           ? this.deviceProfiles.resolve(requested.device_profile_id)
           : auto?.profile);
       const profile = selected ? applyProfileUserAgent(selected, requested.user_agent) : undefined;
+      const locale =
+        requested.locale !== undefined
+          ? Intl.getCanonicalLocales(requested.locale)[0]
+          : (profile?.locale ?? 'en-US');
+      const timezone = requested.timezone ?? profile?.timezone ?? 'UTC';
+      if (profile) {
+        profile.locale = locale;
+        profile.timezone = timezone;
+        if (requested.locale !== undefined) {
+          profile.languages = [locale];
+          profile.http_accept_language = acceptLanguage(profile.languages);
+        }
+      }
       const options: EffectiveInstanceOptions = {
         ...requested,
+        locale,
+        timezone,
+        configuration_sources: {
+          locale: requested.locale !== undefined ? 'request' : profile ? 'profile' : 'default',
+          timezone: requested.timezone !== undefined ? 'request' : profile ? 'profile' : 'default',
+          languages:
+            requested.locale !== undefined
+              ? 'request_locale'
+              : profile
+                ? 'profile'
+                : 'default_locale',
+        },
         device_profile: profile,
         device_profile_id: requested.device_profile_id ?? auto?.profile_id,
         device_profile_source: requested.device_profile
@@ -826,6 +868,14 @@ export class BrowserManager {
       });
       const actual = await this.environment(p);
       i.userAgent = actual.user_agent;
+      i.localeObservation = {
+        language: actual.language,
+        languages: actual.languages,
+        intl_locale: actual.locale,
+        number_locale: actual.number_locale,
+        timezone: actual.timezone,
+        checked_at: new Date().toISOString(),
+      };
       await this.persistEnvironment(i);
       return { ...this.summary(i), actual };
     } catch (e) {
@@ -887,6 +937,9 @@ export class BrowserManager {
         device_scale_factor: devicePixelRatio,
         touch_points: navigator.maxTouchPoints,
         language: navigator.language,
+        languages: [...navigator.languages],
+        locale: Intl.DateTimeFormat().resolvedOptions().locale,
+        number_locale: Intl.NumberFormat().resolvedOptions().locale,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         client_hints: (navigator as any).userAgentData
           ? await (navigator as any).userAgentData
@@ -1414,7 +1467,7 @@ export class BrowserManager {
     if (name === 'health')
       return {
         status: 'ok',
-        version: '0.21.0',
+        version: '0.21.1',
         base_url: this.cfg.baseUrl,
         public_url_mode: this.cfg.quickTunnel
           ? 'quick_tunnel'

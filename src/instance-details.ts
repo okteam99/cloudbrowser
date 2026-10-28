@@ -4,6 +4,19 @@ export type InstanceProperties = {
   viewport: { width: number; height: number };
   locale: string;
   timezone: string;
+  configuration_sources?: {
+    locale: 'request' | 'profile' | 'default';
+    timezone: 'request' | 'profile' | 'default';
+    languages: 'request_locale' | 'profile' | 'default_locale';
+  };
+  locale_observation?: {
+    language: string;
+    languages: string[];
+    intl_locale: string;
+    number_locale: string;
+    timezone: string;
+    checked_at: string;
+  };
   mobile?: InstanceOptions['mobile'];
   proxy: { server: string; proxy_id?: string; authenticated: boolean } | null;
   idle_timeout_seconds: number;

@@ -665,7 +665,7 @@
     },
     {
       "name": "create_instance",
-      "description": "Create an isolated Chromium instance. For ordinary device tests discover saved profiles and use a returned device_profile_id, usually omitting user_agent. Never invent or copy a fixed browser version from examples; only override UA when the user supplies one or requests a specific declared identity test. Explicit user_agent takes precedence over any selected profile and regenerates Client Hints; other device settings come from that profile. Choose device_profile_id or inline device_profile (mutually exclusive); if omitted with a UA, auto-select the enabled default for the same OS (is_default first, otherwise first enabled match). No match uses UA-only settings and returns a warning. Without UA/profile keep native defaults. Returns frozen effective device_profile, device_profile_id, device_profile_source, actual browser_version, user_agent_metadata and details_url (empty access_token= hint). Optional task_description is shown in console/history. Proxy: use proxy_id, inline proxy, or proxy_ref (mutually exclusive). No direct fallback. No proxy means direct mode.",
+      "description": "Create an isolated Chromium instance. For ordinary device tests discover saved profiles and use a returned device_profile_id, usually omitting user_agent. Never invent or copy a fixed browser version from examples; only override UA when the user supplies one or requests a specific declared identity test. Explicit user_agent takes precedence over any selected profile and regenerates Client Hints. Explicit locale and timezone also take precedence over the profile; locale synchronizes navigator.language/languages and default Accept-Language. Omitted locale/timezone inherit the profile, or use en-US/UTC without one. Other device settings come from the profile. Choose device_profile_id or inline device_profile (mutually exclusive); if omitted with a UA, auto-select the enabled default for the same OS (is_default first, otherwise first enabled match). No match uses UA-only settings and returns a warning. Without UA/profile keep native defaults. Returns frozen effective device_profile, device_profile_id, device_profile_source, actual browser_version, user_agent_metadata, configuration_sources, locale_observation and details_url (empty access_token= hint). Optional task_description is shown in console/history. Proxy: use proxy_id, inline proxy, or proxy_ref (mutually exclusive). No direct fallback. No proxy means direct mode.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -678,7 +678,7 @@
           "device_profile_id": {
             "type": "string",
             "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$",
-            "description": "Enabled saved profile from list_device_profiles/get_device_profile. Explicit user_agent overrides the profile UA and regenerates all Client Hints; other device values come from the profile. The effective configuration is frozen at creation."
+            "description": "Enabled saved profile from list_device_profiles/get_device_profile. Explicit user_agent overrides the profile UA and regenerates all Client Hints; explicit locale/timezone also override the profile. Other device values come from the profile. The effective configuration is frozen at creation."
           },
           "device_profile": {
             "type": "object",
@@ -2523,7 +2523,7 @@
               "timezone"
             ],
             "additionalProperties": false,
-            "description": "Complete inline device profile. Mutually exclusive with device_profile_id. Explicit user_agent overrides its UA and regenerates Client Hints, retaining all other profile settings."
+            "description": "Complete inline device profile. Mutually exclusive with device_profile_id. Explicit user_agent overrides its UA and regenerates Client Hints, explicit locale/timezone can also override the profile; remaining device settings are retained."
           },
           "storage_state_id": {
             "type": "string",
@@ -2613,13 +2613,15 @@
           },
           "locale": {
             "type": "string",
+            "minLength": 1,
             "maxLength": 64,
-            "default": "en-US"
+            "description": "Explicit language/Intl locale override. Takes priority over a selected or automatically matched profile and resets its languages and default Accept-Language to this locale. Omit to inherit the profile; without a profile defaults to en-US."
           },
           "timezone": {
             "type": "string",
+            "minLength": 1,
             "maxLength": 128,
-            "default": "UTC"
+            "description": "Explicit IANA timezone override. Takes priority over a selected or automatically matched profile. Omit to inherit the profile; without a profile defaults to UTC."
           },
           "idle_timeout_seconds": {
             "type": "integer",
