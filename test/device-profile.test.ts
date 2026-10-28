@@ -90,10 +90,20 @@ for (const mode of ['profile', 'explicit_ua', 'auto_ua'] as const)
         allowPrivate: true,
       });
       await m.init();
+      // This test exercises the legacy fixture independently of the system defaults.
+      const catalog = m.deviceProfiles.snapshot();
+      await m.deviceProfiles.update({
+        ...catalog,
+        profiles: catalog.profiles.map((p) =>
+          p.profile.client_hints?.platform === 'macOS'
+            ? { ...p, is_default: p.profile_id === 'macos-arm-chrome155' }
+            : p,
+        ),
+      });
       const call = (name: string, args: any = {}) => m.execute('alice', name, args);
       try {
         const profiles = await call('list_device_profiles');
-        assert.equal(profiles.length, 2);
+        assert.equal(profiles.length, 4);
         const override =
           mode === 'profile'
             ? undefined

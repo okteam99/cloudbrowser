@@ -2,11 +2,13 @@ import { createHash } from 'node:crypto';
 import { chmod, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
+import { isDeepStrictEqual } from 'node:util';
 import {
   deviceProfileIdSchema,
   deviceProfileSchema,
   listDeviceProfiles,
   profilePlatform,
+  systemDeviceProfile,
 } from './device-profile.js';
 import { ToolError } from './errors.js';
 import { operatingSystem } from './browser-environment.js';
@@ -77,10 +79,10 @@ export class DeviceProfileStore {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
       // Seed once. An intentionally empty saved catalog stays empty across upgrades.
-      const defaults = listDeviceProfiles().map(({ profile_id, profile }) => ({
+      const defaults = listDeviceProfiles().map(({ profile_id, profile, is_default }) => ({
         profile_id,
         enabled: true,
-        is_default: true,
+        is_default,
         profile,
       }));
       await this.persist(defaults);
@@ -94,10 +96,14 @@ export class DeviceProfileStore {
     return createHash('sha256').update(JSON.stringify(this.records)).digest('hex');
   }
   private entry(record: Entry) {
+    const predefined = systemDeviceProfile(record.profile_id);
+    const modified = !!predefined && !isDeepStrictEqual(predefined, record.profile);
     return {
       ...structuredClone(record),
       platform: profilePlatform(record.profile),
-      kind: 'configured',
+      kind: predefined && !modified ? 'system' : 'configured',
+      predefined: !!predefined,
+      modified_from_predefined: modified,
       revision: this.revision(),
       default_for_platform:
         this.defaultRecord(profilePlatform(record.profile))?.profile_id === record.profile_id,

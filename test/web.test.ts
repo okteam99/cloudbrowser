@@ -313,7 +313,10 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
             .querySelector<HTMLTextAreaElement>('textarea[aria-label="设备档案 JSON"]')
             ?.value.includes('ui-android'),
       );
-      assert.equal(JSON.parse(await profileEditor.inputValue()).length, 3);
+      assert.equal(
+        JSON.parse(await profileEditor.inputValue()).length,
+        originalProfiles.length + 1,
+      );
       await page.getByRole('menuitem', { name: 'MCP&API' }).click();
       await page.getByLabel('MCP 地址', { exact: true }).waitFor();
       assert.equal(await page.getByLabel('MCP 地址', { exact: true }).inputValue(), base + '/mcp');

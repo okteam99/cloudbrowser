@@ -1,0 +1,30 @@
+{
+  "profile_id": "iphone-standard",
+  "captured_at": "2026-10-27T05:19:30.146Z",
+  "coverage": "partial_capture",
+  "profile_file": "../../../config/device-profiles/iphone-standard.json",
+  "reference_file": "reference.json",
+  "reference_checks": 52,
+  "reference_source_sha256": "bab751e93413171785c850915c4fc94e9194f5a04b285b53145b9c79c810aba7",
+  "canonical_reference_sha256": "9f22d9a7d2bd10c953c3b52ef4195b5a22938d8c608d308c2410a813c800d505",
+  "canonicalization": "UTF-8 JSON with recursively sorted keys, compact separators and unescaped Unicode",
+  "excluded": [
+    "request/IP/headers",
+    "capture time",
+    "notes",
+    "intl.local_time"
+  ],
+  "limitations": [
+    "仅采用用户已完整提供的 navigator、screen、window、intl、media 和请求语言头。",
+    "摘要基于完整字段的规范化子集，不是原始完整文件摘要。",
+    "插件列表、Worker、硬件、GPU、Canvas、音频和语音信息缺失，不能宣称已对齐。",
+    "在 Chromium 中模拟网页可见声明，实际内核仍为 Chromium，不是 iOS WebKit。"
+  ],
+  "http_expectations": {
+    "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 26_6_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/155.0.8059.37 Mobile/15E148 Safari/604.1",
+    "accept-language": "en-SG,en-GB;q=0.9,en;q=0.8",
+    "absent_header_prefixes": [
+      "sec-ch-ua"
+    ]
+  }
+}

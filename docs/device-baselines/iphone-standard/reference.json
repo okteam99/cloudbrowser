@@ -1,0 +1,70 @@
+{
+  "schema_version": 2,
+  "navigator": {
+    "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 26_6_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/155.0.8059.37 Mobile/15E148 Safari/604.1",
+    "app_version": "5.0 (iPhone; CPU iPhone OS 26_6_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/155.0.8059.37 Mobile/15E148 Safari/604.1",
+    "platform": "iPhone",
+    "vendor": "Apple Computer, Inc.",
+    "product": "Gecko",
+    "product_sub": "20030107",
+    "language": "en-SG",
+    "languages": [
+      "en-SG"
+    ],
+    "hardware_concurrency": 4,
+    "device_memory": null,
+    "max_touch_points": 5,
+    "webdriver": false,
+    "cookie_enabled": true,
+    "do_not_track": null,
+    "global_privacy_control": null,
+    "pdf_viewer_enabled": true,
+    "client_hints": {
+      "status": "unsupported",
+      "low": null,
+      "high": null
+    }
+  },
+  "screen": {
+    "width": 420,
+    "height": 912,
+    "available_width": 420,
+    "available_height": 912,
+    "color_depth": 24,
+    "pixel_depth": 24,
+    "orientation": "portrait-primary",
+    "orientation_angle": 0
+  },
+  "window": {
+    "inner_width": 420,
+    "inner_height": 716,
+    "outer_width": 420,
+    "outer_height": 912,
+    "device_pixel_ratio": 3,
+    "visual_viewport": {
+      "width": 420,
+      "height": 716,
+      "scale": 1
+    }
+  },
+  "intl": {
+    "locale": "en-SG",
+    "calendar": "gregory",
+    "numberingSystem": "latn",
+    "timeZone": "Asia/Singapore",
+    "year": "numeric",
+    "month": "2-digit",
+    "day": "2-digit",
+    "timezone_offset_minutes": -480,
+    "number_locale": "en-SG"
+  },
+  "media": {
+    "prefers-color-scheme: dark": false,
+    "prefers-reduced-motion: reduce": false,
+    "pointer: coarse": true,
+    "pointer: fine": false,
+    "hover: hover": false,
+    "color-gamut: p3": true,
+    "forced-colors: active": false
+  }
+}

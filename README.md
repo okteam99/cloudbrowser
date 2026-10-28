@@ -167,7 +167,7 @@ Agent 必须支持远程 Streamable HTTP MCP 及自定义 Authorization 请求�
 
 ## 完整设备配置档与核验
 
-默认使用完整 Chromium 的新版无头模式。在控制台 **系统设置 → 设备档案** 编辑 JSON 数组，每项包含唯一的 `profile_id`、`enabled`、`is_default` 和完整的 `profile`。首次启动预置 macOS 与 Android 两份示例，可新增、修改、停用或删除；最多 100 份。保存时校验 UA / Client Hints 的版本和系统、屏幕、语言等字段，配置持久化到 `/data/device-profiles.json`，无需重启。
+默认使用完整 Chromium 的新版无头模式。在控制台 **系统设置 → 设备档案** 编辑 JSON 数组，每项包含唯一的 `profile_id`、`enabled`、`is_default` 和完整的 `profile`。首次启动预置 macos-standard、iphone-standard 两份系统标准，以及兼容保留的旧 macOS / Android 示例。新部署的 macOS / iOS 默认使用系统标准，已有配置保持原样；最多 100 份。保存时校验 UA / Client Hints 的版本和系统、屏幕、语言等字段，配置持久化到 `/data/device-profiles.json`，无需重启。
 
 Agent 调用 `list_device_profiles` 查询已启用档案，支持 iOS 档案（client_hints:null），可传 `{"platform":"Android"}` 或 `{"query":"pixel"}` 筛选。将返回的真实 ID 传给 `get_device_profile` 读取完整 JSON 和启用状态；创建时传 `device_profile_id`。也可把返回的 `profile` 放入内联 `device_profile` 后修改。两者互斥，单独指定的 `user_agent` 优先，并自动重新生成全部 Client Hints；viewport / mobile / locale / timezone 等其他设备参数沿用档案，代理和实例生命周期仍单独设置。
 
@@ -188,6 +188,12 @@ Agent 调用 `list_device_profiles` 查询已启用档案，支持 iOS 档案（
 设备档案可用 `web_observables` 保存网页可见字段与 API 读取行为，包括蓝牙可用性、媒体设备列表、权限、语音、电池、屏幕补充信息等。未配置的值保持原生；模拟对象不会连接真实硬件。配置和限制见 [共用工具参考](docs/mcp-api.md#网页可观察行为模拟)。
 
 iPhone / iOS 档案以 `operating_system:"iOS"` 与 `client_hints:null` 明确关闭网页及请求中的 Client Hints；`device_memory:null` 可隐藏未提供的设备内存信息。请求的 Accept-Language 可与 navigator.languages 分开配置。运行内核仍是 Chromium；原始资料缺失的字段保留为未采集。
+
+### 系统预定义与回归基准
+
+系统预定义配置保存在 [config/device-profiles](config/device-profiles)，原始可对照字段、采集范围和使用方法保存在 [设备基准目录](docs/device-baselines/README.md)。macos-standard 是 macOS 默认标准；iphone-standard 是 iOS 默认基础标准，仍标记部分采集。旧 macOS 示例 ID 保留兼容，Android 示例暂保留。已有部署、用户修改和空目录不会被升级自动覆盖。
+
+可运行 `npm run compare:fingerprint -- docs/device-baselines/iphone-standard/reference.json /path/to/actual.json` 对比后续检测报告。只验证基准已收录字段，缺失部分不计为一致。
 
 ## 公开设备指纹检测
 
@@ -494,10 +500,10 @@ bash scripts/publish-docker.sh
 ## 源码构建及 stdio 接入
 
 ```sh
-docker build -t cloudbrowser:0.20.0 .
+docker build -t cloudbrowser:0.21.0 .
 ```
 
-将一行部署命令最后的镜像名换成 `cloudbrowser:0.20.0` 即可本地使用。
+将一行部署命令最后的镜像名换成 `cloudbrowser:0.21.0` 即可本地使用。
 
 兼容配置见 [本地 stdio](examples/mcp.local.json)、[SSH stdio](examples/mcp.ssh.json)。仍使用 `docker exec -i`，不得使用 `-t`。MCP_PRINCIPAL 是可信 SSH/Docker 接入中的命名空间，不是独立认证。
 

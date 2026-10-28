@@ -5,13 +5,69 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DeviceProfileStore } from '../src/device-profiles.js';
 
+test('system definitions are identified while local edits, disabled profiles and deletions survive restart', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'cb-system-profiles-'));
+  try {
+    const store = new DeviceProfileStore(dir);
+    await store.init();
+    const before = store.snapshot();
+    const original = store.get('macos-standard').profile;
+    await store.update({
+      ...before,
+      profiles: before.profiles
+        .filter((p) => p.profile_id !== 'macos-arm-chrome155')
+        .map((p) =>
+          p.profile_id === 'macos-standard'
+            ? { ...p, profile: { ...p.profile, name: 'Locally customized Mac' } }
+            : p.profile_id === 'iphone-standard'
+              ? { ...p, enabled: false }
+              : p,
+        ),
+    });
+    const restored = new DeviceProfileStore(dir);
+    await restored.init();
+    const modified = restored.get('macos-standard');
+    assert.equal(modified.kind, 'configured');
+    assert.equal(modified.predefined, true);
+    assert.equal(modified.modified_from_predefined, true);
+    assert.equal(modified.profile.name, 'Locally customized Mac');
+    assert.equal(restored.get('iphone-standard').enabled, false);
+    assert.equal(
+      restored.defaultForUserAgent(restored.get('iphone-standard').profile.user_agent),
+      undefined,
+    );
+    assert.throws(() => restored.get('macos-arm-chrome155'), { code: 'DEVICE_PROFILE_NOT_FOUND' });
+    const current = restored.snapshot();
+    await restored.update({
+      ...current,
+      profiles: current.profiles.map((p) =>
+        p.profile_id === 'macos-standard' ? { ...p, profile: original } : p,
+      ),
+    });
+    assert.equal(restored.get('macos-standard').kind, 'system');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('saved profile catalog validates, filters, rejects stale writes and persists empty catalogs', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'cb-device-catalog-'));
   try {
     const store = new DeviceProfileStore(dir);
     await store.init();
     const original = store.snapshot();
-    assert.equal(original.profiles.length, 2);
+    assert.equal(original.profiles.length, 4);
+    assert.equal(
+      store.defaultForUserAgent(store.get('macos-standard').profile.user_agent)?.profile_id,
+      'macos-standard',
+    );
+    assert.equal(
+      store.defaultForUserAgent(store.get('iphone-standard').profile.user_agent)?.profile_id,
+      'iphone-standard',
+    );
+    assert.equal(store.get('macos-standard').kind, 'system');
+    assert.equal(store.get('iphone-standard').predefined, true);
+    assert.equal(store.get('iphone-standard').modified_from_predefined, false);
     assert.equal((await stat(join(dir, 'device-profiles.json'))).mode & 0o777, 0o600);
     const android = store.list({ platform: 'Android' });
     assert.equal(android.length, 1);

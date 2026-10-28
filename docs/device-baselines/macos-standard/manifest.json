@@ -1,0 +1,23 @@
+{
+  "profile_id": "macos-standard",
+  "captured_at": "2026-10-27T05:17:00.335Z",
+  "coverage": "captured_report_with_voice_limit",
+  "profile_file": "../../../config/device-profiles/macos-standard.json",
+  "reference_file": "reference.json",
+  "reference_checks": 248,
+  "reference_source_sha256": "065834bc78f2d907e6ca532b8a6029bf035275ce7286f295e7d93faf848987f6",
+  "canonical_reference_sha256": "bee5f1334e19087c2e44d841d649e5d0828fa00e7acc006f583cd40366e9947e",
+  "canonicalization": "UTF-8 JSON with recursively sorted keys, compact separators and unescaped Unicode",
+  "excluded": [
+    "request/IP/headers",
+    "capture time",
+    "notes",
+    "intl.local_time"
+  ],
+  "limitations": [
+    "语音列表仅采集前100项，完整目录未知。",
+    "IP、采集时间和当前电量属于样本环境状态；不会修改代理出口。",
+    "Canvas/离线音频散列保留为实测对照，不能由散列还原渲染输出。",
+    "GPU 读取信息按档案模拟，渲染执行仍受宿主实现限制；未支持操作不伪造成功。"
+  ]
+}

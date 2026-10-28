@@ -6,6 +6,7 @@ COPY scripts/patch-playwright.mjs ./scripts/patch-playwright.mjs
 COPY src/user-agent.js ./src/user-agent.js
 RUN npm ci
 COPY src ./src
+COPY config/device-profiles ./config/device-profiles
 COPY web ./web
 COPY docs/assets ./docs/assets
 COPY scripts/build-web.mjs ./scripts/build-web.mjs
@@ -20,6 +21,8 @@ COPY --from=build --chown=pwuser:pwuser /app/node_modules ./node_modules
 COPY --from=build --chown=pwuser:pwuser /app/dist ./dist
 COPY --chown=pwuser:pwuser package.json README.md ./
 COPY --chown=pwuser:pwuser docs ./docs
+COPY --chown=pwuser:pwuser config/device-profiles ./config/device-profiles
+COPY --chown=pwuser:pwuser scripts/compare-fingerprint.mjs ./scripts/compare-fingerprint.mjs
 RUN mkdir -p /data /config /tmp/browser-mcp && chown -R pwuser:pwuser /data /config /tmp/browser-mcp
 USER pwuser
 VOLUME ["/data"]

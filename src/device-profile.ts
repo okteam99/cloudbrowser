@@ -3,6 +3,7 @@ import { userAgentMetadata, type UserAgentMetadata } from './user-agent.js';
 import { webObservablesSchema } from './web-observables.js';
 import { installWebObservables } from './web-observables-runtime.js';
 import { operatingSystem } from './browser-environment.js';
+import { readFileSync } from 'node:fs';
 
 const size = z
   .object({
@@ -260,13 +261,35 @@ const android = deviceProfileSchema.parse({
   timezone: 'UTC',
   hardware_concurrency: 8,
 });
-const templates = { 'macos-arm-chrome155': mac, 'android-pixel8-chrome155': android };
+const systemProfiles: Record<string, DeviceProfile> = Object.fromEntries(
+  ['macos-standard', 'iphone-standard'].map((id) => [
+    id,
+    deviceProfileSchema.parse(
+      JSON.parse(
+        readFileSync(new URL(`../config/device-profiles/${id}.json`, import.meta.url), 'utf8'),
+      ),
+    ),
+  ]),
+);
+const templates = {
+  'macos-arm-chrome155': mac,
+  'android-pixel8-chrome155': android,
+  ...systemProfiles,
+};
+export function systemDeviceProfile(id: string) {
+  return Object.hasOwn(systemProfiles, id) ? structuredClone(systemProfiles[id]) : undefined;
+}
 export function listDeviceProfiles() {
   return Object.entries(templates).map(([profile_id, profile]) => ({
     profile_id,
-    kind: 'example',
+    kind: Object.hasOwn(systemProfiles, profile_id) ? 'system' : 'example',
+    is_default: ['macos-standard', 'iphone-standard', 'android-pixel8-chrome155'].includes(
+      profile_id,
+    ),
     profile: structuredClone(profile),
-    note: 'A declared test environment, not a real device or browser-version installation. Clone profile into device_profile to customize.',
+    note: Object.hasOwn(systemProfiles, profile_id)
+      ? 'Versioned system baseline. Inspect web_observables.reference for capture coverage and limits; it does not install the target OS or browser engine.'
+      : 'A declared example, not a measured system standard. Clone profile into device_profile to customize.',
   }));
 }
 export function profileMetadata(profile: AppliedDeviceProfile): UserAgentMetadata | undefined {

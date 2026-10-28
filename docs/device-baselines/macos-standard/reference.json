@@ -1,0 +1,1238 @@
+{
+  "schema_version": 2,
+  "navigator": {
+    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
+    "app_version": "5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
+    "platform": "MacIntel",
+    "vendor": "Google Inc.",
+    "product": "Gecko",
+    "product_sub": "20030107",
+    "language": "en-US",
+    "languages": [
+      "en-US",
+      "en"
+    ],
+    "hardware_concurrency": 18,
+    "device_memory": 32,
+    "max_touch_points": 0,
+    "webdriver": false,
+    "cookie_enabled": true,
+    "do_not_track": null,
+    "global_privacy_control": null,
+    "pdf_viewer_enabled": true,
+    "client_hints": {
+      "status": "reported",
+      "low": {
+        "brands": [
+          {
+            "brand": "Google Chrome",
+            "version": "155"
+          },
+          {
+            "brand": "Chromium",
+            "version": "155"
+          },
+          {
+            "brand": "Not(A:Brand",
+            "version": "24"
+          }
+        ],
+        "mobile": false,
+        "platform": "macOS"
+      },
+      "high": {
+        "architecture": "arm",
+        "bitness": "64",
+        "brands": [
+          {
+            "brand": "Google Chrome",
+            "version": "155"
+          },
+          {
+            "brand": "Chromium",
+            "version": "155"
+          },
+          {
+            "brand": "Not(A:Brand",
+            "version": "24"
+          }
+        ],
+        "formFactors": [
+          "Desktop"
+        ],
+        "fullVersionList": [
+          {
+            "brand": "Google Chrome",
+            "version": "155.0.8059.85"
+          },
+          {
+            "brand": "Chromium",
+            "version": "155.0.8059.85"
+          },
+          {
+            "brand": "Not(A:Brand",
+            "version": "24.0.0.0"
+          }
+        ],
+        "mobile": false,
+        "model": "",
+        "platform": "macOS",
+        "platformVersion": "26.4.1",
+        "wow64": false
+      }
+    }
+  },
+  "screen": {
+    "width": 1728,
+    "height": 1117,
+    "available_width": 1728,
+    "available_height": 1038,
+    "color_depth": 30,
+    "pixel_depth": 30,
+    "orientation": "landscape-primary",
+    "orientation_angle": 0
+  },
+  "window": {
+    "inner_width": 1653,
+    "inner_height": 913,
+    "outer_width": 1653,
+    "outer_height": 1034,
+    "device_pixel_ratio": 2,
+    "visual_viewport": {
+      "width": 1653,
+      "height": 913,
+      "scale": 1
+    }
+  },
+  "intl": {
+    "locale": "en-US",
+    "calendar": "gregory",
+    "numberingSystem": "latn",
+    "timeZone": "Asia/Shanghai",
+    "year": "numeric",
+    "month": "numeric",
+    "day": "numeric",
+    "timezone_offset_minutes": -480,
+    "number_locale": "en-US"
+  },
+  "media": {
+    "prefers-color-scheme: dark": true,
+    "prefers-reduced-motion: reduce": false,
+    "pointer: coarse": false,
+    "pointer: fine": true,
+    "hover: hover": true,
+    "color-gamut: p3": true,
+    "forced-colors: active": false
+  },
+  "plugins": [
+    {
+      "name": "PDF Viewer",
+      "filename": "internal-pdf-viewer",
+      "description": "Portable Document Format"
+    },
+    {
+      "name": "Chrome PDF Viewer",
+      "filename": "internal-pdf-viewer",
+      "description": "Portable Document Format"
+    },
+    {
+      "name": "Chromium PDF Viewer",
+      "filename": "internal-pdf-viewer",
+      "description": "Portable Document Format"
+    },
+    {
+      "name": "Microsoft Edge PDF Viewer",
+      "filename": "internal-pdf-viewer",
+      "description": "Portable Document Format"
+    },
+    {
+      "name": "WebKit built-in PDF",
+      "filename": "internal-pdf-viewer",
+      "description": "Portable Document Format"
+    }
+  ],
+  "mime_types": [
+    {
+      "type": "application/pdf",
+      "suffixes": "pdf"
+    },
+    {
+      "type": "text/pdf",
+      "suffixes": "pdf"
+    }
+  ],
+  "capabilities": {
+    "secure_context": true,
+    "webgpu": true,
+    "bluetooth": true,
+    "web_share": true,
+    "webrtc": true,
+    "media_devices": true,
+    "geolocation": true,
+    "service_worker": true,
+    "storage": true,
+    "permissions": true,
+    "indexed_db": true,
+    "speech_synthesis": true
+  },
+  "connection": {
+    "type": null,
+    "effective_type": "4g",
+    "downlink": 10,
+    "rtt": 300,
+    "save_data": false
+  },
+  "voices": [
+    {
+      "name": "Samantha",
+      "lang": "en-US",
+      "local_service": true,
+      "default": true
+    },
+    {
+      "name": "Albert",
+      "lang": "en-US",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Alice",
+      "lang": "it-IT",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Alva",
+      "lang": "sv-SE",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Amélie",
+      "lang": "fr-CA",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Amira",
+      "lang": "ms-MY",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Anna",
+      "lang": "de-DE",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Bad News",
+      "lang": "en-US",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Bahh",
+      "lang": "en-US",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Bells",
+      "lang": "en-US",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Boing",
+      "lang": "en-US",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Bubbles",
+      "lang": "en-US",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Carmit",
+      "lang": "he-IL",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Cellos",
+      "lang": "en-US",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Damayanti",
+      "lang": "id-ID",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Daniel",
+      "lang": "en-GB",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Daria",
+      "lang": "bg-BG",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Eddy (English (United States))",
+      "lang": "en-US",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Eddy (English (United Kingdom))",
+      "lang": "en-GB",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Eddy (Chinese (China mainland))",
+      "lang": "zh-CN",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Eddy (Chinese (Taiwan))",
+      "lang": "zh-TW",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Eddy (German (Germany))",
+      "lang": "de-DE",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Eddy (Spanish (Spain))",
+      "lang": "es-ES",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Eddy (Spanish (Mexico))",
+      "lang": "es-MX",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Eddy (Finnish (Finland))",
+      "lang": "fi-FI",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Eddy (French (Canada))",
+      "lang": "fr-CA",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Eddy (French (France))",
+      "lang": "fr-FR",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Eddy (Italian (Italy))",
+      "lang": "it-IT",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Eddy (Japanese (Japan))",
+      "lang": "ja-JP",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Eddy (Korean (South Korea))",
+      "lang": "ko-KR",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Eddy (Portuguese (Brazil))",
+      "lang": "pt-BR",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Ellen",
+      "lang": "nl-BE",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Flo (English (United States))",
+      "lang": "en-US",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Flo (English (United Kingdom))",
+      "lang": "en-GB",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Flo (Chinese (China mainland))",
+      "lang": "zh-CN",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Flo (Chinese (Taiwan))",
+      "lang": "zh-TW",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Flo (German (Germany))",
+      "lang": "de-DE",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Flo (Spanish (Spain))",
+      "lang": "es-ES",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Flo (Spanish (Mexico))",
+      "lang": "es-MX",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Flo (Finnish (Finland))",
+      "lang": "fi-FI",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Flo (French (Canada))",
+      "lang": "fr-CA",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Flo (French (France))",
+      "lang": "fr-FR",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Flo (Italian (Italy))",
+      "lang": "it-IT",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Flo (Japanese (Japan))",
+      "lang": "ja-JP",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Flo (Korean (South Korea))",
+      "lang": "ko-KR",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Flo (Portuguese (Brazil))",
+      "lang": "pt-BR",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Fred",
+      "lang": "en-US",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Geeta",
+      "lang": "te-IN",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Good News",
+      "lang": "en-US",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandma (English (United States))",
+      "lang": "en-US",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandma (English (United Kingdom))",
+      "lang": "en-GB",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandma (Chinese (China mainland))",
+      "lang": "zh-CN",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandma (Chinese (Taiwan))",
+      "lang": "zh-TW",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandma (German (Germany))",
+      "lang": "de-DE",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandma (Spanish (Spain))",
+      "lang": "es-ES",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandma (Spanish (Mexico))",
+      "lang": "es-MX",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandma (Finnish (Finland))",
+      "lang": "fi-FI",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandma (French (Canada))",
+      "lang": "fr-CA",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandma (French (France))",
+      "lang": "fr-FR",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandma (Italian (Italy))",
+      "lang": "it-IT",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandma (Japanese (Japan))",
+      "lang": "ja-JP",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandma (Korean (South Korea))",
+      "lang": "ko-KR",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandma (Portuguese (Brazil))",
+      "lang": "pt-BR",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandpa (English (United States))",
+      "lang": "en-US",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandpa (English (United Kingdom))",
+      "lang": "en-GB",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandpa (Chinese (China mainland))",
+      "lang": "zh-CN",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandpa (Chinese (Taiwan))",
+      "lang": "zh-TW",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandpa (German (Germany))",
+      "lang": "de-DE",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandpa (Spanish (Spain))",
+      "lang": "es-ES",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandpa (Spanish (Mexico))",
+      "lang": "es-MX",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandpa (Finnish (Finland))",
+      "lang": "fi-FI",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandpa (French (Canada))",
+      "lang": "fr-CA",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandpa (French (France))",
+      "lang": "fr-FR",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandpa (Italian (Italy))",
+      "lang": "it-IT",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandpa (Japanese (Japan))",
+      "lang": "ja-JP",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandpa (Korean (South Korea))",
+      "lang": "ko-KR",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Grandpa (Portuguese (Brazil))",
+      "lang": "pt-BR",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Ioana",
+      "lang": "ro-RO",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Jacques",
+      "lang": "fr-FR",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Jester",
+      "lang": "en-US",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Joana",
+      "lang": "pt-PT",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Junior",
+      "lang": "en-US",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Kanya",
+      "lang": "th-TH",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Karen",
+      "lang": "en-AU",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Kathy",
+      "lang": "en-US",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Kyoko",
+      "lang": "ja-JP",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Lana",
+      "lang": "hr-HR",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Laura",
+      "lang": "sk-SK",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Lekha",
+      "lang": "hi-IN",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Lesya",
+      "lang": "uk-UA",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Linh",
+      "lang": "vi-VN",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Luciana",
+      "lang": "pt-BR",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Majed",
+      "lang": "ar-001",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Meijia",
+      "lang": "zh-TW",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Melina",
+      "lang": "el-GR",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Milena",
+      "lang": "ru-RU",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Moira",
+      "lang": "en-IE",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Montse",
+      "lang": "ca-ES",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Mónica",
+      "lang": "es-ES",
+      "local_service": true,
+      "default": false
+    },
+    {
+      "name": "Nora",
+      "lang": "nb-NO",
+      "local_service": true,
+      "default": false
+    }
+  ],
+  "canvas": {
+    "status": "measured",
+    "value": {
+      "algorithm": "SHA-256",
+      "recipe": "cloudbrowser-canvas-v1",
+      "width": 360,
+      "height": 96,
+      "hash": "78131c96546f3533660f6b9fb982f120837c5e4dcb6253a4349b463555053294"
+    }
+  },
+  "audio": {
+    "status": "measured",
+    "value": {
+      "algorithm": "SHA-256",
+      "recipe": "cloudbrowser-audio-v1-float32",
+      "sample_rate": 44100,
+      "frames": 5000,
+      "hash": "235ebb31c876b7d81fbbe4c7b65623ac142ed6a6b82c130f3037895df65e9419",
+      "audible_output": false
+    }
+  },
+  "webgl": {
+    "status": "measured",
+    "value": {
+      "vendor": "WebKit",
+      "renderer": "WebKit WebGL",
+      "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)",
+      "shading_language_version": "WebGL GLSL ES 1.0 (OpenGL ES GLSL ES 1.0 Chromium)",
+      "unmasked_vendor": "Google Inc. (Apple)",
+      "unmasked_renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Max, Unspecified Version)",
+      "max_texture_size": 16384,
+      "max_renderbuffer_size": 16384,
+      "extensions": [
+        "ANGLE_instanced_arrays",
+        "EXT_blend_minmax",
+        "EXT_clip_control",
+        "EXT_color_buffer_half_float",
+        "EXT_depth_clamp",
+        "EXT_disjoint_timer_query",
+        "EXT_float_blend",
+        "EXT_frag_depth",
+        "EXT_polygon_offset_clamp",
+        "EXT_shader_texture_lod",
+        "EXT_texture_compression_bptc",
+        "EXT_texture_compression_rgtc",
+        "EXT_texture_filter_anisotropic",
+        "EXT_texture_mirror_clamp_to_edge",
+        "EXT_sRGB",
+        "KHR_parallel_shader_compile",
+        "OES_element_index_uint",
+        "OES_fbo_render_mipmap",
+        "OES_standard_derivatives",
+        "OES_texture_float",
+        "OES_texture_float_linear",
+        "OES_texture_half_float",
+        "OES_texture_half_float_linear",
+        "OES_vertex_array_object",
+        "WEBGL_blend_func_extended",
+        "WEBGL_color_buffer_float",
+        "WEBGL_compressed_texture_astc",
+        "WEBGL_compressed_texture_etc",
+        "WEBGL_compressed_texture_etc1",
+        "WEBGL_compressed_texture_pvrtc",
+        "WEBGL_compressed_texture_s3tc",
+        "WEBGL_compressed_texture_s3tc_srgb",
+        "WEBGL_debug_renderer_info",
+        "WEBGL_debug_shaders",
+        "WEBGL_depth_texture",
+        "WEBGL_draw_buffers",
+        "WEBGL_lose_context",
+        "WEBGL_multi_draw",
+        "WEBGL_polygon_mode"
+      ]
+    }
+  },
+  "webgl2": {
+    "status": "measured",
+    "value": {
+      "vendor": "WebKit",
+      "renderer": "WebKit WebGL",
+      "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+      "shading_language_version": "WebGL GLSL ES 3.00 (OpenGL ES GLSL ES 3.0 Chromium)",
+      "unmasked_vendor": "Google Inc. (Apple)",
+      "unmasked_renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Max, Unspecified Version)",
+      "max_texture_size": 16384,
+      "max_renderbuffer_size": 16384,
+      "extensions": [
+        "EXT_clip_control",
+        "EXT_color_buffer_float",
+        "EXT_color_buffer_half_float",
+        "EXT_conservative_depth",
+        "EXT_depth_clamp",
+        "EXT_disjoint_timer_query_webgl2",
+        "EXT_float_blend",
+        "EXT_polygon_offset_clamp",
+        "EXT_render_snorm",
+        "EXT_texture_compression_bptc",
+        "EXT_texture_compression_rgtc",
+        "EXT_texture_filter_anisotropic",
+        "EXT_texture_mirror_clamp_to_edge",
+        "EXT_texture_norm16",
+        "KHR_parallel_shader_compile",
+        "NV_shader_noperspective_interpolation",
+        "OES_draw_buffers_indexed",
+        "OES_sample_variables",
+        "OES_shader_multisample_interpolation",
+        "OES_texture_float_linear",
+        "WEBGL_blend_func_extended",
+        "WEBGL_clip_cull_distance",
+        "WEBGL_compressed_texture_astc",
+        "WEBGL_compressed_texture_etc",
+        "WEBGL_compressed_texture_etc1",
+        "WEBGL_compressed_texture_pvrtc",
+        "WEBGL_compressed_texture_s3tc",
+        "WEBGL_compressed_texture_s3tc_srgb",
+        "WEBGL_debug_renderer_info",
+        "WEBGL_debug_shaders",
+        "WEBGL_lose_context",
+        "WEBGL_multi_draw",
+        "WEBGL_polygon_mode",
+        "WEBGL_provoking_vertex",
+        "WEBGL_render_shared_exponent",
+        "WEBGL_stencil_texturing"
+      ]
+    }
+  },
+  "worker": {
+    "status": "measured",
+    "value": {
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
+      "app_version": "5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
+      "platform": "MacIntel",
+      "vendor": null,
+      "product": "Gecko",
+      "product_sub": null,
+      "language": "en-US",
+      "languages": [
+        "en-US",
+        "en"
+      ],
+      "hardware_concurrency": 18,
+      "device_memory": 32,
+      "max_touch_points": null,
+      "webdriver": null,
+      "cookie_enabled": null,
+      "do_not_track": null,
+      "global_privacy_control": null,
+      "pdf_viewer_enabled": null,
+      "client_hints": {
+        "status": "reported",
+        "low": {
+          "brands": [
+            {
+              "brand": "Google Chrome",
+              "version": "155"
+            },
+            {
+              "brand": "Chromium",
+              "version": "155"
+            },
+            {
+              "brand": "Not(A:Brand",
+              "version": "24"
+            }
+          ],
+          "mobile": false,
+          "platform": "macOS"
+        },
+        "high": {
+          "architecture": "arm",
+          "bitness": "64",
+          "brands": [
+            {
+              "brand": "Google Chrome",
+              "version": "155"
+            },
+            {
+              "brand": "Chromium",
+              "version": "155"
+            },
+            {
+              "brand": "Not(A:Brand",
+              "version": "24"
+            }
+          ],
+          "formFactors": [
+            "Desktop"
+          ],
+          "fullVersionList": [
+            {
+              "brand": "Google Chrome",
+              "version": "155.0.8059.85"
+            },
+            {
+              "brand": "Chromium",
+              "version": "155.0.8059.85"
+            },
+            {
+              "brand": "Not(A:Brand",
+              "version": "24.0.0.0"
+            }
+          ],
+          "mobile": false,
+          "model": "",
+          "platform": "macOS",
+          "platformVersion": "26.4.1",
+          "wow64": false
+        }
+      }
+    }
+  },
+  "battery": {
+    "status": "measured",
+    "value": {
+      "charging": false,
+      "level": 0.2,
+      "charging_time": null,
+      "discharging_time": 4740
+    }
+  },
+  "hardware": {
+    "collection_mode": "passive_no_permission_prompts",
+    "page_visibility": "visible",
+    "bluetooth": {
+      "api_supported": true,
+      "availability": {
+        "status": "reported",
+        "value": true
+      },
+      "granted_devices": {
+        "status": "unsupported"
+      },
+      "note": "可用状态是浏览器报告，不等于证明蓝牙芯片存在或开启；只列出本站已获授权设备，不扫描周边、不连接设备，不读取蓝牙 MAC。"
+    },
+    "media_devices": {
+      "api_supported": true,
+      "enumeration": {
+        "status": "reported",
+        "value": {
+          "count": 3,
+          "truncated": false,
+          "devices": [
+            {
+              "kind": "audioinput",
+              "label": null,
+              "device_id": null,
+              "group_id": null
+            },
+            {
+              "kind": "videoinput",
+              "label": null,
+              "device_id": null,
+              "group_id": null
+            },
+            {
+              "kind": "audiooutput",
+              "label": null,
+              "device_id": null,
+              "group_id": null
+            }
+          ]
+        }
+      },
+      "note": "不调用 getUserMedia。未授权或页面不可见时，列表、名称和 ID 可能为空或受限；空列表不能证明没有摄像头、麦克风或扬声器。设备 ID 可能随网站和会话变化。"
+    },
+    "usb": {
+      "api_supported": true,
+      "granted_devices": {
+        "status": "reported",
+        "value": {
+          "count": 0,
+          "truncated": false,
+          "devices": []
+        }
+      },
+      "note": "只查询浏览器允许本站访问的设备，不申请授权、不打开连接。空列表不代表电脑没有 USB 设备。"
+    },
+    "hid": {
+      "api_supported": true,
+      "granted_devices": {
+        "status": "reported",
+        "value": {
+          "count": 0,
+          "truncated": false,
+          "devices": []
+        }
+      },
+      "note": "只查询本站已授权设备；键鼠等受保护 HID 可能不向网页开放，不读取输入报告。"
+    },
+    "serial": {
+      "api_supported": true,
+      "granted_ports": {
+        "status": "reported",
+        "value": {
+          "count": 0,
+          "truncated": false,
+          "devices": []
+        }
+      },
+      "note": "只查询本站已授权端口，不打开串口、不读写设备。"
+    },
+    "gamepads": {
+      "enumeration": {
+        "status": "reported",
+        "value": {
+          "count": 0,
+          "truncated": false,
+          "devices": []
+        }
+      },
+      "note": "浏览器可能要求用户先与手柄交互才公开列表；仅读取设备描述和按键数量，不记录按键状态。"
+    },
+    "audio_output": {
+      "parameters": {
+        "status": "reported",
+        "value": {
+          "sample_rate": 44100,
+          "state": "suspended",
+          "base_latency_seconds": 0.005804988662131519,
+          "output_latency_seconds": 0,
+          "max_channels": 2,
+          "channel_count": 2,
+          "audible_output": false
+        }
+      },
+      "note": "只读取 AudioContext 默认处理参数后关闭；不播放声音，参数不保证等于声卡的全部硬件规格。"
+    },
+    "webgpu": {
+      "adapter": {
+        "status": "reported",
+        "value": {
+          "adapter_available": true,
+          "vendor": "apple",
+          "architecture": "metal-3",
+          "device": "",
+          "description": "",
+          "fallback_adapter": false,
+          "features": [
+            "depth32float-stencil8",
+            "rg11b10ufloat-renderable",
+            "bgra8unorm-storage",
+            "texture-formats-tier1",
+            "texture-compression-bc",
+            "dual-source-blending",
+            "core-features-and-limits",
+            "float32-filterable",
+            "indirect-first-instance",
+            "texture-compression-astc-sliced-3d",
+            "float32-blendable",
+            "subgroup-size-control",
+            "texture-compression-astc",
+            "texture-compression-etc2",
+            "depth-clip-control",
+            "texture-compression-bc-sliced-3d",
+            "shader-f16",
+            "timestamp-query",
+            "clip-distances",
+            "texture-formats-tier2",
+            "primitive-index",
+            "texture-component-swizzle",
+            "subgroups"
+          ],
+          "limits": {
+            "maxTextureDimension2D": 16384,
+            "maxBufferSize": 4294967292,
+            "maxBindGroups": 4,
+            "maxStorageBufferBindingSize": 4294967292,
+            "maxComputeWorkgroupSizeX": 1024
+          }
+        }
+      },
+      "note": "只查询默认适配器，不创建 GPUDevice；浏览器可能隐藏型号，软件适配器不代表物理 GPU。"
+    },
+    "sensors": {
+      "constructors": {
+        "Accelerometer": true,
+        "LinearAccelerationSensor": true,
+        "GravitySensor": true,
+        "Gyroscope": true,
+        "Magnetometer": false,
+        "AbsoluteOrientationSensor": true,
+        "RelativeOrientationSensor": true,
+        "AmbientLightSensor": false,
+        "DeviceMotionEvent": true,
+        "DeviceOrientationEvent": true
+      },
+      "motion_permission_request_supported": true,
+      "orientation_permission_request_supported": true,
+      "nfc_api_supported": false,
+      "midi_api_supported": true,
+      "note": "仅显示 API 和权限状态，不启动传感器、NFC 扫描或 MIDI 访问；API 存在不等于传感器硬件存在。"
+    },
+    "permissions": {
+      "camera": {
+        "status": "reported",
+        "value": {
+          "state": "prompt"
+        }
+      },
+      "microphone": {
+        "status": "reported",
+        "value": {
+          "state": "prompt"
+        }
+      },
+      "speaker-selection": {
+        "status": "unavailable",
+        "error_name": "TypeError",
+        "error": "Failed to execute 'query' on 'Permissions': The Speaker Selection API is not enabled."
+      },
+      "geolocation": {
+        "status": "reported",
+        "value": {
+          "state": "prompt"
+        }
+      },
+      "accelerometer": {
+        "status": "reported",
+        "value": {
+          "state": "granted"
+        }
+      },
+      "gyroscope": {
+        "status": "reported",
+        "value": {
+          "state": "granted"
+        }
+      },
+      "magnetometer": {
+        "status": "reported",
+        "value": {
+          "state": "granted"
+        }
+      },
+      "ambient-light-sensor": {
+        "status": "unavailable",
+        "error_name": "TypeError",
+        "error": "Failed to execute 'query' on 'Permissions': GenericSensorExtraClasses flag is not enabled."
+      },
+      "midi": {
+        "status": "reported",
+        "value": {
+          "state": "prompt"
+        }
+      }
+    }
+  },
+  "webrtc": {
+    "tested": false,
+    "note": "仅检查 API 可用性；未连接 STUN/TURN，未检测 WebRTC 公网出口。HTTP 来源 IP 不能替代 WebRTC 出口检测。"
+  }
+}

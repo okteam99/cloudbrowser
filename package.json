@@ -1,6 +1,6 @@
 {
   "name": "cloudbrowser",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -19,7 +19,8 @@
     "release": "bash scripts/publish-docker.sh",
     "smoke:http": "tsx scripts/smoke-http.ts",
     "build:server": "node scripts/patch-playwright.mjs && tsc",
-    "build:web": "tsc -p tsconfig.web.json && node scripts/build-web.mjs"
+    "build:web": "tsc -p tsconfig.web.json && node scripts/build-web.mjs",
+    "compare:fingerprint": "node scripts/compare-fingerprint.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",

@@ -1,4 +1,4 @@
-# 共用工具参考 V0.20（MCP & API）
+# 共用工具参考 V0.21（MCP & API）
 
 推荐使用 `BASE_URL/mcp` 的 Streamable HTTP，携带 `Authorization: Bearer <登录网页自动生成的 Token>`。网页登录后可复制完整配置。兼容 MCP stdio，通过 SSH 或 docker exec 接入。HTTP 调用共享 web principal，stdio 仍按 MCP_PRINCIPAL 隔离。
 
@@ -78,7 +78,7 @@
 
 管理员在 **系统设置 → 设备档案** 编辑 JSON 数组；每项为 `{ "profile_id": "自定义唯一ID", "enabled": true, "is_default": false, "profile": { ...完整设备字段... } }`。ID 为 1–100 位英文字母、数字、下划线或连字符，首位为字母/数字。最多 100 份；重复 ID、UA / Client Hints 冲突、无效语言/时区等会被拒绝，并返回具体字段路径。保存后新实例立即可用，重启后保留；空数组表示没有可选档案，不会重新补入示例。
 
-首次初始化提供 macOS 与 Android 两份可编辑测试模板；模板不保证等于当前设备或内核，不应作为日常测试固定 ID。管理员应以目标设备实测信息维护档案。`list_device_profiles` 返回当前配置而非固定枚举，每项包含 `profile_id`、`platform`、`enabled`、`is_default`、`default_for_platform`（当前系统实际默认项）、`kind=configured`、`revision`、完整 `profile`。默认只返回启用项；传 `enabled_only:false` 可查看停用档案。`platform` 可为 macOS / Windows / Linux / Android / Chrome OS / iOS，`query` 按 ID 或名称匹配，不区分大小写。`get_device_profile` 可读取单份启用或停用档案。两个接口均不启动浏览器、不发送外部请求。
+首次初始化提供 macos-standard（macOS 默认）、iphone-standard（iOS 默认，部分采集）系统预定义；旧 macOS 示例保留兼容，现有 Android 示例仍为 Android 默认。已有配置、修改或有意清空的目录不会被升级覆盖。系统定义保存在代码库 config/device-profiles，对照基准保存在 docs/device-baselines。`list_device_profiles` 返回当前配置而非固定枚举，每项包含 `profile_id`、`platform`、`enabled`、`is_default`、`default_for_platform`（当前系统实际默认项）、`kind=system/configured`、`predefined`、`modified_from_predefined`、`revision`、完整 `profile`。默认只返回启用项；传 `enabled_only:false` 可查看停用档案。`platform` 可为 macOS / Windows / Linux / Android / Chrome OS / iOS，`query` 按 ID 或名称匹配，不区分大小写。`get_device_profile` 可读取单份启用或停用档案。两个接口均不启动浏览器、不发送外部请求。
 
 Agent 的选择流程（HTTP API 与 MCP 同名同参）：
 

@@ -54,8 +54,16 @@ test('iOS profiles with absent Client Hints validate, select by OS, reject ambig
     ])
       assert.equal(deviceProfileSchema.safeParse({ ...p, ...change }).success, false);
     const entry = { profile_id: 'ios-fixture', enabled: true, is_default: true, profile: p };
-    const next = await store.update({ ...original, profiles: [...original.profiles, entry] });
-    assert.equal(store.list({ platform: 'iOS' }).length, 1);
+    const next = await store.update({
+      ...original,
+      profiles: [
+        ...original.profiles.map((p) =>
+          p.profile.operating_system === 'iOS' ? { ...p, is_default: false } : p,
+        ),
+        entry,
+      ],
+    });
+    assert.equal(store.list({ platform: 'iOS' }).length, 2);
     assert.equal(store.defaultForUserAgent(ua)?.profile_id, entry.profile_id);
     assert.equal(store.get(entry.profile_id).default_for_platform, true);
     assert.throws(() =>
@@ -106,7 +114,9 @@ test('iPhone identity suppresses UA-CH in page, worker and HTTP while preserving
     await manager.deviceProfiles.update({
       ...catalog,
       profiles: [
-        ...catalog.profiles,
+        ...catalog.profiles.map((p) =>
+          p.profile.operating_system === 'iOS' ? { ...p, is_default: false } : p,
+        ),
         { profile_id: 'ios-fixture', enabled: true, is_default: true, profile: p },
       ],
     });
