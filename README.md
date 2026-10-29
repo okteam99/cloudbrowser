@@ -169,13 +169,13 @@ Agent 必须支持远程 Streamable HTTP MCP 及自定义 Authorization 请求�
 
 默认使用完整 Chromium 的新版无头模式。在控制台 **系统设置 → 设备档案** 编辑 JSON 数组，每项包含唯一的 `profile_id`、`enabled`、`is_default` 和完整的 `profile`。首次启动预置 macos-standard、iphone-standard 两份系统标准，以及兼容保留的旧 macOS / Android 示例。新部署的 macOS / iOS 默认使用系统标准，已有配置保持原样；最多 100 份。保存时校验 UA / Client Hints 的版本和系统、屏幕、语言等字段，配置持久化到 `/data/device-profiles.json`，无需重启。
 
-Agent 调用 `list_device_profiles` 查询已启用档案，支持 iOS 档案（client_hints:null），可传 `{"platform":"Android"}` 或 `{"query":"pixel"}` 筛选。将返回的真实 ID 传给 `get_device_profile` 读取完整 JSON 和启用状态；创建时传 `device_profile_id`。也可把返回的 `profile` 放入内联 `device_profile` 后修改。两者互斥，单独指定的 `user_agent` 优先，并自动重新生成全部 Client Hints；显式 locale/timezone 也优先于档案；未传时继承档案，viewport/mobile 等其他设备参数仍沿用档案，代理和实例生命周期仍单独设置。
+Agent 调用 `list_device_profiles` 查询已启用档案，支持 iOS 档案（client_hints:null），可传 `{"platform":"Android"}` 或 `{"query":"pixel"}` 筛选。将返回的真实 ID 传给 `get_device_profile` 读取完整 JSON 和启用状态；创建时传 `device_profile_id`。也可把返回的 `profile` 放入内联 `device_profile` 后修改。两者互斥，单独指定的 `user_agent` 优先，并自动重新生成全部 Client Hints；显式 locale/timezone、viewport 和 mobile 中单独传入的字段也优先于档案；未传字段继承档案，代理和实例生命周期仍单独设置。
 
 每个实例独立选择档案，没有全局“当前选中档案”。只传 UA 时按操作系统自动匹配启用档案：优先 `is_default:true`，否则按 JSON 顺序取同系统第一份启用档案。每个系统最多一份启用的默认档案；缺省 `is_default:false`，旧配置无需修改即可匹配。没有同系统可用档案时保留 UA 模式并返回说明，不会选择其他系统。已删除或停用的 ID 无法创建新实例；修改档案只影响后续创建，运行中实例和历史记录保留原配置及档案 ID。
 
 只传目标设备实测 UA 时，会自动沿用后台同操作系统默认档案的屏幕、触控、语言、时区及 CPU。这是显式兼容性测试路径，按系统匹配不等于匹配手机型号；只有用户明确提供 UA 或指定这类测试时才使用。
 
-明确指定档案时也可追加 `user_agent` 覆盖其 UA 和 Client Hints。UA 无法判断的 Client Hints 字段留空，不沿用档案中的旧品牌、版本、机型或架构；locale/timezone 的显式覆盖规则见下文，其余档案属性不变。返回 `device_profile_source`（explicit_id / inline / ua_default / ua_unmatched / none）说明选择来源，`device_profile` 是创建时实际生效的快照，不会修改后台模板。
+明确指定档案时也可追加 `user_agent` 覆盖其 UA 和 Client Hints。UA 无法判断的 Client Hints 字段留空，不沿用档案中的旧品牌、版本、机型或架构；其他创建参数的显式覆盖规则见下文。跨系统 UA 与指定档案会返回混合配置提醒，不会暗中换档案。返回 `device_profile_source`（explicit_id / inline / ua_default / ua_unmatched / none）说明选择来源，`device_profile` 是创建时实际生效的快照，不会修改后台模板。
 
 桌面测试同样先调用 `list_device_profiles`（例如 platform=macOS），再使用返回的真实 ID；无需指定桌面型号时可直接创建原生默认实例。
 
@@ -195,9 +195,15 @@ iPhone / iOS 档案以 `operating_system:"iOS"` 与 `client_hints:null` 明确�
 
 可运行 `npm run compare:fingerprint -- docs/device-baselines/iphone-standard/reference.json /path/to/actual.json` 对比后续检测报告。只验证基准已收录字段，缺失部分不计为一致。
 
-### 语言和时区优先级
+### 创建参数优先级
 
 创建时显式传入的 `locale` / `timezone` 优先于指定或按 UA 自动匹配的档案。未传时继承档案；没有档案时才回退为 en-US / UTC。显式 locale 会同时设置 Intl locale、navigator.language/languages（单元素列表）以及默认 Accept-Language，避免沿用旧地区的语言头。需要不同的 Intl、语言列表和请求头组合时，使用完整内联档案并省略顶层 locale。
+
+`viewport` 和 `mobile.enabled` / `mobile.touch` / `mobile.device_scale_factor` 分别按“显式参数 > 档案 > 服务默认”解析；只传 `mobile.touch:false` 不会连带改变移动布局或 DPR。关闭触控时同步 maxTouchPoints=0、pointer/hover；开启时保留档案的正触点数，否则使用1。DPR 同时作用于网页和原始截图：1440×900 CSS 像素、DPR=2 对应 2880×1800 图片；MCP 图片预览可能缩放，坐标点击仍用 CSS 像素。
+
+显式视口超出档案屏幕时，生效快照只按需扩大 screen、已有的 available/outer 尺寸，并返回提醒；保存的模板保持不变。屏幕可以大于浏览器窗口。移动页面缺少 viewport meta 时 innerWidth 可能为980，`actual.viewport` 是配置视口，`actual.layout_viewport` 是网页布局视口，二者含义不同。
+
+无档案、未传 viewport 时默认1280×720。无档案、未传 mobile 时默认 enabled=false、touch=false、DPR=1；为兼容旧接口，传了 mobile 对象时，其缺省字段默认 true/true/1。mobile.enabled 仅控制布局，不修改 UA 或 Client Hints。CPU、GPU、navigator.platform 等没有顶层覆盖参数的属性仍从档案继承。
 
 返回 `configuration_sources` 标明 request/profile/default 来源，`locale_observation` 保存创建时的网页语言、Intl locale、时区和采样时间；历史 properties 也保留。有效实例档案是复制后的配置，不会改写已保存模板。浏览器可能规范化语言大小写或时区别名，应结合实测字段判断。修改配置只对新实例生效。
 
@@ -506,10 +512,10 @@ bash scripts/publish-docker.sh
 ## 源码构建及 stdio 接入
 
 ```sh
-docker build -t cloudbrowser:0.21.1 .
+docker build -t cloudbrowser:0.21.2 .
 ```
 
-将一行部署命令最后的镜像名换成 `cloudbrowser:0.21.1` 即可本地使用。
+将一行部署命令最后的镜像名换成 `cloudbrowser:0.21.2` 即可本地使用。
 
 兼容配置见 [本地 stdio](examples/mcp.local.json)、[SSH stdio](examples/mcp.ssh.json)。仍使用 `docker exec -i`，不得使用 `-t`。MCP_PRINCIPAL 是可信 SSH/Docker 接入中的命名空间，不是独立认证。
 

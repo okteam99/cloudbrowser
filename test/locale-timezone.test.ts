@@ -70,11 +70,16 @@ test('explicit locale/timezone survive profile selection across page, Worker, HT
       const instance = await manager.execute('qa', 'create_instance', createSchema.parse(raw));
       assert.equal(instance.locale, raw.locale, mode);
       assert.equal(instance.timezone, raw.timezone, mode);
-      assert.deepEqual(instance.configuration_sources, {
-        locale: 'request',
-        timezone: 'request',
-        languages: 'request_locale',
-      });
+      assert.deepEqual(
+        Object.fromEntries(
+          ['locale', 'timezone', 'languages'].map((k) => [k, instance.configuration_sources[k]]),
+        ),
+        {
+          locale: 'request',
+          timezone: 'request',
+          languages: 'request_locale',
+        },
+      );
       assert.equal(instance.locale_observation.language, 'pt-BR');
       assert.equal(instance.locale_observation.timezone, 'America/Sao_Paulo');
       const ids = { instance_id: instance.instance_id, page_id: instance.pages[0].page_id };
@@ -162,11 +167,16 @@ test('explicit locale/timezone survive profile selection across page, Worker, HT
     assert.equal(zoneOnly.locale, 'en-SG');
     assert.deepEqual(zoneOnly.device_profile.languages, ['en-SG']);
     assert.equal(zoneOnly.device_profile.http_accept_language, 'en-SG,en-GB;q=0.9,en;q=0.8');
-    assert.deepEqual(zoneOnly.configuration_sources, {
-      locale: 'profile',
-      timezone: 'request',
-      languages: 'profile',
-    });
+    assert.deepEqual(
+      Object.fromEntries(
+        ['locale', 'timezone', 'languages'].map((k) => [k, zoneOnly.configuration_sources[k]]),
+      ),
+      {
+        locale: 'profile',
+        timezone: 'request',
+        languages: 'profile',
+      },
+    );
     await manager.execute('qa', 'close_instance', { instance_id: zoneOnly.instance_id });
     const defaults = await manager.execute('qa', 'create_instance', createSchema.parse({}));
     assert.equal(defaults.locale, 'en-US');

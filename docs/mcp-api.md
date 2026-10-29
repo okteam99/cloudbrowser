@@ -90,11 +90,15 @@ Agent 的选择流程（HTTP API 与 MCP 同名同参）：
 
 如需内联档案，把 `get_device_profile` 返回的完整 `profile` 放入 `create_instance.device_profile`，再按目标设备实测修改。避免分别复制不同设备的 UA、CPU、屏幕、时区，或将示例中的版本常量当作当前真实版本。
 
-`device_profile` 与 `device_profile_id` 互斥。单独传入的 `user_agent` 优先于档案内的 UA，并从该 UA 重新生成全部 Client Hints（品牌、版本、系统、机型、移动标记等）；无法推断的提示字段留空，Safari/Firefox/iOS/不透明 UA 不生成 Chromium 提示，此时生效快照 `client_hints:null`。显式 locale/timezone 同样优先于档案；未传时继承。locale 覆盖会同步 languages 和默认 Accept-Language。其余设备参数（包含 navigator_platform、屏幕、触控、CPU）沿用所选档案。跨系统明确指定档案时也不会暗中更换其他配置，调用方应选择所需的系统环境。`proxy` / `proxy_id` / `proxy_ref`、任务描述、登录态和生命周期不受影响。创建时复制档案，再应用 UA 覆盖，不修改后台模板。`device_profile_source` 为 explicit_id / inline / ua_default / ua_unmatched / none，历史也记录该来源。随后修改、停用、删除该 ID，不影响运行中实例或已保存历史。`get_instance` / `list_instances` 返回完整生效配置和 `device_profile_id`，历史保存在 `environment.device_profile` / `environment.device_profile_id`。仅传实测 Android UA 时，会匹配后台 Android 默认档案，匹配系统不代表匹配具体型号。未知 ID 返回 `DEVICE_PROFILE_NOT_FOUND`，停用 ID 返回 `DEVICE_PROFILE_DISABLED`，均不会回退为默认环境。配置变更需创建新实例。
+`device_profile` 与 `device_profile_id` 互斥。单独传入的 `user_agent` 优先于档案内的 UA，并从该 UA 重新生成全部 Client Hints（品牌、版本、系统、机型、移动标记等）；无法推断的提示字段留空，Safari/Firefox/iOS/不透明 UA 不生成 Chromium 提示，此时生效快照 `client_hints:null`。显式 locale/timezone 同样优先于档案；未传时继承。locale 覆盖会同步 languages 和默认 Accept-Language。显式 viewport 和 mobile.enabled/touch/device_scale_factor 逐字段优先；未传字段继承档案。触控覆盖同步原生触控、maxTouchPoints 和 pointer/hover。显式视口超出屏幕时按需扩大生效快照的 screen、available/outer 尺寸，并返回提醒，不修改模板。navigator_platform、CPU、GPU 等其他属性沿用档案。跨系统明确指定档案时也不会暗中更换其他配置，调用方应选择所需的系统环境。`proxy` / `proxy_id` / `proxy_ref`、任务描述、登录态和生命周期不受影响。创建时复制档案，再应用显式字段覆盖，不修改后台模板。`device_profile_source` 为 explicit_id / inline / ua_default / ua_unmatched / none，历史也记录该来源。随后修改、停用、删除该 ID，不影响运行中实例或已保存历史。`get_instance` / `list_instances` 返回完整生效配置和 `device_profile_id`，历史保存在 `environment.device_profile` / `environment.device_profile_id`。仅传实测 Android UA 时，会匹配后台 Android 默认档案，匹配系统不代表匹配具体型号。未知 ID 返回 `DEVICE_PROFILE_NOT_FOUND`，停用 ID 返回 `DEVICE_PROFILE_DISABLED`，均不会回退为默认环境。配置变更需创建新实例。
 
 `client_hints.brands` 和 `full_version_list` 可选，但必须同时提供，格式与浏览器 `brands` / `fullVersionList` 相同；省略时按 UA 品牌和明确的 full_version 生成。UA 与 Client Hints 必须保持 Chromium 主版本、平台和移动标记一致。viewport 必须放得进 screen。档案语言列表最多8项且不得重复；档案内 locale 用于 Intl 格式，languages 用于 navigator.language/languages，两者可以不同。若在 create_instance 顶层显式传 locale，则三种语言声明同步覆盖；省略顶层 locale 才保留档案中的自定义组合。
 
 `expectations` 是要比较的真实能力，不会覆盖浏览器返回值。支持 device_memory、webdriver、pdf_viewer、bluetooth、web_share、audio_sample_rate、speech_voices_min、webgl。未配置的期望不参与差异判定。设备档案只模拟声明；实际操作系统、浏览器内核、硬件和网络不因此改变。Chromium 在 Linux 上未将平台覆盖应用到 WorkerNavigator，服务在 Worker 脚本执行前补齐 platform getter；这属于可观测的脚本模拟，不保证原型或函数行为与真机一致。
+
+`configuration_sources` 返回 locale/timezone/languages/viewport/user_agent/mobile_enabled/touch/device_scale_factor/screen 的来源，并保留在历史 properties。无档案时默认视口1280×720；省略 mobile 默认 false/false/1，传入 mobile 对象则缺省字段使用 true/true/1，兼容原接口。有档案时部分 mobile 对象只覆盖实际传入的字段。mobile.enabled 只改变移动布局，不改变 UA/Client Hints。
+
+视口使用 CSS 像素，原始截图尺寸为视口乘以 DPR；MCP 预览可能缩放。移动页缺少 viewport meta 时布局宽度可能为980：对照 `actual.viewport`（配置尺寸）和 `actual.layout_viewport`（网页布局尺寸），不要把布局缩放当成档案覆盖。请求头/Client Hints 需在安全页面实测，空白页可能没有 navigator.userAgentData。
 
 ## 设备字段与能力核验
 

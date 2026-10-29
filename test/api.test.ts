@@ -236,6 +236,8 @@ test('HTTP tool API and MCP share instances, validation, idempotent actions, art
       user_agent: customProfile.profile.user_agent.replace('155.0.0.0', '130.0.6723.58'),
       locale: 'pt-BR',
       timezone: 'America/Sao_Paulo',
+      viewport: { width: 360, height: 780 },
+      mobile: { touch: false, device_scale_factor: 3 },
     });
     assert.equal(profiled.response.status, 200, JSON.stringify(profiled.result));
     const profiledId = profiled.result.data.instance_id;
@@ -244,6 +246,14 @@ test('HTTP tool API and MCP share instances, validation, idempotent actions, art
     assert.equal(profiled.result.data.locale, 'pt-BR');
     assert.equal(profiled.result.data.timezone, 'America/Sao_Paulo');
     assert.equal(profiled.result.data.configuration_sources.locale, 'request');
+    assert.deepEqual(profiled.result.data.viewport, { width: 360, height: 780 });
+    assert.deepEqual(profiled.result.data.mobile, {
+      enabled: true,
+      touch: false,
+      device_scale_factor: 3,
+    });
+    assert.equal(profiled.result.data.actual.device_scale_factor, 3);
+    assert.equal(profiled.result.data.actual.touch_points, 0);
     assert.equal(profiled.result.data.locale_observation.language, 'pt-BR');
     assert.equal(profiled.result.data.user_agent_metadata.fullVersion, '130.0.6723.58');
     const effectiveProfile = profiled.result.data.device_profile;
@@ -259,7 +269,7 @@ test('HTTP tool API and MCP share instances, validation, idempotent actions, art
     );
     assert.equal(measured.data.value.platform, customProfile.profile.navigator_platform);
     assert.equal(measured.data.value.screenWidth, 412);
-    assert.ok(measured.data.value.touch > 0);
+    assert.equal(measured.data.value.touch, 0);
     const disabled = await (
       await saveProfiles({ ...savedProfiles, profiles: [{ ...customProfile, enabled: false }] })
     ).json();

@@ -37,12 +37,12 @@ export const createSchema = z
     device_profile_id: deviceProfileIdSchema
       .optional()
       .describe(
-        'Enabled saved profile from list_device_profiles/get_device_profile. Explicit user_agent overrides the profile UA and regenerates all Client Hints; explicit locale/timezone also override the profile. Other device values come from the profile. The effective configuration is frozen at creation.',
+        'Enabled saved profile from list_device_profiles/get_device_profile. Explicit user_agent overrides the profile UA and regenerates all Client Hints; explicit locale/timezone, viewport and individual mobile fields also override the profile. Omitted fields inherit the profile. The effective configuration is frozen at creation.',
       ),
     device_profile: deviceProfileSchema
       .optional()
       .describe(
-        'Complete inline device profile. Mutually exclusive with device_profile_id. Explicit user_agent overrides its UA and regenerates Client Hints, explicit locale/timezone can also override the profile; remaining device settings are retained.',
+        'Complete inline device profile. Mutually exclusive with device_profile_id. Explicit user_agent, locale, timezone, viewport and individual mobile fields override the profile; unspecified fields inherit it. UA regenerates Client Hints. The saved profile is never changed.',
       ),
     storage_state_id: z
       .string()
@@ -63,17 +63,23 @@ export const createSchema = z
         width: z.number().int().min(240).max(3840),
         height: z.number().int().min(240).max(3840),
       })
-      .default({ width: 1280, height: 720 }),
+      .optional()
+      .describe(
+        'Explicit viewport in CSS pixels, overriding any selected profile. Omit to inherit the profile or default to 1280x720 without one. A profile screen and recorded outer/available dimensions are enlarged only as needed to contain this viewport.',
+      ),
     proxy: proxySchema.optional(),
     proxy_id: z.string().min(1).max(128).optional(),
     proxy_ref: z.string().max(128).optional(),
     mobile: z
       .object({
-        enabled: z.boolean().default(true),
-        touch: z.boolean().default(true),
-        device_scale_factor: z.number().min(1).max(4).default(1),
+        enabled: z.boolean().optional(),
+        touch: z.boolean().optional(),
+        device_scale_factor: z.number().min(1).max(4).optional(),
       })
-      .optional(),
+      .optional()
+      .describe(
+        'Per-field overrides: enabled controls mobile layout, touch controls native touch and pointer capability, device_scale_factor controls DPR. Unspecified fields inherit the profile. Without a profile, omitted mobile means false/false/1; a supplied object defaults missing fields to true/true/1 for compatibility. Does not rewrite UA or Client Hints.',
+      ),
     locale: z
       .string()
       .trim()

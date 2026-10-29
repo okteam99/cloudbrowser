@@ -4,7 +4,7 @@
 
 1. 从用户目标确定 URL、设备、代理和允许的写入操作。只使用用户授权的账号、文件与站点。
 2. `list_proxies` 选择代理；不把国家标签当作已验证的出口。
-3. 日常测试通常省略 user_agent，不照抄固定版本。优先通过 `list_device_profiles` 查询后台配置的启用档案（例如 `{"platform":"Android"}`），用 `get_device_profile` 查看完整 JSON，再在 `create_instance` 传 `device_profile_id`；也可提供完整内联 `device_profile`。任务描述用 task_description，代理用 proxy_id，保存 instance_id、初始 page_id 和 details_url。档案每实例单独选择；仅传 UA 时会匹配同系统的后台默认档案。单独传入的 user_agent 优先，并重新生成 Client Hints，显式 locale/timezone 也优先；locale 会同步网页语言列表和默认语言头，未传则沿用档案。检查返回的 device_profile_source、device_profile_id、configuration_sources 和 locale_observation 确认最终配置。只有用户明确指定 UA 才覆盖；缩减 UA 无法还原完整构建号，自动生成的提示不等于真机信息。browser_version 是真实内核版本，UA 不会切换内核。
+3. 日常测试通常省略 user_agent，不照抄固定版本。优先通过 `list_device_profiles` 查询后台配置的启用档案（例如 `{"platform":"Android"}`），用 `get_device_profile` 查看完整 JSON，再在 `create_instance` 传 `device_profile_id`；也可提供完整内联 `device_profile`。任务描述用 task_description，代理用 proxy_id，保存 instance_id、初始 page_id 和 details_url。档案每实例单独选择；仅传 UA 时会匹配同系统的后台默认档案。单独传入的 user_agent 优先，并重新生成 Client Hints，显式 locale/timezone、viewport 和 mobile 的各个已传字段也优先，未传字段继承档案；locale 会同步网页语言列表和默认语言头，未传则沿用档案。检查返回的 device_profile_source、device_profile_id、configuration_sources、actual 和 locale_observation 确认最终配置。只有用户明确指定 UA 才覆盖；缩减 UA 无法还原完整构建号，自动生成的提示不等于真机信息。browser_version 是真实内核版本，UA 不会切换内核。
 4. `verify_environment` 检查真实 IP、UA 和设备属性；失败时报告环境失败，不能当作目标网站故障。
 5. `navigate` 打开目标；需要设备一致性验证时调用 `verify_device_profile`，分别报告配置字段差异与真实能力限制；`snapshot` 获取可见结构与元素。
 6. `interact` 使用 role/name 或当前快照 ref。页面变化后重新读取，不猜测过期引用。

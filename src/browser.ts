@@ -69,14 +69,16 @@ type PageEntry = {
   navigation: NavigationRecorder;
   navigationReady: Promise<void>;
 };
-type EffectiveInstanceOptions = Omit<InstanceOptions, 'device_profile' | 'locale' | 'timezone'> & {
+type EffectiveInstanceOptions = Omit<
+  InstanceOptions,
+  'device_profile' | 'locale' | 'timezone' | 'viewport' | 'mobile'
+> & {
   locale: string;
   timezone: string;
-  configuration_sources: {
-    locale: 'request' | 'profile' | 'default';
-    timezone: 'request' | 'profile' | 'default';
-    languages: 'request_locale' | 'profile' | 'default_locale';
-  };
+  viewport: { width: number; height: number };
+  mobile: { enabled: boolean; touch: boolean; device_scale_factor: number };
+  configuration_sources: NonNullable<InstanceProperties['configuration_sources']>;
+  configuration_warnings: string[];
   device_profile?: AppliedDeviceProfile;
   device_profile_source: 'explicit_id' | 'inline' | 'ua_default' | 'ua_unmatched' | 'none';
 };
@@ -473,6 +475,7 @@ export class BrowserManager {
       max_lifetime_seconds: i.options.max_lifetime_seconds,
       pages: Array.from(i.pages, ([page_id, p]) => ({ page_id, url: p.page.url() })),
       warnings: [
+        ...i.options.configuration_warnings,
         ...(i.options.device_profile_source === 'ua_unmatched'
           ? [
               'No enabled profile matches the UA operating system. Using UA-only settings without a device profile.',
@@ -515,6 +518,7 @@ export class BrowserManager {
       locale: current.locale,
       timezone: current.timezone,
       configuration_sources: current.configuration_sources,
+      configuration_warnings: [...i.options.configuration_warnings],
       ...(i.localeObservation ? { locale_observation: i.localeObservation } : {}),
       mobile: current.mobile,
       proxy: current.proxy,
@@ -579,6 +583,15 @@ export class BrowserManager {
           ? Intl.getCanonicalLocales(requested.locale)[0]
           : (profile?.locale ?? 'en-US');
       const timezone = requested.timezone ?? profile?.timezone ?? 'UTC';
+      const viewport = requested.viewport ?? profile?.viewport ?? { width: 1280, height: 720 };
+      const mobile = {
+        enabled: requested.mobile?.enabled ?? profile?.mobile ?? requested.mobile !== undefined,
+        touch: requested.mobile?.touch ?? profile?.touch ?? requested.mobile !== undefined,
+        device_scale_factor:
+          requested.mobile?.device_scale_factor ?? profile?.device_scale_factor ?? 1,
+      };
+      const configurationWarnings: string[] = [];
+      let screenExpanded = false;
       if (profile) {
         profile.locale = locale;
         profile.timezone = timezone;
@@ -586,11 +599,80 @@ export class BrowserManager {
           profile.languages = [locale];
           profile.http_accept_language = acceptLanguage(profile.languages);
         }
+        profile.viewport = { ...viewport };
+        profile.mobile = mobile.enabled;
+        profile.touch = mobile.touch;
+        profile.device_scale_factor = mobile.device_scale_factor;
+        if (requested.mobile?.touch !== undefined) {
+          // Synchronize the native setting and the optional JS/profile observations.
+          const observed = (profile.web_observables ??= {});
+          const navigator = (observed.navigator ??= {});
+          navigator.max_touch_points = mobile.touch
+            ? Math.max(1, navigator.max_touch_points ?? 1)
+            : 0;
+          if (observed.media) {
+            observed.media['pointer: coarse'] = mobile.touch;
+            observed.media['pointer: fine'] = !mobile.touch;
+            observed.media['hover: hover'] = !mobile.touch;
+          }
+        }
+        if (requested.viewport !== undefined) {
+          // A resized browser window may be smaller than its display, but must fit inside it.
+          screenExpanded =
+            viewport.width > profile.screen.width || viewport.height > profile.screen.height;
+          profile.screen = {
+            width: Math.max(profile.screen.width, viewport.width),
+            height: Math.max(profile.screen.height, viewport.height),
+          };
+          const observed = profile.web_observables;
+          if (observed?.screen) {
+            if (observed.screen.available_width !== undefined)
+              observed.screen.available_width = Math.max(
+                observed.screen.available_width,
+                viewport.width,
+              );
+            if (observed.screen.available_height !== undefined)
+              observed.screen.available_height = Math.max(
+                observed.screen.available_height,
+                viewport.height,
+              );
+            if (screenExpanded && observed.screen.orientation !== undefined) {
+              observed.screen.orientation =
+                profile.screen.width > profile.screen.height
+                  ? 'landscape-primary'
+                  : 'portrait-primary';
+              observed.screen.orientation_angle =
+                mobile.enabled && profile.screen.width > profile.screen.height ? 90 : 0;
+            }
+          }
+          if (observed?.window) {
+            if (observed.window.outer_width !== undefined)
+              observed.window.outer_width = Math.max(observed.window.outer_width, viewport.width);
+            if (observed.window.outer_height !== undefined)
+              observed.window.outer_height = Math.max(
+                observed.window.outer_height,
+                viewport.height,
+              );
+          }
+          if (screenExpanded)
+            configurationWarnings.push(
+              'The profile screen was enlarged to contain the explicitly requested viewport; the saved profile is unchanged.',
+            );
+        }
+        const requestedOs = requested.user_agent && operatingSystem(requested.user_agent);
+        if (requestedOs && selected && requestedOs !== operatingSystem(selected.user_agent))
+          configurationWarnings.push(
+            'The explicit UA operating system differs from the selected profile. UA and Client Hints follow the request; other identity fields such as navigator.platform, hardware and GPU remain from the selected profile. Use a same-OS profile for a coherent identity.',
+          );
       }
       const options: EffectiveInstanceOptions = {
         ...requested,
         locale,
         timezone,
+        viewport,
+        mobile,
+        user_agent: profile?.user_agent ?? requested.user_agent,
+        configuration_warnings: configurationWarnings,
         configuration_sources: {
           locale: requested.locale !== undefined ? 'request' : profile ? 'profile' : 'default',
           timezone: requested.timezone !== undefined ? 'request' : profile ? 'profile' : 'default',
@@ -600,6 +682,20 @@ export class BrowserManager {
               : profile
                 ? 'profile'
                 : 'default_locale',
+          viewport: requested.viewport !== undefined ? 'request' : profile ? 'profile' : 'default',
+          user_agent:
+            requested.user_agent !== undefined ? 'request' : profile ? 'profile' : 'browser',
+          mobile_enabled:
+            requested.mobile?.enabled !== undefined ? 'request' : profile ? 'profile' : 'default',
+          touch:
+            requested.mobile?.touch !== undefined ? 'request' : profile ? 'profile' : 'default',
+          device_scale_factor:
+            requested.mobile?.device_scale_factor !== undefined
+              ? 'request'
+              : profile
+                ? 'profile'
+                : 'default',
+          screen: screenExpanded ? 'expanded_for_viewport' : profile ? 'profile' : 'viewport',
         },
         device_profile: profile,
         device_profile_id: requested.device_profile_id ?? auto?.profile_id,
@@ -613,19 +709,6 @@ export class BrowserManager {
                 ? 'ua_unmatched'
                 : 'none',
       };
-      if (profile)
-        Object.assign(options, {
-          device_profile: profile,
-          user_agent: profile.user_agent,
-          viewport: profile.viewport,
-          locale: profile.locale,
-          timezone: profile.timezone,
-          mobile: {
-            enabled: profile.mobile,
-            touch: profile.touch,
-            device_scale_factor: profile.device_scale_factor,
-          },
-        });
       this.logs.update(id, { task_description: options.task_description });
       const proxy = await this.resolveProxy(options);
       const proxyId = options.proxy_id ?? options.proxy_ref;
@@ -1467,7 +1550,7 @@ export class BrowserManager {
     if (name === 'health')
       return {
         status: 'ok',
-        version: '0.21.1',
+        version: '0.21.2',
         base_url: this.cfg.baseUrl,
         public_url_mode: this.cfg.quickTunnel
           ? 'quick_tunnel'

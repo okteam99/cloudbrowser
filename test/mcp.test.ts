@@ -73,8 +73,15 @@ test('MCP stdio discovery, operation lookup, artifact transfer, reconnect and pr
       (await call(a, 'create_instance', { proxy_id: 'x', proxy_ref: 'y' })).error.code,
       'INVALID_ARGUMENT',
     );
-    const created = await call(a, 'create_instance', { viewport: { width: 390, height: 844 } });
+    const created = await call(a, 'create_instance', {
+      device_profile_id: 'macos-standard',
+      viewport: { width: 390, height: 844 },
+      mobile: { touch: true },
+    });
     assert.equal(created.status, 'succeeded');
+    assert.deepEqual(created.data.viewport, { width: 390, height: 844 });
+    assert.deepEqual(created.data.mobile, { enabled: false, touch: true, device_scale_factor: 2 });
+    assert.equal(created.data.actual.touch_points, 1);
     const i = created.data.instance_id;
     const detailTool = tools.tools.find((t) => t.name === 'get_instance_details')!;
     assert.equal(detailTool.annotations?.readOnlyHint, true);

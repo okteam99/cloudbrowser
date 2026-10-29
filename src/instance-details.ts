@@ -8,7 +8,14 @@ export type InstanceProperties = {
     locale: 'request' | 'profile' | 'default';
     timezone: 'request' | 'profile' | 'default';
     languages: 'request_locale' | 'profile' | 'default_locale';
+    viewport?: 'request' | 'profile' | 'default';
+    user_agent?: 'request' | 'profile' | 'browser';
+    mobile_enabled?: 'request' | 'profile' | 'default';
+    touch?: 'request' | 'profile' | 'default';
+    device_scale_factor?: 'request' | 'profile' | 'default';
+    screen?: 'profile' | 'expanded_for_viewport' | 'viewport';
   };
+  configuration_warnings?: string[];
   locale_observation?: {
     language: string;
     languages: string[];
