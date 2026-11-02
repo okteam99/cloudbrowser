@@ -173,3 +173,39 @@ test('4 FPS recording does not disrupt mobile clicks and popups on pages without
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('a timing write failure stops the encoder before later frame timestamps can become misaligned', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'cb-recording-io-'));
+  const m = new BrowserManager({ ...config(), dataDir: dir, recordVideo: true });
+  await m.init();
+  try {
+    const i = await m.execute('qa', 'create_instance', {});
+    const r = m.recordings.active.get(i.instance_id)!.pages.get(i.pages[0].page_id)!;
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    assert.ok(r.meta.frames > 0);
+    const file = m.recordings.path(r.meta.id, 'frames');
+    const { rename, mkdir } = await import('node:fs/promises');
+    await rename(file, file + '.saved');
+    await mkdir(file);
+    for (let n = 0; n < 30 && r.meta.status !== 'failed'; n++)
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(r.meta.status, 'failed');
+    const frames = r.meta.frames;
+    await rm(file, { recursive: true });
+    await rename(file + '.saved', file);
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    assert.equal(r.meta.frames, frames);
+    const t = await m.recordings.timeline(r.meta.id);
+    assert.equal(t.complete, false);
+    assert.ok(t.frame_offsets_ms.length < frames);
+    await m.close('qa', i.instance_id);
+    const logs = await m.execute('qa', 'get_logs', {
+      instance_id: i.instance_id,
+      component: 'recorder',
+    });
+    assert.ok(logs.entries.some((e: any) => e.code === 'recording_timing_write_failed'));
+  } finally {
+    await m.shutdown();
+    await rm(dir, { recursive: true, force: true });
+  }
+});

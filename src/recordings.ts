@@ -425,7 +425,8 @@ export class PageRecorder {
         this.totalSamplingFailures++;
         this.meta.sampling_failures = this.totalSamplingFailures;
         this.lastSamplingError = Date.now();
-        this.meta.error = 'Frame sampling temporarily unavailable';
+        if (this.meta.status !== 'failed')
+          this.meta.error = 'Frame sampling temporarily unavailable';
         this.report('frame_sampling_failed', 'warn', {
           error_code: publicError(error).code,
           consecutive_failures: this.samplingFailures,
@@ -475,11 +476,22 @@ export class PageRecorder {
       } // Drop samples rather than accumulate memory under encoder backpressure.
       this.process.stdin.write(bytes);
       this.meta.frames++;
-      await appendFile(
-        this.store.path(this.meta.id, 'frames'),
-        `${Math.max(0, Date.now() - Date.parse(this.meta.instance_created_at!))}\n`,
-        { mode: 0o600 },
-      );
+      try {
+        await appendFile(
+          this.store.path(this.meta.id, 'frames'),
+          `${Math.max(0, Date.now() - Date.parse(this.meta.instance_created_at!))}\n`,
+          { mode: 0o600 },
+        );
+      } catch (error) {
+        // Stop at the first unmapped frame. Continuing would shift every subsequent
+        // timestamp onto the wrong video frame after an I/O failure.
+        this.meta.status = 'failed';
+        this.meta.error = 'Recording timing write failed.';
+        this.process.stdin.end();
+        this.report('recording_timing_write_failed', 'error');
+        await this.store.persist(this.meta).catch(() => {});
+        throw error;
+      }
       const size = (await stat(this.store.path(this.meta.id)).catch(() => null))?.size ?? 0;
       this.meta.bytes = size;
       if (Date.now() - this.lastPersisted > 5000) {
