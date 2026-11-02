@@ -74,7 +74,7 @@ Cloudflare 的 403/1010 与 502 回源错误是不同问题。自动监控请使
 
 ## 多实例、多 Tab、脚本和网络分析
 
-先用 list_instances 选择实例，再用 list_pages / get_page 确认 page_id、frame_id、URL及标题；所有页面工具都明确传入对应实例和 Tab。select_page 切换焦点及直播/录屏内容。截图直接返回可见图片和原图artifact，坐标操作按原始视口CSS像素换算，避免把缩略图像素直接当作点击坐标。
+先用 list_instances 选择实例，再用 list_pages / get_page 确认 page_id、frame_id、URL及标题；所有页面工具都明确传入对应实例和 Tab。select_page 切换焦点及默认直播内容；所有 Tab 独立录制。关闭 Tab 后可通过 list_recordings(instance_id) 找到对应 page_id 的录像，实例详情统一时间轴，timing_url 提供真实时间到视频帧的映射。截图直接返回可见图片和原图artifact，坐标操作按原始视口CSS像素换算，避免把缩略图像素直接当作点击坐标。
 
 优先使用 snapshot、read_element、interact、pointer、keyboard 完成明确操作。需要页面脚本时使用 evaluate，表达式或函数返回JSON；函数可接收arg，也可指定iframe的frame_id。脚本结果超限时缩小查询范围。SCRIPT_TIMEOUT后先查询只读状态、网络和Console，确认副作用，再reload该Tab或关闭；不能重复提交原脚本。
 

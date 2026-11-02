@@ -644,7 +644,10 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
       await viewerPage.locator('.live-instance-task .instance-task-full').innerText(),
       taskDescription,
     );
-    await viewerPage.getByRole('button', { name: `查看实例日志 ${id}`, exact: true }).click();
+    await viewerPage
+      .getByRole('button', { name: `查看实例日志 ${id}`, exact: true })
+      .first()
+      .click();
     const logDrawer = viewerPage.getByRole('dialog', { name: /实例调用日志/ });
     await logDrawer.getByText(taskDescription, { exact: true }).waitFor();
     await logDrawer.getByText('navigate', { exact: true }).waitFor();
@@ -813,20 +816,22 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     assert.deepEqual(newerCalls.entries, []);
 
     let history: any[] = [];
+    let mainRecording: any;
     for (let n = 0; n < 20; n++) {
       history = (await (await fetch(base + '/api/recordings', { headers })).json()) as any[];
-      if (history[0]?.status === 'completed') break;
+      mainRecording = history.find((r) => r.id === result.data.recording_id);
+      if (mainRecording?.status === 'completed') break;
       await new Promise((r) => setTimeout(r, 100));
     }
-    assert.equal(history[0].task_description, taskDescription);
-    assert.equal(history[0].status, 'completed', JSON.stringify(history));
-    assert.ok(history[0].frames >= 2);
-    assert.ok(history[0].bytes > 0);
-    assert.equal(history[0].fps, 2);
-    assert.equal(history[0].environment.user_agent, result.data.actual.user_agent);
-    assert.equal(history[0].environment.egress.ip, '8.8.4.4');
-    assert.equal(history[0].environment.egress.source, 'instance_check');
-    assert.equal(history[0].environment.country, null);
+    assert.equal(mainRecording.task_description, taskDescription);
+    assert.equal(mainRecording.status, 'completed', JSON.stringify(history));
+    assert.ok(mainRecording.frames >= 2);
+    assert.ok(mainRecording.bytes > 0);
+    assert.equal(mainRecording.fps, 4);
+    assert.equal(mainRecording.environment.user_agent, result.data.actual.user_agent);
+    assert.equal(mainRecording.environment.egress.ip, '8.8.4.4');
+    assert.equal(mainRecording.environment.egress.source, 'instance_check');
+    assert.equal(mainRecording.environment.country, null);
     const closedDetails = await (await fetch(`${base}/api/instances/${id}`, { headers })).json();
     assert.equal(closedDetails.current, null);
     assert.equal(closedDetails.instance.status, 'closed');
@@ -851,7 +856,7 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
       '设备配置界面回归',
     );
     const tokenVideo = await fetch(
-      `${base}/api/recordings/${history[0].id}/video?access_token=${accessToken}`,
+      `${base}/api/recordings/${mainRecording.id}/video?access_token=${accessToken}`,
       { headers: { Range: 'bytes=0-3' } },
     );
     assert.equal(tokenVideo.status, 206);
@@ -864,19 +869,33 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     await detailPage.setViewportSize({ width: 390, height: 844 });
     await detailPage.waitForFunction(() => document.documentElement.scrollWidth <= innerWidth + 1);
     await detailPage.setViewportSize({ width: 1280, height: 900 });
-    assert.ok(history[0].environment.os);
-    const playback = `${base}/api/recordings/${history[0].id}/video`;
+    assert.ok(mainRecording.environment.os);
+    const timingUrl = `${base}/api/recordings/${mainRecording.id}/timeline`;
+    assert.equal((await fetch(timingUrl)).status, 401);
+    assert.equal((await fetch(timingUrl + '?access_token=wrong')).status, 401);
+    const timing = await (
+      await fetch(timingUrl + '?access_token=' + encodeURIComponent(accessToken))
+    ).json();
+    assert.equal(timing.recorded, true);
+    assert.equal(timing.complete, true);
+    assert.equal(timing.frame_offsets_ms.length, mainRecording.frames);
+    assert.equal(timing.page_id, mainRecording.page_id);
+    await detailPage.getByLabel('所有标签页统一时间轴').waitFor();
+    const playback = `${base}/api/recordings/${mainRecording.id}/video`;
     assert.equal((await fetch(playback)).status, 401);
     const part = await fetch(playback, { headers: { ...headers, Range: 'bytes=0-3' } });
     assert.equal(part.status, 206);
     assert.equal(Buffer.from(await part.arrayBuffer()).toString('hex'), '1a45dfa3');
-    assert.equal((await call('list_recordings')).data[0].id, history[0].id);
+    assert.equal(
+      (await call('list_recordings')).data.find((r: any) => r.id === result.data.recording_id).id,
+      mainRecording.id,
+    );
     assert.equal(((await (await fetch(liveShare.url + '/status')).json()) as any).state, 'ended');
     assert.equal((await fetch(liveShare.media_url)).status, 410);
     const recordingShare = (
       await call('create_share_link', {
         kind: 'recording',
-        recording_id: history[0].id,
+        recording_id: mainRecording.id,
         expires_in_seconds: 3600,
       })
     ).data;
@@ -885,14 +904,14 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     assert.equal(Buffer.from(await sharedPart.arrayBuffer()).toString('hex'), '1a45dfa3');
     const sharedHead = await fetch(recordingShare.media_url, { method: 'HEAD' });
     assert.equal(sharedHead.status, 200);
-    assert.equal(Number(sharedHead.headers.get('content-length')), history[0].bytes);
+    assert.equal(Number(sharedHead.headers.get('content-length')), mainRecording.bytes);
     await publicPage.goto(recordingShare.url);
     await publicPage.getByRole('heading', { name: '操作录像' }).waitFor();
     await publicPage.waitForFunction(() => (document.querySelector('video')?.videoWidth ?? 0) > 0);
     const expiring = (
       await call('create_share_link', {
         kind: 'recording',
-        recording_id: history[0].id,
+        recording_id: mainRecording.id,
         expires_in_seconds: 1,
       })
     ).data;
@@ -904,27 +923,34 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     assert.equal(await publicPage.locator('video').count(), 0);
     await publicContext.close();
     const persistentShare = (
-      await call('create_share_link', { kind: 'recording', recording_id: history[0].id })
+      await call('create_share_link', { kind: 'recording', recording_id: mainRecording.id })
     ).data;
 
     await viewerPage.getByRole('menuitem', { name: '历史录屏' }).click();
     await viewerPage.getByLabel('搜索录像', { exact: true }).fill('移动端页面');
     assert.equal(
-      await viewerPage.locator('.recording-task-cell a').getAttribute('href'),
+      await viewerPage.locator('.recording-task-cell a').first().getAttribute('href'),
       `/browser/instances/${id}?access_token=`,
     );
-    await viewerPage.locator('.history-egress').getByText('8.8.4.4', { exact: true }).waitFor();
     await viewerPage
-      .getByRole('button', { name: `查看完整 UA ${history[0].id}`, exact: true })
+      .locator('.history-egress')
+      .getByText('8.8.4.4', { exact: true })
+      .first()
+      .waitFor();
+    await viewerPage
+      .getByRole('button', { name: `查看完整 UA ${mainRecording.id}`, exact: true })
       .click();
     await viewerPage
       .locator('.history-user-agent')
       .getByText(result.data.actual.user_agent, { exact: true })
       .waitFor();
     await viewerPage
-      .getByRole('button', { name: `查看完整 UA ${history[0].id}`, exact: true })
+      .getByRole('button', { name: `查看完整 UA ${mainRecording.id}`, exact: true })
       .click();
-    await viewerPage.getByRole('button', { name: `查看实例日志 ${id}`, exact: true }).click();
+    await viewerPage
+      .getByRole('button', { name: `查看实例日志 ${id}`, exact: true })
+      .first()
+      .click();
     await logDrawer.getByText('close_instance', { exact: true }).waitFor();
     await logDrawer.getByText('wait_for', { exact: true }).waitFor();
     await logDrawer.getByLabel('筛选调用结果').click();
@@ -934,7 +960,11 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     await logDrawer.getByRole('tab', { name: '全部事件' }).click();
     await logDrawer.getByText('instance_closed', { exact: true }).waitFor();
     await logDrawer.locator('.ant-drawer-close').click();
-    await viewerPage.getByRole('button', { name: '播放录像' }).click();
+    await viewerPage
+      .getByRole('button', { name: '播放录像' })
+      .and(viewerPage.locator(':enabled'))
+      .first()
+      .click();
     await viewerPage.getByLabel('历史录像播放器').waitFor();
     await viewerPage.waitForFunction(
       () => {
@@ -996,8 +1026,8 @@ test('password web portal, BASE_URL prefix, authenticated HTTP MCP, live JPEG an
     assert.equal(persisted.status, 200);
     const restoredRecordings = (await persisted.json()) as any[];
     assert.equal(restoredRecordings.length, recordingsBefore);
-    assert.deepEqual(restoredRecordings[0].environment, history[0].environment);
-    assert.deepEqual(restoredLogs.instance.environment, history[0].environment);
+    assert.deepEqual(restoredRecordings[0].environment, mainRecording.environment);
+    assert.deepEqual(restoredLogs.instance.environment, mainRecording.environment);
     const resumedClient = new Client({ name: 'diagnostic-reconnect', version: '1' });
     try {
       await resumedClient.connect(

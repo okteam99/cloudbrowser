@@ -35,6 +35,10 @@ export async function instanceDocument(
       live: details.current ? `${root}/api/instances/${id}/live?access_token=` : null,
       recordings: details.recordings.map((r) => ({
         recording_id: r.id,
+        page_id: r.page_id ?? null,
+        timing_url: r.timing_available
+          ? `${root}/api/recordings/${r.id}/timeline?access_token=`
+          : null,
         url: `${root}/api/recordings/${r.id}/video?access_token=`,
       })),
     },

@@ -219,7 +219,7 @@ role/name 和 text 为精确匹配。多元素匹配会报错，不默认点击�
 | 工具 | 参数与结果 |
 | --- | --- |
 | `get_page` | instance_id、page_id；返回 URL、标题、active、state、frames（frame_id / parent_frame_id / name / url）、pending dialog、requires_reload |
-| `select_page` | instance_id、page_id；选中浏览器焦点及直播/录屏页面 |
+| `select_page` | instance_id、page_id；选中浏览器焦点及默认直播页面；所有 Tab 独立录制 |
 | `read_element` | instance_id、page_id、target；max_text 默认10000、最多60000；返回文本、值、属性、勾选/选中/禁用状态、主视口CSS坐标box |
 | `evaluate` | instance_id、page_id、script；可选 arg、frame_id、timeout_ms（默认5000，100–30000）、max_result_bytes（默认65536，256–262144）；返回 value、value_type、bytes |
 | `pointer` | instance_id、page_id、action；支持 click / double_click / right_click / move / down / up / drag / wheel |
@@ -512,3 +512,16 @@ WebGL/WebGPU 的标识、扩展/功能列表和数值限制按目标档案返回
 `configuration_sources` 分别记录 locale、timezone、languages 的来源；`locale_observation` 返回创建时实测的 language、languages、intl_locale、number_locale、timezone、checked_at。历史通过 get_instance_details.instance.properties 读取。Intl 区域数据可能回退，时区可能使用别名；例如当前 Chromium 将 Asia/Kolkata 报告为 Asia/Calcutta。可用同一浏览器的 Intl.DateTimeFormat("en", {timeZone:配置值}).resolvedOptions().timeZone 规范化后比较，并核对日期偏移，不能仅凭别名字符串不同判为时区未生效。
 
 已有实例保留创建时快照，修复或修改配置后需新建实例。排查时同时保存 create_instance 参数、返回的配置来源和网页实测值，避免将控制台查看者的本地显示时间当作实例时区。
+
+
+## 多 Tab 录屏与统一时间轴
+
+新实例每个 Tab 独立录屏，默认目标4 FPS、JPEG质量75、最大1280×1280，按页面比例采样 CSS 像素并缩小到上限（独立 screenshot 原图仍保留 DPR），VP9 WebM无音频。后台 Tab 也会采样；select_page、navigate、pointer 等只切换默认直播目标，不会停掉其他 Tab。关闭 Tab 即完成该条视频，无需等整个实例结束。详情页的直播选择只切换观看画面，不操作浏览器。
+
+`list_recordings`、实例详情的 recordings 返回每 Tab 的 id、page_id、page_title、page_url、instance_created_at、started_offset_ms、ended_offset_ms、frames、fps、width、height、status、timing_available。旧版混合录像缺少 page_id；empty 表示短暂 Tab 未采到画面。get_instance 的 recording_id 是活动 Tab 的录像 ID，不能当成所有 Tab 的唯一录像；查询完整列表用 list_recordings(instance_id)。
+
+`GET /api/recordings/{recording_id}/timeline` 返回 recorded、origin_at、page_id、fps、frame_offsets_ms、complete、status。数组第 n 项是视频第 n 帧相对实例创建时刻的毫秒数；视频位置为 n/fps 秒。真实时间内可能有采样空档，不应把压缩后视频时长当作执行耗时。旧录像 recorded=false；中断或写入不完整时 complete=false。只在播放/定位选定视频时读取该映射，避免反复下载全部时间数据。
+
+时间映射接口与录像一样需要登录或 Bearer，亦支持只读 access_token 查询鉴权；默认 timing_url 仅带空 access_token=。实例详情 links.recordings 提供视频和时间映射链接，公开分享只提供所授权的视频，不暴露私有时间映射。`GET /api/instances/{instance_id}/frame?page_id=page_...` 可观看本实例某个 Tab，省略 page_id 则跟随活动 Tab；不能跨实例读取。
+
+所有 Tab 的采样共用最多4个并发截图名额，每 Tab 最多一个在途任务。负载高时实际帧率可能低于4，不排队重放业务操作。正常关闭会写完帧时间映射和录像；异常终止可能只保留部分，两者与视频一同按原录像保留期/容量清理。

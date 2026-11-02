@@ -115,7 +115,7 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
     const queryToken = requestUrl.searchParams.get('access_token');
     const queryAllowed =
       ['GET', 'HEAD'].includes(req.method ?? '') &&
-      /^(?:\/instances\/ins_[a-f0-9-]{36}|\/api\/instances\/ins_[a-f0-9-]{36}(?:\/(?:logs|navigation|frame|live))?|\/api\/recordings\/rec_[a-f0-9-]{36}\/video)$/.test(
+      /^(?:\/instances\/ins_[a-f0-9-]{36}|\/api\/instances\/ins_[a-f0-9-]{36}(?:\/(?:logs|navigation|frame|live))?|\/api\/recordings\/rec_[a-f0-9-]{36}\/(?:video|timeline))$/.test(
         path,
       );
     const queryAuthenticated = queryAllowed && !!queryToken && auth.bearer(`Bearer ${queryToken}`);
@@ -189,7 +189,7 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         return;
       }
       if (path === '/healthz') {
-        json(res, { status: 'ok', version: '0.21.2' });
+        json(res, { status: 'ok', version: '0.22.0' });
         return;
       }
       const toolRoute = /^\/api\/tools\/([^/]+)$/.exec(path);
@@ -685,7 +685,7 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
       }
       const frame = /^\/api\/instances\/(ins_[a-f0-9-]{36})\/frame$/.exec(path);
       if (frame && req.method === 'GET') {
-        frameMedia(manager, res, frame[1]);
+        frameMedia(manager, res, frame[1], requestUrl.searchParams.get('page_id') ?? undefined);
         return;
       }
       const live = /^\/api\/instances\/(ins_[a-f0-9-]{36})\/live$/.exec(path);
@@ -697,6 +697,17 @@ export async function startWeb(manager: BrowserManager, cfg: Config, dispatch: D
         );
       if (live && req.method === 'GET') {
         liveMedia(manager, cfg, res, streams, live[1], allowed);
+        return;
+      }
+      const timeline = /^\/api\/recordings\/(rec_[a-f0-9-]{36})\/timeline$/.exec(path);
+      if (timeline && req.method === 'GET') {
+        try {
+          json(res, await manager.recordings.timeline(timeline[1]));
+        } catch (e) {
+          if (e instanceof ToolError && e.code === 'RECORDING_NOT_FOUND')
+            json(res, { error: publicError(e) }, 404);
+          else throw e;
+        }
         return;
       }
       const video = /^\/api\/recordings\/(rec_[a-f0-9-]{36})\/video$/.exec(path);

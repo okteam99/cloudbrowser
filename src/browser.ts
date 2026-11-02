@@ -267,10 +267,27 @@ export class BrowserManager {
       i.pageData.delete(old[0]);
     }
     i.activePageId = id;
+    void this.recordings.active
+      .get(i.id)
+      ?.add(id)
+      .catch(() =>
+        this.logs.log({
+          owner: i.owner,
+          instance_id: i.id,
+          page_id: id,
+          component: 'recorder',
+          level: 'error',
+          code: 'page_recorder_start_failed',
+        }),
+      );
     page.on('close', () => {
       for (const session of entry.watchdogs.values()) void session.detach().catch(() => {});
       entry.watchdogs.clear();
       this.clearRefs(entry);
+      void this.recordings.active
+        .get(i.id)
+        ?.stopPage(id)
+        .catch(() => {});
       i.pages.delete(id);
       i.probes.delete(id);
       if (i.activePageId === id) i.activePageId = [...i.pages.keys()].at(-1);
@@ -435,7 +452,8 @@ export class BrowserManager {
       task_description: i.options.task_description,
       details_url: instanceDetailsUrl(this.cfg.baseUrl, i.id),
       active_page_id: i.activePageId,
-      recording_id: this.recordings.active.get(i.id)?.meta.id,
+      recording_id: this.recordings.active.get(i.id)?.pages.get(i.activePageId ?? '')?.meta.id,
+      recording_mode: 'per_page',
       live_frame_at: this.recordings.active.get(i.id)?.latest?.time,
       live_url: this.cfg.baseUrl
         ? `${this.cfg.baseUrl.replace(/\/$/, '')}/api/instances/${i.id}/live`
@@ -927,17 +945,17 @@ export class BrowserManager {
       const recorder = await this.recordings.start(
         i.id,
         owner,
-        () => {
-          const e = i.pages.get(i.activePageId ?? '') ?? Array.from(i.pages.values()).at(-1);
-          if (!e) return undefined;
-          return {
+        () =>
+          [...i.pages].map(([page_id, e]) => ({
             page: e.page,
-            page_id: Array.from(i.pages).find(([, v]) => v === e)![0],
-            deviceScaleFactor: i.options.mobile?.device_scale_factor ?? 1,
-            busy: i.busy,
-          };
-        },
+            page_id,
+            title: i.pageData.get(page_id)?.info(page_id, page_id === i.activePageId).title,
+            url: e.page.url(),
+            deviceScaleFactor: i.options.mobile.device_scale_factor,
+          })),
+        () => i.activePageId,
         options.task_description,
+        new Date(i.created).toISOString(),
       );
       this.logs.update(id, {
         recording: {
@@ -1222,7 +1240,9 @@ export class BrowserManager {
     const instance = history ?? {
       instance_id: id,
       task_description: active?.options.task_description ?? latest?.task_description,
-      created_at: active ? new Date(active.created).toISOString() : latest?.created_at,
+      created_at: active
+        ? new Date(active.created).toISOString()
+        : (latest?.instance_created_at ?? latest?.created_at),
       ended_at: latest?.ended_at,
       status: active ? (active.crashed ? 'crashed' : 'active') : 'unknown',
       environment: active?.environment ?? latest?.environment,
@@ -1510,7 +1530,7 @@ export class BrowserManager {
         if (['recording', 'finalizing'].includes(meta.status))
           throw new ToolError(
             'RECORDING_NOT_READY',
-            'Close the instance before sharing its recording.',
+            'Close the tab or instance before sharing its recording.',
           );
         if (!(await stat(path).catch(() => null))?.size)
           throw new ToolError('RECORDING_NOT_FOUND', 'Recording file unavailable.');
@@ -1537,6 +1557,10 @@ export class BrowserManager {
         .map((r) => ({
           ...r,
           details_url: instanceDetailsUrl(this.cfg.baseUrl, r.instance_id),
+          timing_url:
+            this.cfg.baseUrl && r.timing_available
+              ? `${this.cfg.baseUrl.replace(/\/$/, '')}/api/recordings/${r.id}/timeline?access_token=`
+              : null,
           playback_url: this.cfg.baseUrl
             ? `${this.cfg.baseUrl.replace(/\/$/, '')}/api/recordings/${r.id}/video`
             : undefined,
@@ -1550,7 +1574,7 @@ export class BrowserManager {
     if (name === 'health')
       return {
         status: 'ok',
-        version: '0.21.2',
+        version: '0.22.0',
         base_url: this.cfg.baseUrl,
         public_url_mode: this.cfg.quickTunnel
           ? 'quick_tunnel'
@@ -2016,6 +2040,7 @@ export class BrowserManager {
       };
     }
     if (name === 'close_page') {
+      await this.recordings.active.get(i.id)?.stopPage(a.page_id);
       await deadline(p.navigation.flush(), 1000, 'Navigation metadata flush timed out.').catch(() =>
         p.navigation.warning(),
       );

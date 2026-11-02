@@ -63,6 +63,15 @@ export type BrowserInstance = {
   pages: { page_id: string; url: string }[];
 };
 export type Recording = {
+  schema_version?: 2;
+  page_id?: string;
+  page_title?: string;
+  page_url?: string;
+  instance_created_at?: string;
+  started_offset_ms?: number;
+  ended_offset_ms?: number;
+  timing_available?: boolean;
+  sampling_failures?: number;
   id: string;
   instance_id: string;
   task_description?: string;
@@ -255,7 +264,7 @@ export async function copyText(value: string) {
     if (!copied) throw Error('浏览器不允许自动复制，请在详情中手动复制');
   }
 }
-export const compactId = (id: string) => id.replace(/^(ins_|rec_)/, '').slice(0, 8);
+export const compactId = (id: string) => id.replace(/^(ins_|rec_|page_)/, '').slice(0, 8);
 export const instancePath = (id: string) => `${bootstrap.base}/instances/${id}?access_token=`;
 export function privateMediaUrl(path: string) {
   if (!bootstrap.access_token) return path;

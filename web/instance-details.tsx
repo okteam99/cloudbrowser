@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Alert,
   App,
@@ -33,6 +33,8 @@ import {
 import { InstanceLogsPanel } from './instance-logs';
 import { LiveImage } from './live-image';
 import { DeviceProfileCard } from './device-profile';
+import { RecordingTimeline } from './recording-timeline';
+import { recordingSeek, elapsedLabel, type RecordingTiming } from './recording-timing';
 import { NavigationHistory } from './navigation-history';
 const { Text, Paragraph } = Typography;
 const pageStates: Record<string, string> = {
@@ -299,6 +301,13 @@ function InstanceMedia({ data }: { data: InstanceDetails }) {
   const [liveLoaded, setLiveLoaded] = useState(false);
   const [liveError, setLiveError] = useState(false);
   const [playbackError, setPlaybackError] = useState(false);
+  const [livePageId, setLivePageId] = useState<string>();
+  const [offset, setOffset] = useState(0);
+  const [seek, setSeek] = useState<{ id: string; offset: number }>();
+  const [timing, setTiming] = useState<RecordingTiming>();
+  const [timingError, setTimingError] = useState('');
+  const [gap, setGap] = useState(false);
+  const video = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     if (!data.current) setMode('recordings');
   }, [data.instance.instance_id, !!data.current]);
@@ -308,7 +317,71 @@ function InstanceMedia({ data }: { data: InstanceDetails }) {
     data.recordings.find(playable) ??
     data.recordings[0];
   const active = data.current;
+  const origin = Date.parse(
+    data.instance.created_at ??
+      data.recordings.at(-1)?.instance_created_at ??
+      data.recordings.at(-1)?.created_at ??
+      new Date().toISOString(),
+  );
+  const end = data.current
+    ? Date.now()
+    : Math.max(
+        origin,
+        ...data.recordings.map((r) => Date.parse(r.ended_at ?? r.created_at)),
+        Date.parse(data.instance.ended_at ?? new Date(origin).toISOString()),
+      );
+  const pick = (r: Recording, ms: number) => {
+    setOffset(ms);
+    setRecordingId(r.id);
+    setGap(false);
+    if (['recording', 'finalizing'].includes(r.status) && active && r.page_id) {
+      setLivePageId(r.page_id);
+      setMode('live');
+    } else {
+      setSeek({ id: r.id, offset: ms });
+      setMode('recordings');
+    }
+  };
   useEffect(() => setPlaybackError(false), [selected?.id]);
+  useEffect(() => {
+    if (livePageId && !data.pages.some((p) => p.page_id === livePageId && p.state !== 'closed'))
+      setLivePageId(undefined);
+  }, [data.pages, livePageId]);
+  useEffect(() => {
+    setTiming(undefined);
+    setTimingError('');
+    if (!selected?.timing_available || !playable(selected)) return;
+    const controller = new AbortController();
+    void api<RecordingTiming>(`/api/recordings/${selected.id}/timeline`, controller.signal)
+      .then(setTiming)
+      .catch((e) => {
+        if (!controller.signal.aborted)
+          setTimingError('采样时间数据暂时不可用，仍可使用播放器回放。');
+      });
+    return () => controller.abort();
+  }, [selected?.id, selected?.status]);
+  const applySeek = () => {
+    if (
+      !video.current ||
+      !selected ||
+      !seek ||
+      seek.id !== selected.id ||
+      video.current.readyState < 1
+    )
+      return;
+    if (selected.timing_available) {
+      if (!timing) return;
+      const target = recordingSeek(seek.offset, timing);
+      setGap(!target || target.gap);
+      if (target) video.current.currentTime = target.seconds;
+    } else
+      video.current.currentTime = Math.max(
+        0,
+        (seek.offset - (Date.parse(selected.created_at) - origin)) / 1000,
+      );
+    setSeek(undefined);
+  };
+  useEffect(applySeek, [timing, seek, selected?.id, mode]);
   return (
     <Card title="直播与录屏" className="section-card instance-detail-media">
       <Tabs
@@ -331,9 +404,40 @@ function InstanceMedia({ data }: { data: InstanceDetails }) {
           { key: 'recordings', label: `录屏（${data.recordings.length}）` },
         ]}
       />
+      <RecordingTimeline
+        recordings={data.recordings}
+        origin={origin}
+        end={end}
+        selected={selected?.id}
+        offset={offset}
+        onPick={pick}
+        onSeek={(ms) => {
+          setOffset(ms);
+          if (selected) pick(selected, ms);
+        }}
+      />
       {mode === 'live' ? (
         active ? (
           <>
+            <Select
+              aria-label="选择直播标签页"
+              className="instance-live-tab-select"
+              value={livePageId ?? ''}
+              onChange={(id) => {
+                setLivePageId(id || undefined);
+                setLiveLoaded(false);
+                setLiveError(false);
+              }}
+              options={[
+                { value: '', label: '跟随 Agent 当前操作的 Tab' },
+                ...data.pages
+                  .filter((p) => p.state !== 'closed')
+                  .map((p) => ({
+                    value: p.page_id,
+                    label: `Tab ${compactId(p.page_id)} · ${p.title || p.url || '空白页'}`,
+                  })),
+              ]}
+            />
             <div className="instance-detail-media-stage">
               {(!liveLoaded || liveError) && (
                 <div className="detail-media-message">
@@ -341,8 +445,10 @@ function InstanceMedia({ data }: { data: InstanceDetails }) {
                 </div>
               )}
               <LiveImage
-                key={active.instance_id}
-                src={privateMediaUrl(`${bootstrap.base}/api/instances/${active.instance_id}/frame`)}
+                key={`${active.instance_id}:${livePageId ?? ''}`}
+                src={privateMediaUrl(
+                  `${bootstrap.base}/api/instances/${active.instance_id}/frame${livePageId ? '?page_id=' + encodeURIComponent(livePageId) : ''}`,
+                )}
                 alt="实例实时画面"
                 className="instance-detail-live-image"
                 onLoad={() => {
@@ -365,12 +471,20 @@ function InstanceMedia({ data }: { data: InstanceDetails }) {
             <Select
               aria-label="选择实例录屏"
               value={selected?.id}
-              onChange={setRecordingId}
+              onChange={(id) => {
+                const r = data.recordings.find((r) => r.id === id);
+                if (r) pick(r, offset);
+              }}
               options={data.recordings.map((r) => ({
                 value: r.id,
-                label: `${displayTime(r.created_at)} · ${r.status}`,
+                label: `${r.page_id ? 'Tab ' + compactId(r.page_id) : '旧版录屏'} · ${r.page_title || displayTime(r.created_at)} · ${r.status}`,
               }))}
             />
+          )}
+          {timingError && <Alert type="warning" title={timingError} />}
+          {gap && <Alert type="info" title="所选时刻没有采样画面，已定位到最近的可用帧。" />}
+          {selected && !selected.timing_available && (
+            <Alert type="info" title="旧版混合录像没有逐 Tab 采样时间，时间轴位置仅供参考。" />
           )}
           {selected && playable(selected) ? (
             <>
@@ -379,6 +493,20 @@ function InstanceMedia({ data }: { data: InstanceDetails }) {
               )}
               <video
                 key={selected.id}
+                ref={video}
+                onLoadedMetadata={applySeek}
+                onTimeUpdate={() => {
+                  if (!video.current || seek) return;
+                  const frame = Math.floor(video.current.currentTime * selected.fps);
+                  const ms = timing?.frame_offsets_ms[frame];
+                  setOffset(
+                    ms ??
+                      Math.max(
+                        0,
+                        Date.parse(selected.created_at) - origin + video.current.currentTime * 1000,
+                      ),
+                  );
+                }}
                 className="instance-detail-video"
                 aria-label="实例录屏播放器"
                 src={privateMediaUrl(`${bootstrap.base}/api/recordings/${selected.id}/video`)}
@@ -398,7 +526,7 @@ function InstanceMedia({ data }: { data: InstanceDetails }) {
             <Empty
               description={
                 selected && ['recording', 'finalizing'].includes(selected.status)
-                  ? '录屏正在生成，实例结束后可播放'
+                  ? '该标签页正在录制，标签页或实例结束后可播放'
                   : '没有可播放的录屏，可能未开启录屏或已过期'
               }
             />

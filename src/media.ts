@@ -8,20 +8,30 @@ const json = (res: ServerResponse, value: unknown, status: number) => {
   res.setHeader('content-type', 'application/json; charset=utf-8');
   res.end(JSON.stringify(value));
 };
-export function frameMedia(manager: BrowserManager, res: ServerResponse, instanceId: string) {
+export function frameMedia(
+  manager: BrowserManager,
+  res: ServerResponse,
+  instanceId: string,
+  pageId?: string,
+) {
   const recorder = manager.recordings.active.get(instanceId);
   if (!recorder) {
     json(res, { error: 'Instance not active' }, 404);
     return;
   }
-  if (!recorder.latest) {
+  if (pageId && !recorder.pages.has(pageId)) {
+    json(res, { error: 'Unknown tab for this instance' }, 404);
+    return;
+  }
+  const frame = recorder.frame(pageId);
+  if (!frame) {
     res.statusCode = 204;
     res.end();
     return;
   }
   res.setHeader('content-type', 'image/jpeg');
-  res.setHeader('content-length', recorder.latest.bytes.length);
-  res.end(recorder.latest.bytes);
+  res.setHeader('content-length', frame.bytes.length);
+  res.end(frame.bytes);
 }
 export function liveMedia(
   manager: BrowserManager,

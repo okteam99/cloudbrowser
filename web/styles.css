@@ -1843,3 +1843,88 @@ input {
     max-width: 125px;
   }
 }
+
+.recording-timeline {
+  margin-bottom: 20px;
+  padding: 14px 0;
+  border-bottom: 1px solid #edf0f5;
+}
+.recording-timeline-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.recording-timeline-row {
+  display: grid;
+  grid-template-columns: minmax(100px, 170px) minmax(80px, 1fr) 52px;
+  gap: 10px;
+  align-items: center;
+  margin: 10px 0;
+}
+.recording-track-label {
+  border: 0;
+  background: transparent;
+  padding: 3px;
+  cursor: pointer;
+  text-align: left;
+  min-width: 0;
+  color: #52647d;
+}
+.recording-track-label strong,
+.recording-track-label span {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.recording-track-label span {
+  font-size: 12px;
+  margin-top: 2px;
+}
+.recording-track-rail {
+  height: 24px;
+  background: #f1f5fb;
+  position: relative;
+  border-radius: 5px;
+}
+.recording-track-bar {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  background: #9abaff;
+  border: 0;
+  border-radius: 3px;
+  cursor: pointer;
+  min-width: 4px;
+}
+.selected .recording-track-bar {
+  background: #2463eb;
+}
+.recording-track-bar.failed {
+  background: #ff8f8f;
+}
+.recording-track-cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #102744;
+  pointer-events: none;
+}
+.recording-track-state {
+  font-size: 12px;
+  color: #74839a;
+}
+.instance-live-tab-select {
+  width: 100%;
+  margin-bottom: 12px;
+}
+.recording-timeline > .ant-typography {
+  font-size: 12px;
+}
+@media (max-width: 600px) {
+  .recording-timeline-row {
+    grid-template-columns: 100px minmax(60px, 1fr) 44px;
+    gap: 6px;
+  }
+}

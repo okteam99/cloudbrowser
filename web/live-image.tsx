@@ -20,7 +20,7 @@ export function LiveImage(props: {
       src={`${props.src}${props.src.includes('?') ? '&' : '?'}frame=${frame}`}
       onLoad={() => {
         props.onLoad();
-        next(500);
+        next(250);
       }}
       onError={() => {
         props.onError();

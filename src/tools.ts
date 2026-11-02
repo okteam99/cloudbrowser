@@ -123,7 +123,7 @@ export const definitions: Record<
   },
   list_recordings: {
     description:
-      'List retained recordings for this principal, optionally filtered by instance, including task description, details_url and captured environment (exit IP/source/time, configured country, OS and full UA) when recorded. details_url has an empty access_token= hint; log in or fill an existing MCP token to view. Playback URLs require authentication.',
+      'List retained recordings for this principal, optionally filtered by instance. New recordings have one stream per Tab (page_id/title/url, instance_created_at, start/end offsets, fps and dimensions); timing_url provides an authenticated per-frame wall-clock map. Closed Tabs can play/share while other Tabs continue. Legacy recordings have no page_id. Includes task description, details_url and captured environment (exit IP/source/time, configured country, OS and full UA) when recorded. details_url has an empty access_token= hint; log in or fill an existing MCP token to view. Playback URLs require authentication.',
     schema: z.object({ instance_id: z.string().optional() }),
     readOnly: true,
   },
@@ -237,7 +237,7 @@ export const definitions: Record<
   },
   select_page: {
     description:
-      'Select a live tab for browser focus, livestream and recording. Other operations still explicitly specify page_id.',
+      'Select a live tab for browser focus and the default livestream. Every tab records independently; selecting does not stop other recordings. Other operations still explicitly specify page_id.',
     schema: z.object(page).strict(),
   },
   evaluate: {
@@ -300,7 +300,7 @@ export const definitions: Record<
   },
   pointer: {
     description:
-      'Mouse operations in viewport CSS pixels: click, double_click, right_click, move, down, up, drag and wheel. Drag uses x/y to to_x/to_y; modifiers and mouse buttons supported. The active tab is selected for recording.',
+      'Mouse operations in viewport CSS pixels: click, double_click, right_click, move, down, up, drag and wheel. Drag uses x/y to to_x/to_y; modifiers and mouse buttons supported. The active tab is selected for the default livestream; all tabs record independently.',
     schema: z
       .object({
         ...page,

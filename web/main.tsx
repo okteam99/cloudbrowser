@@ -258,6 +258,7 @@ function StatusTag({ status }: { status: string }) {
     ready: { color: 'success', text: '运行中' },
     crashed: { color: 'error', text: '异常' },
     recording: { color: 'processing', text: '录制中' },
+    empty: { color: 'default', text: '未采样到画面' },
     completed: { color: 'success', text: '已完成' },
     interrupted: { color: 'warning', text: '意外中断' },
     failed: { color: 'error', text: '失败' },
@@ -343,7 +344,7 @@ function Dashboard() {
                 <span className="status-dot" />
                 远程浏览器服务
               </div>
-              <Text>cloudbrowser · v0.21.2</Text>
+              <Text>cloudbrowser · v0.22.0</Text>
             </div>
           </Layout.Sider>
         )}
@@ -1169,6 +1170,11 @@ function RecordingTable({
               <a href={instancePath(id)}>实例 {compactId(id)}</a>
             </Text>
             <TaskDescription value={r.task_description} />
+            <Text type="secondary" ellipsis title={r.page_url}>
+              {r.page_id
+                ? `Tab ${compactId(r.page_id)} · ${r.page_title || r.page_url || '空白页'}`
+                : '旧版混合录屏'}
+            </Text>
           </div>
         </Space>
       ),
@@ -1253,7 +1259,7 @@ function RecordingTable({
           <Tooltip
             title={
               r.status === 'recording'
-                ? '实例结束后可播放'
+                ? '标签页或实例结束后可播放'
                 : r.bytes === 0
                   ? '暂无可播放内容'
                   : undefined
