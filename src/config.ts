@@ -160,7 +160,7 @@ export function config() {
     videoQuality: integer('VIDEO_QUALITY', 75, 10, 80),
     ffmpeg: process.env.FFMPEG_PATH ?? 'ffmpeg',
     recordingLimit: integer('MAX_RECORDING_BYTES', 134217728, 1048576, 1073741824),
-    recordingsLimit: integer('MAX_RECORDINGS_BYTES', 1073741824, 1048576, Number.MAX_SAFE_INTEGER),
+    recordingsLimit: integer('MAX_RECORDINGS_BYTES', 10737418240, 1048576, Number.MAX_SAFE_INTEGER),
     maxPages: integer('MAX_PAGES', 10, 1, 100),
     timeout: integer('ACTION_TIMEOUT_MS', 15000, 1000, 60000),
     downloadLimit: integer('MAX_DOWNLOAD_BYTES', 52428800, 1024, 1073741824),

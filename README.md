@@ -277,7 +277,7 @@ https://your-domain.example/instances/ins_12345678-1234-4234-8234-123456789abc?a
 | JPEG 质量 | 75；VP9 使用 CRF 30 |
 | 录像 | VP9 WebM，无音频 |
 | 单 Tab 录像上限 | 128 MiB |
-| 历史录像总配额 | 1 GiB |
+| 历史录像总配额 | 10 GiB |
 | 保留时间 | 7 天 |
 
 实例列表与实时预览显示代理地址、UA 和最近检测的出口 IP。UA 默认值会显示浏览器实际 UA；列表缩略显示，预览区可查看并复制完整内容。出口标记“实例检测”或“代理检测”并提供时间：前者来自该实例的 `verify_environment`，后者来自未改变的保存代理的最近健康检查样本；代理检查不等于当前浏览器连接的实测结果。没有检测数据时显示“未检测”，不会把代理服务器地址当作已验证出口 IP。读取列表不发起新的外部请求。
@@ -352,12 +352,12 @@ Agent 可通过 MCP 创建无需登录的只读观看链接；链接使用 `BASE
 | `MAX_PAGES` | 10 | 每实例最大页面数 |
 | `ACTION_TIMEOUT_MS` | 15000 | 默认工具/导航超时 |
 | `RECORD_VIDEO` | true | 是否保存历史录像 |
-| `VIDEO_FPS` | 2 | 1–10 FPS |
-| `VIDEO_WIDTH` / `VIDEO_HEIGHT` | 640 / 480 | 低清视频画面边界，建议使用偶数值 |
-| `VIDEO_QUALITY` | 40 | JPEG 质量，10–80 |
+| `VIDEO_FPS` | 4 | 1–10 FPS |
+| `VIDEO_WIDTH` / `VIDEO_HEIGHT` | 1280 / 1280 | 按页面比例输出的画面边界，建议使用偶数值 |
+| `VIDEO_QUALITY` | 75 | JPEG 质量，10–80 |
 | `FFMPEG_PATH` | ffmpeg | 编码程序路径；Docker 内已安装 |
 | `MAX_RECORDING_BYTES` | 134217728 | 单段录像大小上限 |
-| `MAX_RECORDINGS_BYTES` | 1073741824 | 历史录像总配额 |
+| `MAX_RECORDINGS_BYTES` | 10737418240 | 历史录像总配额，10 GiB；显式环境变量优先 |
 | `MAX_DOWNLOAD_BYTES` | 52428800 | 下载及单产物大小限制 |
 | `MAX_DATA_BYTES` | 214748364800 | 产物默认配额，200 GB，不含录像；后台保存后以后台值为准 |
 | `SCREENSHOT_RETENTION_DAYS` | 7 | 截图原图及预览的默认保留天数，1–365；后台保存后以后台值为准 |

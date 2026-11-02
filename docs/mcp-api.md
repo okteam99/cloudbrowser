@@ -516,6 +516,8 @@ WebGL/WebGPU 的标识、扩展/功能列表和数值限制按目标档案返回
 
 ## 多 Tab 录屏与统一时间轴
 
+历史录像总配额的代码默认值为 **10 GiB**（10737418240 字节），显式设置的 `MAX_RECORDINGS_BYTES` 优先。录屏额度与截图、下载等产物的额度独立；容量超限时会清理最旧的已结束录像，保留天数是最长保留期限。
+
 新实例每个 Tab 独立录屏，默认目标4 FPS、JPEG质量75、最大1280×1280，按页面比例采样 CSS 像素并缩小到上限（独立 screenshot 原图仍保留 DPR），VP9 WebM无音频。后台 Tab 也会采样；select_page、navigate、pointer 等只切换默认直播目标，不会停掉其他 Tab。关闭 Tab 即完成该条视频，无需等整个实例结束。详情页的直播选择只切换观看画面，不操作浏览器。
 
 `list_recordings`、实例详情的 recordings 返回每 Tab 的 id、page_id、page_title、page_url、instance_created_at、started_offset_ms、ended_offset_ms、frames、fps、width、height、status、timing_available。旧版混合录像缺少 page_id；empty 表示短暂 Tab 未采到画面。get_instance 的 recording_id 是活动 Tab 的录像 ID，不能当成所有 Tab 的唯一录像；查询完整列表用 list_recordings(instance_id)。
